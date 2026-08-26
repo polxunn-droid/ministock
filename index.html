@@ -1064,3 +1064,84 @@ setInterval(()=>{
 (function v15WaitReady(){if(state&&Store.online&&Store.db&&Store.uid){Store.scheduleScore(false);if(view==='ranking')loadHourlyRanking(false);return}setTimeout(v15WaitReady,900)})();
 window.__rankingV15={version:15,slot:rankSlotInfo,load:loadHourlyRanking};
 </script></body></html>
+
+<script>
+/* ============ V16 — Short-session activity tuning (2026-08-26) ============
+   목표: 5~20분 플레이에서도 시장에 사건이 보이도록 활동성 전환을 단축하고,
+   일부 종목에 2~5분짜리 숨은 변동성 폭발을 허용한다. ETF 제외.
+   표시용 상태/정답 신호는 추가하지 않는다.
+*/
+(function(){
+  const priorActivity=v11Activity;
+
+  // 1) Activity 지속시간 3~10분 수준(6~20 메인틱)으로 단축 + active/hot 비중 소폭 상향.
+  v11Activity=function(s,day,minute){
+    if(s?.isETF) return priorActivity(s,day,minute);
+    const anchor=Math.floor(minute/13);
+    const len=6+Math.floor(v9Unit(s.code,day,anchor,'v16-act-len')*15); // 6~20 ticks
+    const block=Math.floor(minute/len);
+    const tierBias={blue:-.025,growth:0,theme:.020,junk:.035}[s.tier]||0;
+    const x=Math.max(0,Math.min(.999,v9Unit(s.code,day,block,'v16-activity')+tierBias));
+    let a;
+    if(x<.24)a={name:'quiet',mult:.55,flow:.68};
+    else if(x<.62)a={name:'normal',mult:1.22,flow:1.18};
+    else if(x<.89)a={name:'active',mult:2.65,flow:2.75};
+    else a={name:'hot',mult:4.55,flow:4.85};
+
+    // 기존 섹터 순환 효과를 약하게 유지한다. 정답이 되지 않도록 강도는 제한.
+    const sectors=[...new Set(STOCKS.filter(z=>!z.isETF).map(z=>z.sector))];
+    const rotBlock=Math.floor(minute/36);
+    const hotSector=sectors.length?sectors[hash('v16-sector-rotation',day,rotBlock)%sectors.length]:null;
+    if(hotSector&&s.sector===hotSector){
+      const boost=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;
+      a={...a,mult:a.mult*boost,flow:a.flow*(1+(boost-1)*1.25)};
+    }
+    return a;
+  };
+
+  // 2) 2~5분 숨은 변동성 폭발. 방향 자체를 확정하지 않고 현재 추세와 반대 방향도 허용.
+  function v16VolBurst(s,day,minute){
+    if(s?.isETF)return 0;
+    const window=10; // 새 후보는 약 5분마다 평가
+    const block=Math.floor(minute/window), start=block*window;
+    const chance={blue:.105,growth:.145,theme:.190,junk:.225}[s.tier]||.14;
+    if(v9Unit(s.code,day,block,'v16-volburst-on')>=chance)return 0;
+    const duration=4+Math.floor(v9Unit(s.code,day,block,'v16-volburst-len')*7); // 4~10 ticks = 약 2~5분
+    const age=minute-start;if(age<0||age>=duration)return 0;
+    const act=v11Activity(s,day,minute),reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+    const trend=Math.sign((reg?.bias||0)+(mom||0));
+    const flip=v9Unit(s.code,day,block,'v16-volburst-dir');
+    // 68%는 현재 추세 쪽, 32%는 역방향/반전 가능. 추세가 없으면 양방향 균등.
+    const dir=trend ? (flip<.68?trend:-trend) : (flip<.5?-1:1);
+    const hot=act?.name==='hot', active=act?.name==='active';
+    const base=hot?.00165:active?.00125:.00095;
+    const mag=base+v9Unit(s.code,day,block,'v16-volburst-mag')*(hot?.00235:active?.00185:.00145);
+    // 시작/끝이 갑자기 끊기지 않도록 가운데가 강한 envelope.
+    const phase=(age+1)/(duration+1), envelope=.62+.38*Math.sin(Math.PI*phase);
+    return dir*mag*envelope;
+  }
+
+  // 3) 기존 V13 가속 위에 burst를 합성. 최대치가 아니라 발생 빈도/전개 속도를 높인다.
+  const priorExtreme=v11ExtremeDrive;
+  v11ExtremeDrive=function(s,day,minute){
+    if(s?.isETF)return 0;
+    const base=Number(priorExtreme(s,day,minute))||0;
+    const burst=v16VolBurst(s,day,minute);
+    return Math.max(-.0065,Math.min(.0065,base+burst));
+  };
+
+  // 4) 미세 움직임도 아주 소폭만 상향. 큰 수익/손실은 메인 엔진이 담당한다.
+  const priorMicro=v12MicroFactor;
+  v12MicroFactor=function(s,ms){
+    if(s?.isETF||!marketSessionInfo(ms).open)return 1;
+    const base=Number(priorMicro(s,ms))||1;
+    const t=sessionTick(ms),day=Math.floor(t/390),minute=((t%390)+390)%390;
+    const act=v11Activity(s,day,minute);
+    const k=act?.name==='hot'?1.16:act?.name==='active'?1.10:1.04;
+    return Math.exp(Math.log(Math.max(.98,Math.min(1.02,base)))*k);
+  };
+
+  try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
+  window.__marketV16={version:16,activityTicks:'6-20',burstTicks:'4-10',focus:'short-session-activity'};
+})();
+</script>
