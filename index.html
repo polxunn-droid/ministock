@@ -41,6 +41,13 @@
   .holding .price{width:112px;min-width:112px;max-width:112px;font-size:14px}
   .holding .price small{font-size:11px}
 }
+
+/* ============ V27 — 장중 1시간 랜덤 보상 ============ */
+.hourly-reward{margin:14px 0 22px;padding:16px;border:1px solid #e2e8f0;border-radius:20px;background:linear-gradient(135deg,#fff 0%,#f7faff 100%)}
+.hourly-reward-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.hourly-reward-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:850}.hourly-reward-title i{font-style:normal;font-size:19px}.hourly-reward-slot{font-size:10.5px;color:var(--muted);font-weight:700}
+.hourly-reward-body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}.hourly-reward-copy b{display:block;font-size:15px;margin-bottom:4px}.hourly-reward-copy small{display:block;color:var(--muted);line-height:1.45;font-size:11px}.hourly-reward-btn{min-width:92px;height:44px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-weight:850;font-size:13px;padding:0 14px}.hourly-reward-btn:disabled{background:#e9edf2;color:#8b95a1}.hourly-reward-done{color:#3182f6!important}
+.reward-pop{position:fixed;inset:0;background:#0006;z-index:55;display:grid;place-items:center;padding:22px}.reward-result{width:min(100%,360px);background:#fff;border-radius:26px;padding:28px 22px 24px;text-align:center;box-shadow:0 18px 50px #0000002e;animation:up .24s ease}.reward-gift{font-size:48px;line-height:1;margin-bottom:12px}.reward-rarity{display:inline-block;padding:6px 11px;border-radius:999px;background:#eef4ff;color:#3182f6;font-size:11px;font-weight:850}.reward-rarity.rare{background:#f5efff;color:#7950c8}.reward-rarity.jackpot{background:#fff5db;color:#a66b00}.reward-result h2{font-size:20px;margin:14px 0 5px}.reward-value{font-size:29px;font-weight:900;letter-spacing:-.8px;color:#191f28;margin:3px 0}.reward-result p{font-size:12px;line-height:1.55;color:var(--muted);margin:10px 0 0}.reward-result .primary{width:100%;margin-top:18px}
+@media(max-width:359px){.hourly-reward{padding:14px}.hourly-reward-body{grid-template-columns:1fr}.hourly-reward-btn{width:100%}}
 </style></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
@@ -1638,6 +1645,108 @@ window.__marketV25={
 };
 
 
+
+
+/* ============ V27 — 장중 1시간 랜덤 보상 ============
+   - 08:00~23:30 장 운영 중 매 시간 슬롯당 1회
+   - 현금 60% / 주식 40%, 주식은 가격이 높을수록 희귀
+   - Firebase claim 문서로 같은 계정의 동일 슬롯 중복 수령 방지
+   - 보상 현금 및 지급주식의 지급가액은 accountPrincipal() 구조상 자동으로 원금에 반영됨
+*/
+function rewardDateKey(d){return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`}
+function hourlyRewardSlot(ms=Date.now()){
+  const d=new Date(ms),session=marketSessionInfo(ms),hour=d.getHours();
+  const open=session.open&&hour>=8&&hour<=23;
+  const slotKey=open?`${rewardDateKey(d)}_${String(hour).padStart(2,'0')}`:'';
+  let next;
+  if(open&&hour<23)next=new Date(d.getFullYear(),d.getMonth(),d.getDate(),hour+1,0,0,0);
+  else if(open)next=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,8,0,0,0);
+  else if(hour<8)next=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0);
+  else next=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,8,0,0,0);
+  return {open,slotKey,hour,nextMs:+next};
+}
+function rewardRand(slotKey){return rnd(hash('hourly-reward-v27',Store.uid||userId||'guest',slotKey))}
+function rewardCashAmount(r,kind){
+  if(kind==='tiny')return Math.round((100+Math.floor(r()*401))/100)*100;
+  if(kind==='jackpot')return Math.round((30000+Math.floor(r()*70001))/100)*100;
+  if(kind==='high')return Math.round((5000+Math.floor(r()*25001))/100)*100;
+  return Math.round((500+Math.floor(r()*4501))/100)*100;
+}
+const REWARD_PRICE_BUCKETS=[
+  {min:0,max:10000,w:38},{min:10000,max:30000,w:27},{min:30000,max:70000,w:17},
+  {min:70000,max:150000,w:10},{min:150000,max:300000,w:5},{min:300000,max:500000,w:2},{min:500000,max:Infinity,w:1}
+];
+function chooseRewardStock(r){
+  const pool=STOCKS.filter(s=>!s.isETF),priced=pool.map(s=>({s,price:quote(s).price}));
+  let z=r()*100,b=REWARD_PRICE_BUCKETS.at(-1);for(const x of REWARD_PRICE_BUCKETS){if((z-=x.w)<0){b=x;break}}
+  let candidates=priced.filter(x=>x.price>=b.min&&x.price<b.max);
+  if(!candidates.length)candidates=priced.sort((a,c)=>Math.abs(a.price-(Number.isFinite(b.max)?(b.min+b.max)/2:b.min))-Math.abs(c.price-(Number.isFinite(b.max)?(b.min+b.max)/2:b.min))).slice(0,12);
+  const pick=candidates[Math.floor(r()*candidates.length)]||priced[0];
+  const rarity=pick.price>=500000?'초희귀':pick.price>=150000?'희귀':'일반';
+  return {type:'stock',stockCode:pick.s.code,stockName:pick.s.name,qty:1,grantPrice:pick.price,amount:0,rarity};
+}
+function buildHourlyReward(slotKey){
+  const r=rewardRand(slotKey),roll=r()*100;
+  if(roll<5){const amount=rewardCashAmount(r,'tiny');return{type:'cash',amount,stockCode:'',stockName:'',qty:0,grantPrice:0,rarity:'소액'}}
+  if(roll<50){const amount=rewardCashAmount(r,'normal');return{type:'cash',amount,stockCode:'',stockName:'',qty:0,grantPrice:0,rarity:'일반'}}
+  if(roll<59.7){const amount=rewardCashAmount(r,'high');return{type:'cash',amount,stockCode:'',stockName:'',qty:0,grantPrice:0,rarity:'희귀'}}
+  if(roll<60){const amount=rewardCashAmount(r,'jackpot');return{type:'cash',amount,stockCode:'',stockName:'',qty:0,grantPrice:0,rarity:'대박'}}
+  return chooseRewardStock(r);
+}
+function rewardClaimed(slotKey){return !!(slotKey&&state?.rewardClaims?.[slotKey])}
+function rewardNextLabel(slot){
+  if(!slot.open)return `다음 보상 ${new Date(slot.nextMs).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})}`;
+  if(rewardClaimed(slot.slotKey))return slot.hour===23?'오늘 보상 완료 · 내일 08:00':'이번 시간 수령 완료';
+  return `${String(slot.hour).padStart(2,'0')}시 보상`;
+}
+function hourlyRewardCard(){
+  const slot=hourlyRewardSlot(),claimed=rewardClaimed(slot.slotKey),online=Store.online;
+  const disabled=!slot.open||claimed||!online;
+  const label=!slot.open?'장 마감':claimed?'수령 완료':!online?'연결 필요':'보상 받기';
+  const copy=!slot.open?'장 운영시간에 다시 열려요':claimed?(slot.hour===23?'다음 보상은 내일 08:00':'다음 정각에 새 보상이 열려요'):'현금 또는 랜덤 주식 1주를 받을 수 있어요';
+  return `<section class="hourly-reward"><div class="hourly-reward-head"><div class="hourly-reward-title"><i>🎁</i> 장중 랜덤 보상</div><span class="hourly-reward-slot">${rewardNextLabel(slot)}</span></div><div class="hourly-reward-body"><div class="hourly-reward-copy"><b class="${claimed?'hourly-reward-done':''}">${claimed?'이번 시간 보상을 받았어요':'1시간에 한 번 열리는 보상'}</b><small>${copy}<br>비싼 주식일수록 당첨 확률이 크게 낮아져요.</small></div><button class="hourly-reward-btn" data-hourly-reward ${disabled?'disabled':''}>${label}</button></div></section>`;
+}
+function applyHourlyReward(reward,slotKey){
+  state.rewardClaims=state.rewardClaims&&typeof state.rewardClaims==='object'?state.rewardClaims:{};
+  if(state.rewardClaims[slotKey])return false;
+  if(reward.type==='cash')state.cash=Math.max(0,Math.round((+state.cash||0)+(+reward.amount||0)));
+  else{
+    const s=STOCKS.find(x=>x.code===reward.stockCode&&!x.isETF);if(!s)return false;
+    const h=state.holdings[s.code]||{qty:0,avg:0},qty=1,price=Math.max(1,Math.round(+reward.grantPrice||quote(s).price));
+    h.avg=(h.avg*h.qty+price*qty)/(h.qty+qty);h.qty+=qty;state.holdings[s.code]=h;
+  }
+  state.rewardClaims[slotKey]={...reward,claimedAt:Date.now()};
+  const keys=Object.keys(state.rewardClaims).sort();while(keys.length>80){delete state.rewardClaims[keys.shift()]}
+  return true;
+}
+function showHourlyRewardResult(reward){
+  const stock=reward.type==='stock',rare=reward.rarity==='희귀'?'rare':(reward.rarity==='초희귀'||reward.rarity==='대박')?'jackpot':'';
+  const title=stock?`${escHtml(reward.stockName)} 1주 획득`:`${fmt(reward.amount)}원 획득`;
+  const value=stock?`${fmt(reward.grantPrice)}원 상당`:`+${fmt(reward.amount)}원`;
+  document.body.insertAdjacentHTML('beforeend',`<div class="reward-pop"><div class="reward-result"><div class="reward-gift">${stock?'📈':'💰'}</div><span class="reward-rarity ${rare}">${escHtml(reward.rarity)} 보상</span><h2>${title}</h2><div class="reward-value">${value}</div><p>${stock?'지급 시점 가격을 평균단가로 반영했어요.':'보상 금액은 원금에도 함께 반영되어 랭킹 수익률을 왜곡하지 않아요.'}</p><button class="primary" data-reward-close>확인</button></div></div>`);
+}
+async function claimHourlyReward(){
+  const slot=hourlyRewardSlot();if(!slot.open)return toast('장 운영시간에만 받을 수 있어요');
+  if(rewardClaimed(slot.slotKey))return toast('이번 시간 보상은 이미 받았어요');
+  if(!Store.online||!Store.db||!Store.uid)return toast('인터넷 연결 후 받을 수 있어요');
+  const btn=document.querySelector('[data-hourly-reward]');if(btn){btn.disabled=true;btn.textContent='추첨 중…'}
+  const reward=buildHourlyReward(slot.slotKey),payload={uid:Store.uid,slotKey:slot.slotKey,type:reward.type,amount:Math.round(+reward.amount||0),stockCode:String(reward.stockCode||''),stockName:String(reward.stockName||''),qty:Math.round(+reward.qty||0),grantPrice:Math.round(+reward.grantPrice||0),rarity:String(reward.rarity||'일반'),createdAtMs:Date.now()};
+  const ref=Store.db.collection('attendance_rewards').doc(Store.uid).collection('claims').doc(slot.slotKey);
+  try{
+    const result=await Store.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists)return{created:false,data:snap.data()};tx.set(ref,payload);return{created:true,data:payload}});
+    if(!result.created){toast('이번 시간 보상은 이미 수령됐어요');render();return}
+    if(!applyHourlyReward(reward,slot.slotKey)){toast('보상을 반영하지 못했어요');return}
+    await Store.saveMe(userId,state);await Store.pushMyScore(true);showHourlyRewardResult(reward);render();
+  }catch(error){console.warn('시간 보상 수령 실패',error?.code||error?.message);toast(error?.code==='permission-denied'?'보상용 Firebase 규칙을 확인해주세요':'보상을 받지 못했어요. 다시 시도해주세요');if(btn){btn.disabled=false;btn.textContent='보상 받기'}}
+}
+/* 저장 상태에 보상 수령 이력 보존 */
+const normalizeStateRewardBase=normalizeState;normalizeState=function(v){const out=normalizeStateRewardBase(v);const raw=v?.rewardClaims&&typeof v.rewardClaims==='object'?v.rewardClaims:{};out.rewardClaims={};for(const k of Object.keys(raw).sort().slice(-80)){const x=raw[k];if(x&&['cash','stock'].includes(x.type))out.rewardClaims[k]=x}return out};
+/* 홈에 보상 카드 삽입 */
+const homeRewardBase=home;home=function(){return homeRewardBase().replace('<div class="account-row">',hourlyRewardCard()+'<div class="account-row">')};
+/* 버튼 이벤트 */
+const bindRewardBase=bind;bind=function(){bindRewardBase();document.querySelector('[data-hourly-reward]')?.addEventListener('click',claimHourlyReward)};
+document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]'))e.target.closest('.reward-pop')?.remove();if(e.target.classList.contains('reward-pop'))e.target.remove()});
+window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
