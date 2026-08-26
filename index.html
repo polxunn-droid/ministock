@@ -622,13 +622,13 @@ function v9RawPriceAt(s,t=marketTick()){
   const day=Math.floor(t/390),minute=((t%390)+390)%390,open=v9DayOpen(s,day);let p=open,slumpUntil=-1,center=open;
   for(let i=0;i<=minute;i++){
     const reg=v9Regime(s,day,i),mom=v9Momentum(s,day,i),vol=v9Volatility(s,day,i),act=v11Activity(s,day,i),shock=v9Shock(s,day,i);
-    if(shock.ret){p*=Math.exp(shock.ret);center*=Math.exp(shock.ret*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));}
+    if(shock.ret){const shockLog=Math.log1p(Math.max(-.95,shock.ret));p*=Math.exp(shockLog);center*=Math.exp(shockLog*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));}
     const slumpBias=i<slumpUntil?-.000045:0;
     // 평소 종목은 기존처럼 잔잔하되, 활동성이 높은 종목만 의미 있게 움직인다.
     const sigma=.00032*vol*act.mult;
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
     const currentChange=p/open-1;
-    const extreme=v11ExtremeDrive(s,day,i),post=v11PostMove(s,day,i,currentChange);
+    const extreme=v11ExtremeDrive(s,day,i,currentChange),post=v11PostMove(s,day,i,currentChange);
     let ret=(reg.bias+mom+slumpBias)*(.72+act.mult*.34)+v9MarketImpulse(day,i)*.28+v9SectorImpulse(s,day,i)*.32+noise+extreme+post;
     center*=Math.exp((reg.bias+slumpBias)*.25);
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
@@ -1950,15 +1950,16 @@ function v29RawWithOpen(s,day,minute,open){
   for(let i=0;i<=minute;i++){
     const reg=v9Regime(s,day,i),mom=v9Momentum(s,day,i),vol=v9Volatility(s,day,i),act=v11Activity(s,day,i),shock=v9Shock(s,day,i);
     if(shock.ret){
-      p*=Math.exp(shock.ret);
-      center*=Math.exp(shock.ret*.78);
+      const shockLog=Math.log1p(Math.max(-.95,shock.ret));
+      p*=Math.exp(shockLog);
+      center*=Math.exp(shockLog*.78);
       if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
     }
     const slumpBias=i<slumpUntil?-.000045:0;
     const sigma=.00032*vol*act.mult;
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
     const currentChange=p/open-1;
-    const extreme=v11ExtremeDrive(s,day,i),post=v11PostMove(s,day,i,currentChange);
+    const extreme=v11ExtremeDrive(s,day,i,currentChange),post=v11PostMove(s,day,i,currentChange);
     let ret=(reg.bias+mom+slumpBias)*(.72+act.mult*.34)+v9MarketImpulse(day,i)*.28+v9SectorImpulse(s,day,i)*.32+noise+extreme+post;
     center*=Math.exp((reg.bias+slumpBias)*.25);
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));
@@ -2895,8 +2896,8 @@ try{
 function v39Clamp(x,a,b){return Math.max(a,Math.min(b,x));}
 const v39ExtremeBase=v11ExtremeDrive;
 
-v11ExtremeDrive=function v39TailDistanceBalancedExtreme(s,day,minute){
-  let ret=Number(v39ExtremeBase(s,day,minute))||0;
+v11ExtremeDrive=function v40TailDistanceBalancedExtreme(s,day,minute,currentChange=0){
+  let ret=Number(v39ExtremeBase(s,day,minute,currentChange))||0;
   if(s?.isETF || ret===0)return ret;
 
   // 현재 등락률은 기존 raw loop에서 직접 전달되지 않으므로,
@@ -2940,6 +2941,29 @@ try{
   priceCache?.clear?.();
   V23_QUOTE_CACHE?.clear?.();
 }catch(e){}
+</script>
+
+
+<script>
+/* ============ V40 — shock 퍼센트 대칭 + currentChange 배선 ============
+   - raw loop의 currentChange를 ExtremeDrive에 실제 전달
+   - 큰 shock을 Math.exp(±m)로 처리하던 로그/퍼센트 비대칭 수정
+   - shock.ret을 실제 퍼센트 충격으로 해석해 log1p() 후 가격에 적용
+   - V39의 방향확률/postMove/체결 보호/ETF 라우팅은 유지
+   - 1/(1+x)를 변동성 전체에 직접 곱하는 방식은 검증에서 저점 반등 편향을
+     만들 수 있어 이번 배포본에는 넣지 않음
+*/
+window.__marketV40={
+  version:40,
+  baseVersion:39,
+  currentChangeWired:true,
+  shockPercentSymmetry:true,
+  shockTransform:'log1p(shock.ret)',
+  directVolatilityScale_1_over_1_plus_x:false,
+  postMoveChanged:false,
+  executionGuardPreserved:true,
+  etfRoutingPreserved:true
+};
 </script>
 
 </body></html>
