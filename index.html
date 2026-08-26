@@ -185,5 +185,139 @@ document.addEventListener('click',e=>{if(e.target.matches('.overlay.blocking'))e
 document.addEventListener('click',e=>{if(e.target.matches('.search-overlay')){e.stopImmediatePropagation();closeSearch()}},true);
 function isKakaoInApp(){return /KAKAOTALK/i.test(navigator.userAgent||'')}
 function showBrowserBlock(){$('#app').innerHTML=`<section class="browser-block"><div class="browser-mark">↗</div><h1>브라우저에서 열어주세요</h1><p class="sub">카카오톡 안에서는 로그인과 랭킹 저장이 불안정해 게임을 실행하지 않아요.</p><ol><li>오른쪽 위 또는 아래의 <b>⋮ ···</b> 메뉴를 누르세요.</li><li><b>다른 브라우저로 열기</b> 또는 <b>Safari로 열기</b>를 선택하세요.</li></ol><button class="primary" id="copy-url">주소 복사</button></section>`;$('#copy-url').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);toast('주소를 복사했어요')}catch{prompt('아래 주소를 복사해주세요',location.href)}}}
+/* ============ 관리자 원화 지급 기능 (v6) ============ */
+const ADMIN_UID='7Rp29EsVDkcgDCz5T9VYn7L5AeB2';
+const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.head.insertAdjacentHTML('beforeend','<style>.grant-pop{position:fixed;inset:0;background:#0006;z-index:40;display:grid;place-items:center;padding:22px}.grant-card{width:min(100%,360px);background:#fff;border-radius:24px;padding:28px 22px 24px;text-align:center;animation:up .24s ease;box-shadow:0 18px 50px #0000002e}.grant-badge{display:inline-block;background:#e8f1ff;color:var(--blue);font-size:11px;font-weight:750;padding:6px 11px;border-radius:999px}.grant-title{margin:14px 0 0;font-size:15px;font-weight:750}.grant-amount{font-size:30px;font-weight:850;letter-spacing:-.5px;margin:6px 0 0;color:var(--blue)}.grant-amount.minus{color:var(--red)}.grant-msg{margin:16px 0 0;padding:14px;background:var(--sub);border-radius:14px;font-size:13.5px;line-height:1.62;color:var(--ink);white-space:pre-wrap;text-align:left}.grant-meta{margin-top:12px;font-size:11px;color:var(--muted)}.grant-card .primary{width:100%;margin-top:18px}.log-row .tag-grant{color:var(--blue)}</style>');
+
+/* 1) 저장 상태에 지급 기록 보존 */
+const normalizeStateV5=normalizeState;
+normalizeState=function(v){
+  const out=normalizeStateV5(v);
+  out.grants=(Array.isArray(v?.grants)?v.grants:[])
+    .filter(g=>g&&typeof g.id==='string'&&Number.isFinite(+g.amount))
+    .map(g=>({id:String(g.id),amount:Math.round(+g.amount),title:String(g.title||'').slice(0,60),message:String(g.message||'').slice(0,500),at:Number.isFinite(+g.at)?+g.at:Date.now(),acked:!!g.acked}))
+    .slice(-200);
+  out.grantCutoff=Number.isFinite(+v?.grantCutoff)?+v.grantCutoff:0;
+  return out;
+};
+
+/* 2) 지급받은 현금은 수익이 아니라 원금 → 오늘 수익에서 제외 */
+const dailyAccountPnlBase=dailyAccountPnl;
+dailyAccountPnl=function(){
+  const base=dailyAccountPnlBase(),start=new Date();start.setHours(0,0,0,0);
+  const today=(state?.grants||[]).reduce((sum,g)=>sum+(+g.at>=start.getTime()?(+g.amount||0):0),0);
+  return base-today;
+};
+
+/* 3) 거래내역에 지급 내역 함께 표시 */
+openTradeLog=function(){
+  const rows=[
+    ...(state?.tradeLog||[]).map(x=>({kind:'trade',at:+x.at||0,x})),
+    ...(state?.grants||[]).map(g=>({kind:'grant',at:+g.at||0,x:g}))
+  ].sort((a,b)=>b.at-a.at);
+  const html=rows.length?rows.map(r=>{
+    if(r.kind==='grant'){
+      const g=r.x,plus=g.amount>=0;
+      return `<div class="log-row"><b class="tag-grant">${plus?'원화 지급':'원화 차감'} · ${escHtml(g.title||'관리자')}</b><b class="${plus?'gain':'down'}">${plus?'+':'-'}${fmt(Math.abs(g.amount))}원</b><small>${new Date(g.at).toLocaleString('ko-KR')}${g.message?' · '+escHtml(g.message):''}</small></div>`;
+    }
+    const x=r.x,s=STOCKS.find(v=>v.code===x.code);
+    if(!s)return '';
+    return `<div class="log-row"><b class="${x.type==='buy'?'gain':'down'}">${x.type==='buy'?'매수':'매도'} · ${escHtml(s.name)}</b><b>${fmt(x.price*x.qty)}원</b><small>${new Date(x.at).toLocaleString('ko-KR')} · ${fmt(x.price)}원 × ${fmt(x.qty)}주</small></div>`;
+  }).join(''):'<div class="empty">아직 거래내역이 없어요.</div>';
+  document.body.insertAdjacentHTML('beforeend',`<div class="overlay"><div class="sheet"><div class="sheet-head"><h2>거래내역</h2>${closeButton()}</div><div class="log-list">${html}</div></div></div>`);
+};
+
+/* 4) 지급 알림 팝업 */
+function grantPopup(g){
+  return new Promise(resolve=>{
+    const plus=g.amount>=0;
+    const el=document.createElement('div');
+    el.className='grant-pop';
+    el.innerHTML=`<div class="grant-card">
+      <span class="grant-badge">${plus?'원화 지급':'원화 차감'}</span>
+      <p class="grant-title">${escHtml(g.title||(plus?'관리자 지급금이 도착했어요':'관리자 정산 안내'))}</p>
+      <p class="grant-amount ${plus?'':'minus'}">${plus?'+':'-'}${fmt(Math.abs(g.amount))}원</p>
+      ${g.message?`<div class="grant-msg">${escHtml(g.message)}</div>`:''}
+      <p class="grant-meta">${new Date(g.at).toLocaleString('ko-KR')} · 예수금에 자동 반영되었어요</p>
+      <button class="primary" data-grant-ok>확인했어요</button>
+    </div>`;
+    el.addEventListener('click',e=>{
+      if(!e.target.closest('[data-grant-ok]'))return;
+      e.stopPropagation();
+      el.remove();
+      resolve();
+    });
+    document.body.append(el);
+  });
+}
+
+/* 5) 지급 수신 */
+const GrantWatch={
+  started:false,showing:false,unsub:null,
+  start(){
+    if(this.started||!Store.online||!Store.db||!Store.uid||!state)return;
+    this.started=true;
+    if(!Number.isFinite(+state.grantCutoff)||+state.grantCutoff<=0){
+      state.grantCutoff=(state.tradeLog?.length||state.nickname)?1:Date.now();
+      Store.saveMe(userId,state);
+    }
+    this.unsub=Store.db.collection('grants').orderBy('createdAtMs','desc').limit(80)
+      .onSnapshot(snap=>{
+        const list=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(+a.createdAtMs||0)-(+b.createdAtMs||0));
+        this.apply(list);
+      },error=>console.warn('지급 수신 실패',error?.code||error?.message));
+  },
+  async apply(list){
+    if(!state)return;
+    let changed=false;
+    for(const g of list){
+      const amount=Math.round(+g.amount||0);
+      if(!Number.isFinite(amount)||!amount)continue;
+      const all=g.targets==='all',mine=all||(Array.isArray(g.targets)&&g.targets.includes(Store.uid));
+      if(!mine)continue;
+      if((state.grants||[]).some(x=>x.id===g.id))continue;
+      const at=Number.isFinite(+g.createdAtMs)?+g.createdAtMs:Date.now();
+      if(all&&at<(+state.grantCutoff||0))continue;
+      state.cash=Math.max(0,Math.round((+state.cash||0)+amount));
+      state.grants=[...(state.grants||[]),{id:g.id,amount,title:String(g.title||''),message:String(g.message||''),at,acked:false}].slice(-200);
+      changed=true;
+      this.report(g.id,amount);
+    }
+    if(changed){
+      await Store.saveMe(userId,state);
+      Store.pushMyScore(true);
+      if(!selected&&!document.querySelector('.overlay'))render();
+    }
+    this.flush();
+  },
+  async report(id,amount){
+    if(!Store.online||!Store.db||!Store.uid)return;
+    try{
+      await Store.db.collection('grants').doc(id).collection('claims').doc(Store.uid).set({
+        uid:Store.uid,nickname:state?.nickname||'',amount,
+        claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+    }catch(error){console.warn('수령 기록 실패',error?.code||error?.message)}
+  },
+  async flush(){
+    if(this.showing||!state)return;
+    const pending=(state.grants||[]).filter(g=>!g.acked);
+    if(!pending.length)return;
+    if(document.querySelector('.overlay')){setTimeout(()=>this.flush(),1500);return}
+    this.showing=true;
+    for(const g of pending){
+      await grantPopup(g);
+      g.acked=true;
+      await Store.saveMe(userId,state);
+    }
+    this.showing=false;
+    if(!selected&&!document.querySelector('.overlay'))render();
+  }
+};
+(function waitGrantReady(){
+  if(state&&Store.online&&Store.db&&Store.uid){GrantWatch.start();return}
+  setTimeout(waitGrantReady,700);
+})();
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script></body></html>
