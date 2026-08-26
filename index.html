@@ -2977,4 +2977,165 @@ window.__marketV41={
 };
 </script>
 
+
+<script>
+/* ============ V41.1 — 1일 차트 시간축/전일종가 기준 수정 ============
+   - 1일 차트는 00:00~24:00이 아니라 실제 장시간 08:00~23:30 기준
+   - 08:06이면 하루 차트의 약 0.6%만 채워짐
+   - '어제보다'는 오늘 시가가 아니라 전일 종가 기준으로 계산
+   - 전일 종가를 점선 기준선으로 표시
+   - 현재가가 전일 종가보다 높으면 차트 색도 상승색으로 표시
+*/
+
+function v411SessionBounds(ms=Date.now()){
+  const d=new Date(ms);
+  const open=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
+  const close=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
+  return {open,close};
+}
+function v411PrevCloseMs(ms=Date.now()){
+  const d=new Date(ms);
+  d.setDate(d.getDate()-1);
+  d.setHours(23,30,0,0);
+  return d.getTime();
+}
+function v411PrevClose(s,ms=Date.now()){
+  return Math.max(1,fastVisualPriceAt(s,v411PrevCloseMs(ms)));
+}
+function v411DaySeries(s,count=CHART_RANGES.day.count){
+  const now=Date.now(),{open,close}=v411SessionBounds(now);
+  const prev=v411PrevClose(s,now);
+
+  if(now<open)return [prev,prev];
+
+  const end=Math.min(now,close);
+  const progress=Math.max(0,Math.min(1,(end-open)/(close-open)));
+  const lastSlot=Math.max(1,Math.min(count-1,Math.floor(progress*(count-1))));
+  const used=Math.min(count,lastSlot+1);
+  const out=[];
+
+  for(let i=0;i<used;i++){
+    if(i===used-1){
+      out.push(quote(s).price);
+    }else{
+      const ms=open+(i/(count-1))*(close-open);
+      out.push(fastVisualPriceAt(s,ms));
+    }
+  }
+  return out;
+}
+
+const v411ChartSeriesBase=chartSeries;
+chartSeries=function(s,range=chartRange){
+  return range==='day'?v411DaySeries(s,CHART_RANGES.day.count):v411ChartSeriesBase(s,range);
+};
+
+const v411RangeChangeBase=rangeChange;
+rangeChange=function(s,range=chartRange){
+  if(range!=='day')return v411RangeChangeBase(s,range);
+  const base=v411PrevClose(s),last=quote(s).price,value=last-base;
+  return {label:'어제보다',value,rate:value/Math.max(1,base)*100};
+};
+
+const v411ChartAnnotationsBase=chartAnnotations;
+chartAnnotations=function(ctx,s,a,x,y,w,h,col){
+  v411ChartAnnotationsBase(ctx,s,a,x,y,w,h,col);
+  if(chartRange!=='day')return;
+  const prev=v411PrevClose(s);
+  ctx.save();
+  ctx.strokeStyle='#cfd6de';
+  ctx.lineWidth=1;
+  ctx.setLineDash([5,5]);
+  ctx.beginPath();
+  ctx.moveTo(0,y(prev));
+  ctx.lineTo(w,y(prev));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#8b95a1';
+  ctx.font='11px -apple-system, sans-serif';
+  ctx.textAlign='left';
+  ctx.textBaseline='bottom';
+  ctx.fillText('전일 종가',7,Math.max(12,y(prev)-5));
+  ctx.restore();
+};
+
+drawChart=function(s,hover=-1){
+  const c=$('#chart');if(!c)return;
+  const rect=c.getBoundingClientRect(),vh=window.innerHeight||document.documentElement.clientHeight;
+  if(rect.bottom<0||rect.top>vh)return;
+
+  // 기존 캔들 렌더러는 day xSlots=120 구조라 새 day series와 함께 그대로 사용 가능.
+  if(chartMode==='candle'){paintChart(s,hover);return}
+
+  const ctx=c.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,2),
+        w=Math.max(1,c.clientWidth),h=Math.max(1,c.clientHeight),
+        pw=Math.round(w*dpr),ph=Math.round(h*dpr);
+  if(c.width!==pw||c.height!==ph){c.width=pw;c.height=ph}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+
+  const a=chartSeries(s),pad=20;
+  if(!a.length)return;
+
+  const prev=chartRange==='day'?v411PrevClose(s):null;
+  const rawMin=Math.min(...a,...(prev!=null?[prev]:[]));
+  const rawMax=Math.max(...a,...(prev!=null?[prev]:[]));
+  const gap=Math.max(10,(rawMax-rawMin)*.14),min=rawMin-gap,max=rawMax+gap;
+
+  // 1일은 전일종가 대비 색상. 장중에 시가보다 내려도 전일 대비 상승이면 빨간색.
+  const up=chartRange==='day'?a.at(-1)>=prev:a.at(-1)>=a[0];
+  const col=up?'#f04452':'#3182f6';
+
+  // 장중 진행률을 실제 전체 장시간 폭에 반영.
+  const xSlots=chartRange==='day'?CHART_RANGES.day.count:a.length;
+  const x=i=>pad+i/Math.max(1,xSlots-1)*(w-pad*2);
+  const y=v=>pad+(max-v)/(max-min||1)*(h-pad*2);
+
+  ctx.strokeStyle='#f1f3f5';ctx.lineWidth=1;
+  for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(0,i*h/4);ctx.lineTo(w,i*h/4);ctx.stroke()}
+
+  ctx.beginPath();
+  a.forEach((v,i)=>i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)));
+  ctx.lineWidth=2.7;ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=col;ctx.stroke();
+
+  chartAnnotations(ctx,s,a,x,y,w,h,col);
+
+  if(hover>=0){
+    const i=Math.max(0,Math.min(a.length-1,hover));
+    ctx.setLineDash([4,4]);ctx.strokeStyle='#8b95a1';ctx.beginPath();
+    ctx.moveTo(x(i),0);ctx.lineTo(x(i),h);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(x(i),y(a[i]),4,0,Math.PI*2);ctx.fill();
+    let tip=$('.chart-tip');
+    if(!tip){$('.chart-wrap').insertAdjacentHTML('beforeend','<div class="chart-tip"></div>');tip=$('.chart-tip')}
+    tip.textContent=fmt(a[i])+'원';
+  }else $('.chart-tip')?.remove();
+};
+
+bindChartPointer=function(s){
+  const c=$('#chart'),wrap=$('.chart-wrap');if(!c||!wrap)return;
+  const point=e=>{
+    const r=c.getBoundingClientRect(),clientX=e.touches?.[0]?.clientX??e.clientX;
+    const a=chartSeries(s);
+    let i;
+    if(chartRange==='day'){
+      const slot=Math.round((clientX-r.left)/Math.max(1,r.width)*(CHART_RANGES.day.count-1));
+      i=Math.max(0,Math.min(a.length-1,slot));
+    }else{
+      i=Math.round((clientX-r.left)/Math.max(1,r.width)*(a.length-1));
+    }
+    chartHoverIndex=i;drawChart(s,chartHoverIndex);
+  };
+  const clear=()=>{chartHoverIndex=-1;drawChart(s)};
+  wrap.onpointermove=point;wrap.onpointerdown=point;wrap.onclick=point;wrap.ontouchmove=point;
+  wrap.onpointerleave=clear;wrap.ontouchend=clear;
+};
+
+window.__chartV411={
+  version:'41.1',
+  daySession:'08:00-23:30',
+  dayCompareBase:'previous-close',
+  fixedFullDayXAxis:true,
+  previousCloseReferenceLine:true
+};
+</script>
+
 </body></html>
