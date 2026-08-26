@@ -3138,4 +3138,27 @@ window.__chartV411={
 };
 </script>
 
+
+<script>
+/* V41.2 — 등락률 기준 전일 종가 통일
+   발견(급상승/급하락/거래량)과 종목 상세가 같은 change 값을 사용한다.
+   가격 생성 엔진 자체는 변경하지 않는다.
+*/
+const v412QuoteBase = quote;
+quote = function(s){
+  const q = v412QuoteBase(s);
+  const prevClose = v411PrevClose(s, Date.now());
+  const change = (q.price - prevClose) / Math.max(1, prevClose) * 100;
+  return {...q, change, prevClose};
+};
+rawQuote = quote;
+
+window.__marketV412 = {
+  version: '41.2',
+  changeBasis: 'previous-close',
+  discoverAndDetailUnified: true,
+  priceEngineChanged: false
+};
+</script>
+
 </body></html>
