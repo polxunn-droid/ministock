@@ -1206,6 +1206,67 @@ try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceC
 window.__marketV19={version:19,focus:'downside-balance',downContinuation:'35-39%',etfExcluded:true};
 
 
+
+/* ============ V20 — 급락주 저점매수 반복수익 악용 방지 ============
+   문제: -25~-30% 부근에서 기존 post-move가 반등 쪽으로 기울어
+   '급하락 탭 최하위 매수 → 몇 % 회복 시 매도' 반복 전략의 기대값이 지나치게 높아질 수 있었다.
+
+   원칙
+   1) 특정 낙폭(-28%, -30% 등)을 반등 신호로 사용하지 않는다.
+   2) 깊게 빠진 종목은 추가하락 / 저점횡보 / 반등이 모두 가능하다.
+   3) -20~-35% 구간의 평균 후속 바이어스는 중립~약한 하락으로 두어 무한 저점줍기를 차단한다.
+   4) 반등형도 고정된 9틱 반등 같은 읽히는 phase 패턴을 없앤다.
+   5) ETF는 기존 구성종목 연동 구조를 유지한다.
+*/
+const v20PostBase=v11PostMove;
+v11PostMove=function(s,day,minute,changeRate){
+  if(s?.isETF || changeRate>-.12)return v20PostBase(s,day,minute,changeRate);
+
+  const abs=Math.abs(changeRate);
+  const severity=Math.max(0,Math.min(1,(abs-.12)/.48));
+  // 6~11틱(약 3~5.5분)마다 숨은 후속 상태를 다시 정한다.
+  // 낙폭이 깊을수록 '무조건 반등'이 아니라 추가하락 확률이 소폭 높아진다.
+  const len=6+Math.floor(v9Unit(s.code,day,Math.floor(minute/8),'v20-dd-len')*6);
+  const block=Math.floor(minute/len);
+  const u=v9Unit(s.code,day,block,'v20-dd-path');
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const alignedDown=(reg.bias<0&&mom<0), alignedUp=(reg.bias>0&&mom>0);
+
+  let pFall=.41 + severity*.06 + (alignedDown?.07:0) - (alignedUp?.05:0);
+  let pRebound=.31 - severity*.035 + (alignedUp?.055:0) - (alignedDown?.035:0);
+  pFall=Math.max(.34,Math.min(.57,pFall));
+  pRebound=Math.max(.20,Math.min(.40,pRebound));
+  const pSide=Math.max(.16,1-pFall-pRebound);
+
+  // ① 추가하락: falling knife 위험. 심한 낙폭에서도 바닥을 보장하지 않는다.
+  if(u<pFall){
+    const pulse=.00078+severity*.00054;
+    const jitter=v9Normal('v20-fall-jitter',s.code,day,minute)*.00022;
+    return Math.max(-.00225,Math.min(-.00038,-pulse+jitter));
+  }
+
+  // ② 저점 횡보: 작은 양·음 움직임을 섞어 '-28%면 곧 -21%' 같은 회귀 패턴 제거.
+  if(u<pFall+pSide){
+    const n=v9Normal('v20-side-jitter',s.code,day,minute)*(.00024+severity*.00008);
+    const drag=alignedDown?-.00012:alignedUp?.00008:-.00003;
+    return Math.max(-.00055,Math.min(.00048,n+drag));
+  }
+
+  // ③ 반등: 실제 반등은 가능하되 매 틱 같은 방향으로 보장하지 않는다.
+  // 짧은 pullback을 섞어 진입 직후 자동수익 패턴을 없앤다.
+  const reboundNoise=v9Normal('v20-rebound-jitter',s.code,day,minute)*.00030;
+  const reboundBase=.00058+severity*.00028;
+  const pullback=v9Unit(s.code,day,minute,'v20-rebound-pullback')<(.28+severity*.08);
+  const out=pullback?-(.00030+severity*.00022):reboundBase+reboundNoise;
+  return Math.max(-.00085,Math.min(.00132,out));
+};
+
+// 급락 상태에서 추가하락 가속도는 유지하되, 특정 -30% 선을 바닥처럼 만들지 않는다.
+// V19의 하락 boost를 그대로 사용하며 최종 -80% 안전장치는 폭주 방지용으로만 유지된다.
+try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
+window.__marketV20={version:20,focus:'anti-dip-exploit',deepDropThreshold:'-12%',fixedReboundPhase:false,fallingKnife:true};
+
+
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
 
