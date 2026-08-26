@@ -3219,4 +3219,101 @@ try{
 }catch(e){}
 </script>
 
+
+
+<script>
+/* ============ V43 — 모바일 UI 성능 최적화 ============
+   - 시장 확률/가격 경로/체결 규칙 변경 없음
+   - 최종 quote 1초 캐시: V41.2 전일종가 재계산까지 중복 제거
+   - 전일종가 종목·기준시점 캐시
+   - 종목코드 조회 Map 사용
+   - 발견/관심 목록은 IntersectionObserver로 화면 근처 행만 1초 갱신
+   - refreshLive 내부의 중복 차트 draw 제거 (기존 liveLoop 750ms 담당)
+*/
+const V43_STOCK_BY_CODE = (typeof V23_STOCK_BY_CODE!=='undefined' && V23_STOCK_BY_CODE) || new Map(STOCKS.map(s=>[s.code,s]));
+
+const v43PrevCloseBase = v411PrevClose;
+const V43_PREVCLOSE_CACHE = new Map();
+v411PrevClose = function(s,ms=Date.now()){
+  if(!s)return 1;
+  const anchor=v411PrevCloseMs(ms), key=s.code+'|'+anchor;
+  const hit=V43_PREVCLOSE_CACHE.get(key);
+  if(hit!==undefined)return hit;
+  const value=v43PrevCloseBase(s,ms);
+  if(V43_PREVCLOSE_CACHE.size>STOCKS.length*3)V43_PREVCLOSE_CACHE.clear();
+  V43_PREVCLOSE_CACHE.set(key,value);
+  return value;
+};
+
+const v43QuoteBase = quote;
+const V43_FINAL_QUOTE_CACHE = new Map();
+quote = function(s){
+  if(!s)return {price:0,open:0,change:0,volume:0,day:0,minute:0,prevClose:0};
+  const slot=Math.floor(Date.now()/1000), tick=sessionTick(), key=s.code+'|'+tick+'|'+slot;
+  const hit=V43_FINAL_QUOTE_CACHE.get(key);
+  if(hit)return hit;
+  const q=v43QuoteBase(s);
+  if(V43_FINAL_QUOTE_CACHE.size>STOCKS.length*3)V43_FINAL_QUOTE_CACHE.clear();
+  V43_FINAL_QUOTE_CACHE.set(key,q);
+  return q;
+};
+rawQuote=quote;
+
+const V43_VISIBLE_QUOTES=new Set();
+const V43_OBSERVED_QUOTES=new WeakSet();
+const V43_QUOTE_OBSERVER=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
+  for(const e of entries){
+    if(e.isIntersecting)V43_VISIBLE_QUOTES.add(e.target);
+    else V43_VISIBLE_QUOTES.delete(e.target);
+  }
+},{root:null,rootMargin:'180px 0px',threshold:0}):null;
+function v43TrackQuoteRows(){
+  document.querySelectorAll('[data-quote]').forEach(el=>{
+    if(V43_OBSERVED_QUOTES.has(el))return;
+    V43_OBSERVED_QUOTES.add(el);
+    if(V43_QUOTE_OBSERVER)V43_QUOTE_OBSERVER.observe(el);
+    else V43_VISIBLE_QUOTES.add(el);
+  });
+}
+function v43UpdateQuoteEl(el){
+  const s=V43_STOCK_BY_CODE.get(el.dataset.quote);if(!s)return;
+  const q=quote(s), text=`${fmt(q.price)}원 · ${pct(q.change)}`;
+  if(el.textContent!==text)el.textContent=text;
+  const cls=q.change<0?'down':'gain';if(el.className!==cls)el.className=cls;
+  const row=el.closest('.stock');
+  if(row&&view==='discover'&&(sort==='rise'||sort==='fall'))row.classList.toggle('hidden',sort==='rise'?q.change<=0:q.change>=0);
+}
+
+refreshLive=function(){
+  const overlay=document.querySelector('.overlay');
+  if(overlay){if(overlay.classList.contains('search-overlay'))refreshSearchQuotes();return;}
+  v43TrackQuoteRows();
+  const nodes=V43_QUOTE_OBSERVER?[...V43_VISIBLE_QUOTES]:[...document.querySelectorAll('[data-quote]')];
+  for(const el of nodes){if(el.isConnected)v43UpdateQuoteEl(el);else V43_VISIBLE_QUOTES.delete(el)}
+
+  const iq=$('.index b'),market=quote(STOCKS[0]);
+  if(iq){const text=`${(2500+market.change*5).toFixed(2)} ${pct(market.change/10)}`;if(iq.textContent!==text)iq.textContent=text;}
+
+  if(!selected&&view==='home'){
+    const tv=total(),pnl=accountPnl(),principal=accountPrincipal(),hero=$('.hero');
+    if(hero){const h2=hero.querySelector('h2'),text=`${fmt(tv)}원`;if(h2&&h2.textContent!==text)h2.textContent=text;const g=hero.querySelector('.gain'),gt=`${sign(pnl)}원 (${pct(pnl/principal*100)})`;if(g&&g.textContent!==gt)g.textContent=gt;if(g)g.className=`gain ${pnl<0?'down':''}`;}
+    const cash=$('.home-balance .card:first-child strong');if(cash){const t=`${fmt(state.cash)}원`;if(cash.textContent!==t)cash.textContent=t;}
+    document.querySelectorAll('.holding[data-stock]').forEach(el=>{const s=V43_STOCK_BY_CODE.get(el.dataset.stock),h=state.holdings[s?.code];if(!s||!h)return;const q=quote(s),val=q.price*h.qty,profit=(q.price-h.avg)*h.qty,rate=(q.price/h.avg-1)*100,box=el.querySelector('.price'),small=box?.querySelector('small');if(box){const t=`${fmt(val)}원`;if(box.firstChild?.textContent!==t)box.firstChild.textContent=t}if(small){const t=`${sign(profit)}원 (${pct(rate)})`;if(small.textContent!==t)small.textContent=t;small.className=profit<0?'down':'gain'}});
+  }
+  if(selected){
+    const q=quote(selected),p=$('.detail-price');if(p){const t=`${fmt(q.price)}원`;if(p.textContent!==t)p.textContent=t;updateRangeChange(selected)}
+    const info=document.querySelectorAll('.info-grid .card strong');if(info.length===4){const year=chartSeries(selected,'year');const vals=[`${fmt(q.open)}원`,`${fmt(q.volume)}주`,`${fmt(Math.max(...year))}원`,`${fmt(Math.min(...year))}원`];info.forEach((el,i)=>{if(el.textContent!==vals[i])el.textContent=vals[i]})}
+  }
+  const realized=$('[data-live-realized]'),unrealized=$('[data-live-unrealized]'),rp=+state.realizedPnl||0,up=unrealizedPnl();
+  if(realized){realized.textContent=`${sign(rp)}원`;realized.className=rp<0?'down':'gain'}
+  if(unrealized){unrealized.textContent=`${sign(up)}원`;unrealized.className=up<0?'down':'gain'}
+  refreshAccountDetail();refreshMyStock();
+};
+
+// 검색창도 O(n) find 대신 Map 조회. 화면에 보이는 검색 결과만 갱신.
+refreshSearchQuotes=function(){document.querySelectorAll('[data-search-stock]').forEach(el=>{const r=el.getBoundingClientRect();if(r.bottom<0||r.top>(window.innerHeight||document.documentElement.clientHeight))return;const s=V43_STOCK_BY_CODE.get(el.dataset.searchStock),box=el.querySelector('.price'),small=box?.querySelector('small');if(!s||!box)return;const q=quote(s),t=`${fmt(q.price)}원`;if(box.firstChild?.textContent!==t)box.firstChild.textContent=t;if(small){const st=pct(q.change);if(small.textContent!==st)small.textContent=st;small.className=q.change<0?'down':'gain'}})};
+
+window.__marketV43={version:43,focus:'mobile-performance',marketRulesChanged:false,finalQuoteCacheMs:1000,prevCloseCached:true,stockLookup:'Map',viewportQuotes:'IntersectionObserver',duplicateChartDrawRemoved:true};
+</script>
+
 </body></html>
