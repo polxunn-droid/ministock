@@ -20,6 +20,11 @@
 .asset-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 14px}.asset-card{border:1px solid #e5e8eb;background:#f7f8fa;border-radius:18px;min-height:86px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#4e5968}.asset-card.active{background:#fff;border-color:#cfd7e2;box-shadow:0 4px 15px #2d3b4a0d;color:var(--ink)}.asset-symbol{width:36px;height:36px;border-radius:12px;background:#fff;display:grid;place-items:center;font-size:25px}.kr-flag{font-size:24px}.etf-mark{position:relative;background:#f2fbfb}.etf-mark:before{content:"";width:24px;height:24px;border-radius:50%;background:conic-gradient(#35b8b5 0 40%,#1d9c9c 40% 68%,#167f82 68% 100%)}.etf-mark:after{content:"";position:absolute;width:11px;height:11px;border-radius:50%;background:#f2fbfb}.logo.etf-logo{background:#eefafa;position:relative}.logo.etf-logo:before{content:"";width:25px;height:25px;border-radius:50%;background:conic-gradient(#35b8b5 0 40%,#1d9c9c 40% 68%,#167f82 68% 100%)}.logo.etf-logo:after{content:"";position:absolute;width:11px;height:11px;border-radius:50%;background:#eefafa}.logo.etf-logo i{display:none}.asset-card b{font-size:14px}.discover-etf-note{font-size:11px;color:var(--muted)}
 
 .market-closed-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));z-index:12;width:min(470px,calc(100% - 28px));padding:11px 14px;border-radius:13px;background:#fff1f2;color:#e5484d;font-size:13px;font-weight:800;text-align:center;border:1px solid #ffd8dc}.tradebar.market-closed button{opacity:.42;pointer-events:none;filter:grayscale(.15)}.strip>div small{display:block;margin-top:3px;font-size:10px;font-weight:800}.strip>div small.down{color:#e5484d}.strip>div small.gain{color:#e5484d}@media(min-width:500px){.market-closed-banner{bottom:104px}}
+
+/* V18 — 실시간 찌라시 카드 */
+.rumor-wrap{margin:14px 0 28px;position:relative;overflow:hidden;border:1px solid #e5dcff;border-radius:18px;background:linear-gradient(135deg,#f7f2ff,#fff)}
+.rumor-head{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 7px;color:#6f52b5;font-weight:800;font-size:14px}.rumor-head small{font-size:10px;color:#9b8ec6;font-weight:700}
+.rumor-viewport{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.rumor-viewport::-webkit-scrollbar{display:none}.rumor-track{display:flex}.rumor-card{min-width:100%;scroll-snap-align:start;padding:8px 16px 18px;min-height:89px}.rumor-card b{display:block;margin-bottom:6px;color:#30343b;font-size:13px}.rumor-card p{margin:0;line-height:1.48;font-size:14px;word-break:keep-all}.rumor-card small{display:block;margin-top:7px;color:var(--muted);font-size:10px}.rumor-dots{display:flex;gap:5px;justify-content:center;padding:0 0 10px}.rumor-dot{width:5px;height:5px;border-radius:50%;background:#d9d1ee}.rumor-dot.on{background:#6f52b5;width:14px;border-radius:5px}
 </style></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
@@ -1028,6 +1033,133 @@ v12MicroFactor=function(s,ms){
 // 기존 가격 캐시에 V13 상태가 남아 있을 수 있으므로 새 엔진 기준으로 초기화.
 v9PriceCache.clear();v9OpenCache.clear();referenceScaleCache.clear();
 window.__marketV16={version:16,activityMinutes:'3-10',burstMinutes:'2-5',rankingRealtimeListener:false};
+
+
+
+/* ============ V18 — 짧은 세션 도파민 + 실시간 찌라시 + 거래량 완전 방어 ============
+   목표: 10~20분 안에 중형/대형 움직임을 더 자주 체감하되 필승 패턴은 만들지 않는다.
+   - ±10~20% 움직임 빈도 상승, ±20~40%가 한 세션에 눈에 띌 확률 상승
+   - 상승 꼬리가 하락보다 지나치게 짧아지지 않도록 상승 추세 연장 확률 보정
+   - ±50% 이상은 여전히 희소, +120/-80 안전장치 유지
+   - 실시간 찌라시는 문장 조합식이며 실제/선반영/무반응/루머/역반응을 내부적으로 숨김
+   - 뉴스는 방향을 확정하지 않고 확률/추세를 약하게 기울이는 정도만 반영
+*/
+function v18RumorEvent(day,minute,index=0){
+  const block=Math.floor(minute/12),r=rnd(hash('v18-rumor',day,block,index));
+  const sectors=[...new Set(STOCKS.filter(x=>!x.isETF).map(x=>x.sector))];
+  const stockTargets=STOCKS.filter(x=>!x.isETF);
+  const targetStock=r()<.34?stockTargets[Math.floor(r()*stockTargets.length)]:null;
+  const sector=targetStock?targetStock.sector:sectors[Math.floor(r()*sectors.length)];
+  const sentiment=r()<.51?1:-1;
+  const behaviorRoll=r();
+  const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
+  const posActions=['대형 수주 기대','실적 개선 기대','외국인 매수 유입설','신규 공급계약 가능성','정책 수혜 기대','증설 검토설','목표가 상향 움직임','업황 회복 기대'];
+  const negActions=['수익성 둔화 우려','외국인 매도 확대설','원가 부담 우려','수요 둔화 전망','차익실현 매물 경계','규제 부담 가능성','실적 눈높이 하향','공급 과잉 우려'];
+  const endings=['시장 관심이 커지고 있다는 얘기','장중 수급이 엇갈린다는 관측','이미 가격에 일부 반영됐다는 시각도 공존','확인되지 않은 이야기라 변동성에 유의','재료 해석을 두고 의견이 갈리는 분위기','단기 매매세가 붙을 수 있다는 관측'];
+  const targetName=targetStock?targetStock.name:`${sector} 업종`;
+  const action=(sentiment>0?posActions:negActions)[Math.floor(r()*(sentiment>0?posActions.length:negActions.length))];
+  const text=`${targetName}, ${action}… ${endings[Math.floor(r()*endings.length)]}`;
+  return {day,block,index,targetCode:targetStock?.code||'',sector,sentiment,behavior,text};
+}
+function v18RumorDrive(s,day,minute){
+  if(s?.isETF)return 0;
+  let total=0,phase=(minute%12)/12;
+  for(let i=0;i<3;i++){
+    const e=v18RumorEvent(day,minute,i),match=e.targetCode?e.targetCode===s.code:e.sector===s.sector;
+    if(!match)continue;
+    const strength=e.targetCode?.length?.00034:.00019;
+    if(e.behavior==='real')total+=e.sentiment*strength*(.78+phase*.25);
+    else if(e.behavior==='priced')total+=e.sentiment*strength*(phase<.32?.42:-.34);
+    else if(e.behavior==='noise')total+=v9Normal('v18-rumor-noise',s.code,day,e.block,i)*strength*.18;
+    else if(e.behavior==='rumor')total+=e.sentiment*strength*(phase<.48?1.05:-.72);
+    else total-=e.sentiment*strength*.62;
+  }
+  return Math.max(-.0009,Math.min(.0009,total));
+}
+
+// V16 burst 위에 '중형 사건'을 한 겹 더 얹는다. normal 상태도 아주 약하게 참여 가능.
+const v18ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function(s,day,minute){
+  let base=Number(v18ExtremeBase(s,day,minute))||0;if(s?.isETF)return base;
+  const act=v11Activity(s,day,minute),reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const block=Math.floor(minute/6),r=rnd(hash('v18-medium',s.code,day,block));
+  const chance0={blue:.035,growth:.055,theme:.080,junk:.105}[s.tier]||.05;
+  const am=act.name==='hot'?1.75:act.name==='active'?1.42:act.name==='normal'?.42:.10;
+  const aligned=mom&&((reg.bias>0&&mom>0)||(reg.bias<0&&mom<0));
+  const chance=Math.min(.24,chance0*am*(aligned?1.28:1));
+  let extra=0;
+  if(r()<chance){
+    let dir;if(mom&&r()<.64)dir=Math.sign(mom);else if(reg.bias&&r()<.78)dir=Math.sign(reg.bias);else dir=r()<.5?-1:1;
+    // 상승은 기존보다 아주 조금 더 연장 기회를 줘 사진처럼 상승 꼬리만 짧아지는 현상을 보정한다.
+    if(dir>0&&r()<.56)dir=1;
+    const mag=(act.name==='hot'?.00135:act.name==='active'?.00095:.00052)+r()*(act.name==='hot'?.00255:act.name==='active'?.00175:.00090);
+    extra=dir*mag;
+  }
+  return Math.max(-.0085,Math.min(.0085,base+extra+v18RumorDrive(s,day,minute)));
+};
+
+// 급등 후 너무 빨리 눌리는 비대칭을 완화. 추가상승/큰조정 후 재상승/종료 모두 유지한다.
+const v18PostBase=v11PostMove;
+v11PostMove=function(s,day,minute,changeRate){
+  if(changeRate<.14)return v18PostBase(s,day,minute,changeRate);
+  const abs=Math.abs(changeRate),heat=Math.min(1,(abs-.14)/.55),block=Math.floor(minute/20),u=v9Unit(s.code,day,block,'v18-up-path'),phase=minute%20;
+  if(u<.40-heat*.035)return .00105+heat*.00028; // 추가상승 약 36~40%
+  if(u<.76){return phase<9?-(.00155+heat*.00135):(.00092+heat*.00058)} // 더 깊은 조정 후 재상승
+  return -(.00065+heat*.00110); // 상승 종료도 충분히 존재
+};
+
+// 단발 shock은 최대크기를 키우지 않고 빈도만 소폭 상향한다.
+v9Shock=function(s,day,minute){
+  if(s?.isETF||minute%15!==0)return {ret:0,slump:false};
+  const block=Math.floor(minute/15),r=rnd(hash('v18-shock',s.code,day,block));
+  const chance={blue:.016,growth:.026,theme:.040,junk:.052}[s.tier]||.025;
+  if(r()>chance)return {ret:0,slump:false};
+  const down=r()<.50,rare=r(),mag=rare<.70?.018+r()*.045:rare<.94?.060+r()*.095:.15+r()*.17;
+  return {ret:(down?-1:1)*mag,slump:down};
+};
+
+// NaN 거래량을 최종 출력단에서 다시 차단. 이후 어떤 패치가 추가돼도 NaN주가 표시되지 않는다.
+const v18QuoteBase=quote;
+quote=function(s){
+  const q=v18QuoteBase(s)||{};let v=Number(q.volume);
+  if(!Number.isFinite(v)||v<0){
+    const t=sessionTick(),day=Number.isFinite(q.day)?q.day:Math.floor(t/390),minute=Number.isFinite(q.minute)?q.minute:((t%390)+390)%390,ch=Number.isFinite(q.change)?Math.abs(q.change):0;
+    const act=s?.isETF?{flow:1}:v11Activity(s,day,minute),flow=Number.isFinite(+act?.flow)?Math.max(.35,+act.flow):1;
+    v=(s?.isETF?135000:82000)*(1+Math.min(6,ch*.14))*flow*(.82+rnd(hash('v18-volume-safe',s?.code||'x',day,Math.floor(minute/2)))*.64);
+  }
+  return {...q,volume:Math.max(1,Math.round(Number.isFinite(v)?v:100000))};
+};
+rawQuote=quote;
+
+function v18RumorCards(){
+  const t=sessionTick(),day=Math.floor(t/390),minute=((t%390)+390)%390;
+  return [0,1,2].map(i=>v18RumorEvent(day,minute,i));
+}
+function v18RumorHtml(){const cards=v18RumorCards();return `<div class="rumor-wrap" data-rumor-slider><div class="rumor-head"><span>✦ 실시간 찌라시</span><small>사실·루머·선반영 가능</small></div><div class="rumor-viewport"><div class="rumor-track">${cards.map((e,i)=>`<div class="rumor-card"><b>${e.targetCode?'종목':'업종'} 소문 ${i+1}</b><p>${e.text}</p><small>모의시장 정보 · 결과와 다를 수 있어요</small></div>`).join('')}</div></div><div class="rumor-dots">${cards.map((_,i)=>`<i class="rumor-dot ${i===0?'on':''}"></i>`).join('')}</div></div>`}
+
+// 발견 화면의 기존 단일 이슈 카드를 3장 자동 순환 찌라시 카드로 교체한다.
+const v18DiscoverBase=discover;
+discover=function(watch=false){
+  let html=v18DiscoverBase(watch);if(watch)return html;
+  html=html.replace(/오늘 이슈<b>1개<\/b>/,'오늘 찌라시<b>3개</b>');
+  html=html.replace(/<div class="issue"><b>✦ 실시간 이슈<\/b>[\s\S]*?<\/div>/,v18RumorHtml());
+  return html;
+};
+
+let v18RumorTimer=0,v18RumorIndex=0;
+function v18StartRumorCarousel(){
+  clearInterval(v18RumorTimer);v18RumorIndex=0;const root=document.querySelector('[data-rumor-slider]');if(!root)return;
+  const vp=root.querySelector('.rumor-viewport'),dots=[...root.querySelectorAll('.rumor-dot')],cards=[...root.querySelectorAll('.rumor-card')];if(!vp||cards.length<2)return;
+  const move=i=>{v18RumorIndex=i%cards.length;vp.scrollTo({left:vp.clientWidth*v18RumorIndex,behavior:'smooth'});dots.forEach((d,j)=>d.classList.toggle('on',j===v18RumorIndex))};
+  v18RumorTimer=setInterval(()=>{if(!document.hidden)move(v18RumorIndex+1)},7500);
+  vp.addEventListener('scroll',()=>{const i=Math.round(vp.scrollLeft/Math.max(1,vp.clientWidth));if(i>=0&&i<cards.length&&i!==v18RumorIndex){v18RumorIndex=i;dots.forEach((d,j)=>d.classList.toggle('on',j===i))}},{passive:true});
+}
+const v18BindBase=bind;bind=function(){v18BindBase();v18StartRumorCarousel()};
+
+// 가격 함수 교체 후 캐시 제거.
+try{v9PriceCache.clear();v9OpenCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
+window.__marketV18={version:18,focus:'dopamine-rumor',rumors:v18RumorCards,volumeSafe:true};
+
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
