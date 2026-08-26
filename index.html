@@ -1465,6 +1465,163 @@ window.__marketV24={version:24,focus:'downtrend-persistence',upperUnchanged:true
 
 
 
+/* ============ V25 — 강한 추세 탄생 복구 + 임계값 패턴 흐리기 ============
+   목적
+   - V24의 하락 지속력 / V22의 급락 V자 단기수익 억제는 유지한다.
+   - 조용한 장에서도 10~20분 안에 강한 상승·하락 후보가 자연스럽게 생길 기회를 복구한다.
+   - +30% 추격 / -20% 회피처럼 특정 숫자를 외워 공략하는 고정 임계값은 제거한다.
+   - 후보가 생겨도 실패·중형·강한 추세·극단 tail이 모두 가능하며 방향도 사전에 노출하지 않는다.
+   - ETF 제외, +120% / -90% 최종 안전장치 유지.
+*/
+
+function v25TrendEvent(s,day,minute){
+  if(s?.isETF)return {active:false,dir:0,quality:'none',drive:0,impulse:0,start:false};
+  const act=v11Activity(s,day,minute);
+  const seedBand=Math.floor(minute/10);
+  const len=7+Math.floor(v9Unit(s.code,day,seedBand,'v25-birth-len')*7); // 약 3.5~6.5분
+  const block=Math.floor(minute/len),r=rnd(hash('v25-birth',s.code,day,block));
+  const tierChance={blue:.030,growth:.046,theme:.066,junk:.082}[s.tier]||.044;
+  const activityMul=act.name==='hot'?1.65:act.name==='active'?1.34:act.name==='normal'?.72:.24;
+  const chance=Math.min(.145,tierChance*activityMul);
+  if(r()>chance)return {active:false,dir:0,quality:'none',drive:0,impulse:0,start:false};
+
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const alignedDir=mom?Math.sign(mom):(reg.bias?Math.sign(reg.bias):0);
+  let dir;
+  const d=r();
+  if(alignedDir&&d<.57)dir=alignedDir;
+  else if(reg.bias&&d<.72)dir=Math.sign(reg.bias);
+  else dir=r()<.5?-1:1;
+
+  const q=r();
+  const quality=q<.34?'weak':q<.76?'medium':q<.96?'strong':'tail';
+  const ranges={
+    weak:[.00016,.00034,.012,.028],
+    medium:[.00038,.00078,.027,.057],
+    strong:[.00078,.00138,.055,.100],
+    tail:[.00128,.00205,.090,.155]
+  }[quality];
+  const drive=ranges[0]+r()*(ranges[1]-ranges[0]);
+  const impulse=ranges[2]+r()*(ranges[3]-ranges[2]);
+  const start=(minute%len)===0;
+  return {active:true,dir,quality,drive:dir*drive,impulse:dir*impulse,start};
+}
+
+// 기존 Burst/Extreme은 유지하면서 '강한 추세가 태어나는 빈도'만 복구한다.
+// 후보 자체가 화면에 보이지 않고, 후보 중 상당수는 weak/medium에서 끝나므로 필승 신호가 없다.
+const v25ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function(s,day,minute){
+  let base=Number(v25ExtremeBase(s,day,minute))||0;
+  if(s?.isETF)return base;
+  const ev=v25TrendEvent(s,day,minute);
+  if(!ev.active)return base;
+  const noise=v9Normal('v25-birth-drive-n',s.code,day,minute)*Math.abs(ev.drive)*.18;
+  // 강한 이벤트도 기존 한 틱 안전범위 안에서만 더한다.
+  return Math.max(-.0085,Math.min(.0085,base+ev.drive+noise));
+};
+
+// 이벤트 시작점에는 중형 impulse를 한 번만 허용해, 조용한 장에서도 눈에 띄는 종목이 탄생할 수 있게 한다.
+// 방향은 대칭이며 down 이벤트는 기존 slump와 결합될 수 있다.
+const v25ShockBase=v9Shock;
+v9Shock=function(s,day,minute){
+  const base=v25ShockBase(s,day,minute);
+  if(s?.isETF || (base&&base.ret))return base;
+  const ev=v25TrendEvent(s,day,minute);
+  if(!ev.active||!ev.start)return base||{ret:0,slump:false};
+  // tail impulse는 희귀하며 기존 +120/-90 최종 안전장치를 넘길 수 없다.
+  return {ret:ev.impulse,slump:ev.dir<0&&ev.quality!=='weak'};
+};
+
+// 고정 +14%, -16/-18% 같은 숫자 경계를 최종 post-move 단계에서 사용하지 않는다.
+// 종목/시간대마다 임계값이 달라지고, 그 임계값을 넘어도 결과가 하나로 고정되지 않는다.
+v11PostMove=function(s,day,minute,changeRate){
+  if(s?.isETF)return 0;
+
+  const windowBlock=Math.floor(minute/28); // 약 14분마다 숨은 임계값 재구성
+  const downTrigger=.13+v9Unit(s.code,day,windowBlock,'v25-down-trigger')*.12; // -13~-25%
+  const upTrigger=.15+v9Unit(s.code,day,windowBlock,'v25-up-trigger')*.14;     // +15~+29%
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
+  const alignedDown=reg.bias<0&&mom<0,alignedUp=reg.bias>0&&mom>0;
+
+  // 급락 후: V자 단기수익 억제 유지 + V24의 tail 지속성 유지.
+  if(changeRate<=-downTrigger){
+    const abs=Math.abs(changeRate),severity=Math.max(0,Math.min(1,(abs-downTrigger)/Math.max(.32,.68-downTrigger)));
+    const len=9+Math.floor(v9Unit(s.code,day,Math.floor(minute/10),'v25-down-len')*10); // 4.5~9분
+    const block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v25-down-path');
+
+    // 하락 지속은 강하지만 V24처럼 특정 숫자 아래에서 80~90% 확정적으로 밀리는 구조는 피한다.
+    let pFall=.46+severity*.075+(alignedDown?.065:0)-(alignedUp?.035:0)+(act.name==='hot'?.025:0);
+    pFall=Math.max(.40,Math.min(.66,pFall));
+    let pRebound=.070-severity*.020+(alignedUp?.026:0)-(alignedDown?.018:0);
+    pRebound=Math.max(.025,Math.min(.105,pRebound));
+    const pSide=Math.max(.25,1-pFall-pRebound);
+
+    if(u<pFall){
+      const jitter=v9Normal('v25-down-fall',s.code,day,minute)*(.00022+severity*.00006);
+      const base=-(.00070+severity*.00048+(alignedDown?.00014:0)+(act.name==='hot'?.00010:0));
+      // 직선 하락을 피하기 위한 작은 되돌림. -29 -> -21 같은 V자는 만들지 않을 정도로 제한.
+      if(v9Unit(s.code,day,minute,'v25-down-relief')<(.105-severity*.025))
+        return Math.max(-.00014,Math.min(.00034,.00012+v9Normal('v25-down-relief-n',s.code,day,minute)*.00012));
+      return Math.max(-.00225,Math.min(-.00018,base+jitter));
+    }
+    if(u<pFall+pSide){
+      const n=v9Normal('v25-down-side',s.code,day,minute)*(.00027+severity*.00006);
+      const drag=-(.000025+severity*.000040+(alignedDown?.000050:0))+(alignedUp?.000025:0);
+      return Math.max(-.00060,Math.min(.00038,n+drag));
+    }
+    // 희귀 반등도 되밀림을 자주 섞어 단기 V자 수익 기대값을 낮게 유지.
+    if(v9Unit(s.code,day,minute,'v25-down-rpb')<(.52+severity*.10))
+      return -(.00015+severity*.00018)+v9Normal('v25-down-rpb-n',s.code,day,minute)*.00013;
+    return Math.max(-.00022,Math.min(.00064,.00030+severity*.00012+v9Normal('v25-down-rup',s.code,day,minute)*.00016));
+  }
+
+  // 급등 후: +30~40% 추격이 자동 우위가 되지 않도록 연장/소화/종료를 더 균형 있게 섞는다.
+  if(changeRate>=upTrigger){
+    const heat=Math.max(0,Math.min(1,(changeRate-upTrigger)/Math.max(.35,.82-upTrigger)));
+    const len=10+Math.floor(v9Unit(s.code,day,Math.floor(minute/11),'v25-up-len')*11); // 5~10분
+    const block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v25-up-path');
+    let pContinue=.34-heat*.045+(alignedUp?.040:0)-(alignedDown?.025:0);
+    pContinue=Math.max(.26,Math.min(.40,pContinue));
+    let pFade=.30+heat*.055+(alignedDown?.035:0)-(alignedUp?.020:0);
+    pFade=Math.max(.25,Math.min(.40,pFade));
+    const pChurn=Math.max(.24,1-pContinue-pFade);
+
+    if(u<pContinue){
+      const n=v9Normal('v25-up-cont',s.code,day,minute)*(.00018+heat*.00004);
+      return Math.max(.00020,Math.min(.00145,.00072+heat*.00026+n));
+    }
+    if(u<pContinue+pChurn){
+      // 큰 조정/재상승을 고정 phase로 만들지 않고 매 틱 불규칙하게 소화한다.
+      const n=v9Normal('v25-up-churn',s.code,day,minute)*(.00048+heat*.00010);
+      const drag=-heat*.00010+(alignedUp?.000025:0);
+      return Math.max(-.00115,Math.min(.00100,n+drag));
+    }
+    const n=v9Normal('v25-up-fade',s.code,day,minute)*.00018;
+    // 추세 종료도 가끔 작은 양봉이 섞여 '+30이면 무조건 매도' 역공략을 막는다.
+    if(v9Unit(s.code,day,minute,'v25-up-relief')<.13)return Math.max(-.00008,Math.min(.00038,.00014+n));
+    return Math.max(-.00155,Math.min(-.00016,-(.00062+heat*.00046)+n));
+  }
+
+  // 극단 구간 밖에서는 Regime/Momentum/Activity 자체가 방향을 결정한다.
+  // 숫자 임계값 근처에서 자동 반등/자동 추가상승 신호를 만들지 않는다.
+  return 0;
+};
+
+try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear();V23_QUOTE_CACHE?.clear?.()}catch(e){}
+window.__marketV25={
+  version:25,
+  focus:'trend-birth-pattern-blur',
+  keepsV24DownPersistence:true,
+  keepsAntiVRebound:true,
+  dynamicDownTrigger:'-13~-25%',
+  dynamicUpTrigger:'+15~+29%',
+  trendBirth:true,
+  upperLimit:'+120%',
+  lowerLimit:'-90%',
+  etfExcluded:true
+};
+
+
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
