@@ -1267,6 +1267,63 @@ try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceC
 window.__marketV20={version:20,focus:'anti-dip-exploit',deepDropThreshold:'-12%',fixedReboundPhase:false,fallingKnife:true};
 window.__marketV21={version:21,focus:'deeper-downside',upperLimit:'+120%',lowerLimit:'-90%',etfExcluded:true};
 
+/* ============ V22 — 급락주 V자 단기수익 강력 억제 ============
+   목적: 발견 > 급하락 탭에서 -20~-35% 부근을 매수한 뒤 짧은 시간 내
+   -29% -> -21%처럼 되돌림만 먹는 반복 전략의 기대값을 크게 낮춘다.
+
+   원칙
+   1) -18% 이하 급락 종목은 '즉시 강반등'을 희귀 경로로 제한한다.
+   2) 대부분은 저점 횡보 또는 추가하락으로 머물며, 낙폭이 깊다고 반등확률이 커지지 않는다.
+   3) 상승 Regime이 겹쳐도 반등확률 상한을 제한해 숫자만 보고 바닥을 읽지 못하게 한다.
+   4) 반등 경로조차 작은 되밀림을 자주 섞어 단기 V자 수익을 보장하지 않는다.
+   5) ETF는 제외한다.
+*/
+const v22PostBase=v11PostMove;
+v11PostMove=function(s,day,minute,changeRate){
+  if(s?.isETF || changeRate>-.18)return v22PostBase(s,day,minute,changeRate);
+
+  const abs=Math.abs(changeRate);
+  const severity=Math.max(0,Math.min(1,(abs-.18)/.55));
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const alignedDown=(reg.bias<0&&mom<0),alignedUp=(reg.bias>0&&mom>0);
+
+  // 4~8분가량 같은 후속 성격을 유지하되, 구간 경계 자체는 종목마다 달라진다.
+  const len=8+Math.floor(v9Unit(s.code,day,Math.floor(minute/9),'v22-len')*9);
+  const block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v22-path');
+
+  // 깊은 낙폭일수록 '반등'이 아니라 횡보/추가하락 비중이 높아진다.
+  let pRebound=.075 - severity*.025 + (alignedUp?.035:0) - (alignedDown?.020:0);
+  pRebound=Math.max(.035,Math.min(.115,pRebound));
+  let pFall=.46 + severity*.075 + (alignedDown?.055:0) - (alignedUp?.025:0);
+  pFall=Math.max(.42,Math.min(.60,pFall));
+  const pSide=Math.max(.28,1-pFall-pRebound);
+
+  // ① 추가하락: 떨어지는 칼날. 단, 매 틱 직선 하락이 되지 않도록 잡음을 섞는다.
+  if(u<pFall){
+    const jitter=v9Normal('v22-fall',s.code,day,minute)*(.00020+severity*.00005);
+    const base=-(.00078+severity*.00048+(alignedDown?.00016:0));
+    return Math.max(-.00220,Math.min(-.00022,base+jitter));
+  }
+
+  // ② 저점 횡보: 가장 흔한 경로. 위아래 흔들리지만 평균은 거의 0~약한 하락.
+  if(u<pFall+pSide){
+    const n=v9Normal('v22-side',s.code,day,minute)*(.00027+severity*.00006);
+    const drag=alignedDown?-.00010:alignedUp?.000035:-.000035;
+    return Math.max(-.00062,Math.min(.00042,n+drag));
+  }
+
+  // ③ 반등: 매우 희귀. 반등이 골라도 절반 가까이는 되밀림이 섞이고 강도도 제한한다.
+  const pullbackChance=.44+severity*.10;
+  const pullback=v9Unit(s.code,day,minute,'v22-rebound-pullback')<pullbackChance;
+  if(pullback)return -(.00020+severity*.00024)+v9Normal('v22-rpb',s.code,day,minute)*.00014;
+  const rebound=.00034+severity*.00018+v9Normal('v22-rup',s.code,day,minute)*.00018;
+  return Math.max(-.00030,Math.min(.00076,rebound));
+};
+
+try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
+window.__marketV22={version:22,focus:'anti-v-rebound',deepDropThreshold:'-18%',strongReboundRare:true,etfExcluded:true};
+
+
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
