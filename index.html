@@ -1323,9 +1323,71 @@ v11PostMove=function(s,day,minute,changeRate){
 try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
 window.__marketV22={version:22,focus:'anti-v-rebound',deepDropThreshold:'-18%',strongReboundRare:true,etfExcluded:true};
 
+/* ============ V23 — 모바일 성능 최적화 ============
+   시장 확률/가격 규칙은 변경하지 않고 반복 계산과 렌더링만 줄인다.
+   1) 종목/섹터 정적 인덱스 1회 생성
+   2) V16 Activity의 매호출 STOCKS 전체 스캔 제거
+   3) V18 찌라시 대상 배열의 반복 생성 제거
+   4) quote 결과를 짧게 캐시하여 같은 화면 프레임의 중복 가격 계산 제거
+   5) 숫자 UI 300ms -> 1000ms, 차트 120ms -> 750ms
+*/
+const V23_STOCK_BY_CODE=new Map(STOCKS.map(s=>[s.code,s]));
+const V23_NON_ETF_STOCKS=STOCKS.filter(s=>!s.isETF);
+const V23_SECTORS=[...new Set(V23_NON_ETF_STOCKS.map(s=>s.sector))];
+
+// V16과 결과가 동일하되 sectors를 매 호출마다 다시 만들지 않는다.
+v11Activity=function(s,day,minute){
+  if(s?.isETF)return v16ActivityPrevious(s,day,minute);
+  const seed=Math.floor(minute/12),len=6+Math.floor(v9Unit(s.code,day,seed,'v16-act-len')*15),block=Math.floor(minute/len);
+  const u=v9Unit(s.code,day,block,'v16-activity');
+  const tierBias={blue:-.025,growth:0,theme:.020,junk:.035}[s.tier]||0;
+  const x=Math.max(0,Math.min(.999,u+tierBias));
+  let a;
+  if(x<.23)a={name:'quiet',mult:.54,flow:.68};
+  else if(x<.63)a={name:'normal',mult:1.18,flow:1.16};
+  else if(x<.90)a={name:'active',mult:2.55,flow:2.65};
+  else a={name:'hot',mult:4.35,flow:4.70};
+  const rotBlock=Math.floor(minute/36),hotSector=V23_SECTORS[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,V23_SECTORS.length)];
+  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  return a;
+};
+
+// V18 찌라시 생성 결과는 그대로 두고 정적 배열만 재사용한다.
+v18RumorEvent=function(day,minute,index=0){
+  const block=Math.floor(minute/12),r=rnd(hash('v18-rumor',day,block,index));
+  const targetStock=r()<.34?V23_NON_ETF_STOCKS[Math.floor(r()*V23_NON_ETF_STOCKS.length)]:null;
+  const sector=targetStock?targetStock.sector:V23_SECTORS[Math.floor(r()*V23_SECTORS.length)];
+  const sentiment=r()<.51?1:-1,behaviorRoll=r();
+  const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
+  const posActions=['대형 수주 기대','실적 개선 기대','외국인 매수 유입설','신규 공급계약 가능성','정책 수혜 기대','증설 검토설','목표가 상향 움직임','업황 회복 기대'];
+  const negActions=['수익성 둔화 우려','외국인 매도 확대설','원가 부담 우려','수요 둔화 전망','차익실현 매물 경계','규제 부담 가능성','실적 눈높이 하향','공급 과잉 우려'];
+  const endings=['시장 관심이 커지고 있다는 얘기','장중 수급이 엇갈린다는 관측','이미 가격에 일부 반영됐다는 시각도 공존','확인되지 않은 이야기라 변동성에 유의','재료 해석을 두고 의견이 갈리는 분위기','단기 매매세가 붙을 수 있다는 관측'];
+  const targetName=targetStock?targetStock.name:`${sector} 업종`,actions=sentiment>0?posActions:negActions;
+  const action=actions[Math.floor(r()*actions.length)],text=`${targetName}, ${action}… ${endings[Math.floor(r()*endings.length)]}`;
+  return {day,block,index,targetCode:targetStock?.code||'',sector,sentiment,behavior,text};
+};
+
+// 동일 1초 안에서 render/header/정렬/refresh가 같은 종목 quote를 반복 계산하지 않게 한다.
+const v23QuoteBase=quote,V23_QUOTE_CACHE=new Map();
+quote=function(s){
+  if(!s)return {price:0,open:0,change:0,volume:0,day:0,minute:0};
+  const slot=Math.floor(Date.now()/1000),tick=sessionTick(),key=s.code+'|'+tick+'|'+slot;
+  const hit=V23_QUOTE_CACHE.get(key);if(hit)return hit;
+  const q=v23QuoteBase(s);
+  if(V23_QUOTE_CACHE.size>1400)V23_QUOTE_CACHE.clear();
+  V23_QUOTE_CACHE.set(key,q);return q;
+};
+rawQuote=quote;
+
+// 자주 쓰는 code lookup도 O(n) find 대신 Map을 사용한다.
+const v23StockByCode=code=>V23_STOCK_BY_CODE.get(code);
+
+window.__marketV23={version:23,focus:'performance',quoteCacheMs:1000,uiRefreshMs:1000,chartRefreshMs:750,marketRulesChanged:false};
 
 
-(async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
+
+
+(async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
 
 /* ============ V15 — 저비용 1시간 스냅샷 랭킹 ============
