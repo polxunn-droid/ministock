@@ -526,7 +526,7 @@ ranks=function(){
    7) 상승/횡보/하락 국면  8) 이동형 중심가격  9) 급락 후 침체·횡보
    10) 변동성 국면  11) 섹터 동조화
 */
-const MARKET_V9_SPEED=7.5; // 현실 약 29.5초 = 게임 1틱 (유지)
+const MARKET_V9_SPEED=12; // 현실 약 29.5초 = 게임 1틱 (유지)
 acceleratedMs=function(ms){return MARKET_REFERENCE_AT+(ms-MARKET_REFERENCE_AT)*MARKET_V9_SPEED};
 
 const v9PriceCache=new Map(),v9OpenCache=new Map();
@@ -3159,6 +3159,64 @@ window.__marketV412 = {
   discoverAndDetailUnified: true,
   priceEngineChanged: false
 };
+</script>
+
+
+<script>
+/* ============ V42 — Extreme depth 실제 반영 + 시장속도 12x ============
+   1) currentChange를 Extreme '크기'에 실제 사용
+      - 방향확률은 변경하지 않음
+      - 깊은 하락일수록 추가 하락 extreme의 거리만 연속적으로 보강
+      - 깊은 상승은 동일 논리로 약하게 압축해 퍼센트 공간 비대칭 완화
+      - 특정 -20/-30% 하드 트리거 없음
+   2) MARKET_V9_SPEED 7.5 -> 12
+      - 10분 플레이 체감을 기존 약 20분 수준에 가깝게 압축
+   3) postMove / shock log1p / 체결보호 / ETF / 전일종가 표시 기준 유지
+*/
+function v42Clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+
+const v42ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function v42DepthAwareExtreme(s,day,minute,currentChange=0){
+  let ret=Number(v42ExtremeBase(s,day,minute,currentChange))||0;
+  if(s?.isETF || ret===0)return ret;
+
+  const cc=v42Clamp(Number(currentChange)||0,-.70,.90);
+
+  // 가격공간 보정은 '현재 방향으로 더 뻗는 extreme'에만 적용.
+  // 반등/되밀림의 방향확률 자체는 건드리지 않는다.
+  if(ret<0 && cc<0){
+    const depth=-cc;
+    const mult=1.04 + Math.min(.55, depth*1.30);
+    ret*=mult;
+  }else if(ret>0 && cc>0){
+    const height=cc;
+    const mult=1 / (1 + Math.min(.30,height*.42));
+    ret*=mult;
+  }
+
+  return v42Clamp(ret,-.00245,.00210);
+};
+
+// 속도는 const 재선언 문제를 피하기 위해 기존 선언부를 아래에서 실제 치환함.
+window.__marketV42={
+  version:42,
+  depthAwareExtreme:true,
+  hardPercentTrigger:false,
+  directionProbabilityChanged:false,
+  targetMarketSpeed:12,
+  postMoveChanged:false,
+  shockLog1pPreserved:true,
+  executionGuardPreserved:true,
+  prevCloseBasisPreserved:true
+};
+
+try{
+  v9PriceCache?.clear?.();
+  referenceScaleCache?.clear?.();
+  dayOpenCache?.clear?.();
+  priceCache?.clear?.();
+  V23_QUOTE_CACHE?.clear?.();
+}catch(e){}
 </script>
 
 </body></html>
