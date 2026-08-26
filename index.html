@@ -1854,29 +1854,106 @@ setInterval(()=>{
 // 앱 연결 직후 자기 점수는 현재 시간 슬롯에 한 번만 저장한다.
 (function v15WaitReady(){if(state&&Store.online&&Store.db&&Store.uid){Store.scheduleScore(false);if(view==='ranking')loadHourlyRanking(false);return}setTimeout(v15WaitReady,900)})();
 window.__rankingV15={version:15,slot:rankSlotInfo,load:loadHourlyRanking};
-
-
-/* ============ V28 — 시장엔진 1단계 구조수정 ============
-   P0: 장중 게임일 경계의 독립 시가 초기화 제거 (세션 내 직전 종가 연결)
-   P1: 급등/급락 한쪽 방향의 구조적 기대값 과교정 완화
-   P2: 실제 활성 postMove를 V28 단일 함수로 명시
-   P3: 주문창 가격 5초 만료 — 오래된 체결가 악용 차단
-   UI: 홈의 장중 랜덤 보상 카드를 최종 home()에서도 보장
+</script>
+<script>
+/* ============ V29 — 전환 안전형 1단계 엔진 수정 ============
+   - 2026-08-27 08:00 KST 전까지는 V27 시세를 그대로 사용
+   - 전환 순간 각 종목의 V27 가격에 새 엔진을 정확히 앵커링
+   - 전환 이후 같은 장중 게임일 경계는 직전 종가에서 이어짐
+   - 급등/급락 기대값 과교정 완화
+   - 주문가격 5초 만료
+   - 홈 장중 보상 카드 표시 보장
 */
+const V29_TRANSITION_MS = Date.parse('2026-08-27T08:00:00+09:00');
 
-// ---------- P0. 세션 내 게임일 연속성 ----------
-const v28LegacyDayOpen=v9DayOpen;
-const V28_OPEN_CACHE=new Map(),V28_CLOSE_CACHE=new Map();
-function v28SessionAnchorDay(){
-  const ems=effectiveMarketRealMs(Date.now()),d=new Date(ems);
-  const openReal=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
+// V27의 실제 동작 함수들을 먼저 보존한다.
+const v29LegacyDayOpen = v9DayOpen;
+const v29LegacyRawPriceAt = v9RawPriceAt;
+const v29LegacyPostMove = v11PostMove;
+
+const V29_OPEN_CACHE = new Map();
+const V29_CLOSE_CACHE = new Map();
+const V29_SCALE_CACHE = new Map();
+
+function v29TransitionTick(){
+  return marketTickAt(acceleratedMs(effectiveMarketRealMs(V29_TRANSITION_MS)));
+}
+function v29SessionAnchorDay(){
+  const ems = effectiveMarketRealMs(Date.now()), d = new Date(ems);
+  const openReal = new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
   return Math.floor(marketTickAt(acceleratedMs(openReal))/390);
 }
-function v28RawWithOpen(s,day,minute,open){
+
+// P1/P2 — 현재 활성 postMove는 이 함수 하나다.
+v11PostMove = function v29PostMove(s,day,minute,changeRate){
+  if(s?.isETF)return 0;
+  const windowBlock=Math.floor(minute/28);
+  const downTrigger=.13+v9Unit(s.code,day,windowBlock,'v29-down-trigger')*.12;
+  const upTrigger=.15+v9Unit(s.code,day,windowBlock,'v29-up-trigger')*.14;
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
+  const alignedDown=reg.bias<0&&mom<0,alignedUp=reg.bias>0&&mom>0;
+
+  if(changeRate<=-downTrigger){
+    const abs=Math.abs(changeRate),severity=Math.max(0,Math.min(1,(abs-downTrigger)/Math.max(.32,.68-downTrigger)));
+    const len=9+Math.floor(v9Unit(s.code,day,Math.floor(minute/10),'v29-down-len')*10),block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v29-down-path');
+    let pFall=.38+severity*.05+(alignedDown?.040:0)-(alignedUp?.030:0)+(act.name==='hot'?.015:0);
+    pFall=Math.max(.33,Math.min(.52,pFall));
+    let pRebound=.22-severity*.05+(alignedUp?.040:0)-(alignedDown?.030:0);
+    pRebound=Math.max(.12,Math.min(.30,pRebound));
+    const pSide=Math.max(.24,1-pFall-pRebound);
+
+    if(u<pFall){
+      const jitter=v9Normal('v29-down-fall',s.code,day,minute)*(.00020+severity*.00005);
+      const base=-(.00045+severity*.00028+(alignedDown?.00008:0)+(act.name==='hot'?.00005:0));
+      if(v9Unit(s.code,day,minute,'v29-down-relief')<(.14-severity*.025))
+        return Math.max(-.00014,Math.min(.00038,.00013+v9Normal('v29-down-relief-n',s.code,day,minute)*.00013));
+      return Math.max(-.00155,Math.min(-.00012,base+jitter));
+    }
+    if(u<pFall+pSide){
+      const n=v9Normal('v29-down-side',s.code,day,minute)*(.00028+severity*.00005);
+      const drag=-(.000010+severity*.000020+(alignedDown?.000025:0))+(alignedUp?.000035:0);
+      return Math.max(-.00058,Math.min(.00048,n+drag));
+    }
+    const pullback=v9Unit(s.code,day,minute,'v29-down-rpb')<(.38+severity*.06);
+    if(pullback)return -(.00010+severity*.00012)+v9Normal('v29-down-rpb-n',s.code,day,minute)*.00015;
+    return Math.max(-.00020,Math.min(.00090,.00042+severity*.00016+v9Normal('v29-down-rup',s.code,day,minute)*.00020));
+  }
+
+  if(changeRate>=upTrigger){
+    const heat=Math.max(0,Math.min(1,(changeRate-upTrigger)/Math.max(.35,.82-upTrigger)));
+    const len=10+Math.floor(v9Unit(s.code,day,Math.floor(minute/11),'v29-up-len')*11),block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v29-up-path');
+    let pContinue=.29-heat*.045+(alignedUp?.030:0)-(alignedDown?.025:0);
+    pContinue=Math.max(.22,Math.min(.35,pContinue));
+    let pFade=.34+heat*.055+(alignedDown?.030:0)-(alignedUp?.015:0);
+    pFade=Math.max(.29,Math.min(.44,pFade));
+    const pChurn=Math.max(.24,1-pContinue-pFade);
+
+    if(u<pContinue){
+      const n=v9Normal('v29-up-cont',s.code,day,minute)*(.00019+heat*.00004);
+      return Math.max(.00014,Math.min(.00122,.00060+heat*.00022+n));
+    }
+    if(u<pContinue+pChurn){
+      const n=v9Normal('v29-up-churn',s.code,day,minute)*(.00050+heat*.00010);
+      const drag=-heat*.00012+(alignedUp?.000015:0);
+      return Math.max(-.00120,Math.min(.00100,n+drag));
+    }
+    const n=v9Normal('v29-up-fade',s.code,day,minute)*.00019;
+    if(v9Unit(s.code,day,minute,'v29-up-relief')<.15)
+      return Math.max(-.00010,Math.min(.00040,.00013+n));
+    return Math.max(-.00148,Math.min(-.00012,-(.00058+heat*.00040)+n));
+  }
+  return 0;
+};
+
+function v29RawWithOpen(s,day,minute,open){
   let p=open,slumpUntil=-1,center=open;
   for(let i=0;i<=minute;i++){
     const reg=v9Regime(s,day,i),mom=v9Momentum(s,day,i),vol=v9Volatility(s,day,i),act=v11Activity(s,day,i),shock=v9Shock(s,day,i);
-    if(shock.ret){p*=Math.exp(shock.ret);center*=Math.exp(shock.ret*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));}
+    if(shock.ret){
+      p*=Math.exp(shock.ret);
+      center*=Math.exp(shock.ret*.78);
+      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
+    }
     const slumpBias=i<slumpUntil?-.000045:0;
     const sigma=.00032*vol*act.mult;
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
@@ -1884,108 +1961,96 @@ function v28RawWithOpen(s,day,minute,open){
     const extreme=v11ExtremeDrive(s,day,i),post=v11PostMove(s,day,i,currentChange);
     let ret=(reg.bias+mom+slumpBias)*(.72+act.mult*.34)+v9MarketImpulse(day,i)*.28+v9SectorImpulse(s,day,i)*.32+noise+extreme+post;
     center*=Math.exp((reg.bias+slumpBias)*.25);
-    const gap=Math.log(Math.max(1,center)/Math.max(1,p));ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
-    ret=Math.max(-.012,Math.min(.012,ret));p*=Math.exp(ret);
+    const gap=Math.log(Math.max(1,center)/Math.max(1,p));
+    ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
+    ret=Math.max(-.012,Math.min(.012,ret));
+    p*=Math.exp(ret);
     p=Math.max(open*.10,Math.min(open*2.20,p));
   }
   return p;
 }
-function v28ChainedDayOpen(s,day){
-  const anchor=v28SessionAnchorDay();
-  // 현재 장 세션 범위만 연결한다. 08:00에는 기존 일봉 앵커로 재시작해 오버나이트 갭은 허용한다.
-  if(day<anchor||day>anchor+7)return v28LegacyDayOpen(s,day);
-  const key=s.code+'|'+anchor+'|'+day;if(V28_OPEN_CACHE.has(key))return V28_OPEN_CACHE.get(key);
-  let open=v28LegacyDayOpen(s,anchor);V28_OPEN_CACHE.set(s.code+'|'+anchor+'|'+anchor,open);
+
+function v29ModelDayOpen(s,day){
+  const anchor=v29SessionAnchorDay();
+  if(day<anchor||day>anchor+7)return v29LegacyDayOpen(s,day);
+  const key=s.code+'|'+anchor+'|'+day;
+  if(V29_OPEN_CACHE.has(key))return V29_OPEN_CACHE.get(key);
+
+  let open=v29LegacyDayOpen(s,anchor);
+  V29_OPEN_CACHE.set(s.code+'|'+anchor+'|'+anchor,open);
+
   for(let d=anchor;d<day;d++){
     const ck=s.code+'|'+anchor+'|close|'+d;
-    let close=V28_CLOSE_CACHE.get(ck);
+    let close=V29_CLOSE_CACHE.get(ck);
     if(!Number.isFinite(close)){
-      close=v28RawWithOpen(s,d,389,open);
-      V28_CLOSE_CACHE.set(ck,close);
+      close=v29RawWithOpen(s,d,389,open);
+      V29_CLOSE_CACHE.set(ck,close);
     }
-    // 경계 갭은 평균 0, σ 약 0.9%, ±3% 제한. 시간만 외워 확정수익을 내지 못하도록 독립 난수를 사용한다.
-    const gap=Math.max(-.03,Math.min(.03,v9Normal('v28-day-gap',s.code,d)*.009));
+    const gap=Math.max(-.03,Math.min(.03,v9Normal('v29-day-gap',s.code,d)*.009));
     open=Math.max(1,close*Math.exp(gap));
-    V28_OPEN_CACHE.set(s.code+'|'+anchor+'|'+(d+1),open);
+    V29_OPEN_CACHE.set(s.code+'|'+anchor+'|'+(d+1),open);
   }
-  if(V28_OPEN_CACHE.size>5000){V28_OPEN_CACHE.clear();V28_CLOSE_CACHE.clear()}
   return open;
 }
-v9DayOpen=v28ChainedDayOpen;
 
-// ---------- P1/P2. 단일 활성 postMove + 양방향 기대값 균형 ----------
-v11PostMove=function v28PostMove(s,day,minute,changeRate){
-  if(s?.isETF)return 0;
-  const windowBlock=Math.floor(minute/28);
-  const downTrigger=.13+v9Unit(s.code,day,windowBlock,'v28-down-trigger')*.12;
-  const upTrigger=.15+v9Unit(s.code,day,windowBlock,'v28-up-trigger')*.14;
-  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
-  const alignedDown=reg.bias<0&&mom<0,alignedUp=reg.bias>0&&mom>0;
+function v29ModelRaw(s,t){
+  const day=Math.floor(t/390),minute=((t%390)+390)%390,open=v29ModelDayOpen(s,day);
+  const p=v29RawWithOpen(s,day,minute,open);
+  return {price:Math.max(1,Math.round(p/10)*10),open:Math.max(1,Math.round(open/10)*10),day,minute};
+}
 
-  if(changeRate<=-downTrigger){
-    const abs=Math.abs(changeRate),severity=Math.max(0,Math.min(1,(abs-downTrigger)/Math.max(.32,.68-downTrigger)));
-    const len=9+Math.floor(v9Unit(s.code,day,Math.floor(minute/10),'v28-down-len')*10),block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v28-down-path');
-    let pFall=.38+severity*.05+(alignedDown?.040:0)-(alignedUp?.030:0)+(act.name==='hot'?.015:0);
-    pFall=Math.max(.33,Math.min(.52,pFall));
-    let pRebound=.22-severity*.05+(alignedUp?.040:0)-(alignedDown?.030:0);
-    pRebound=Math.max(.12,Math.min(.30,pRebound));
-    const pSide=Math.max(.24,1-pFall-pRebound);
-    if(u<pFall){
-      const jitter=v9Normal('v28-down-fall',s.code,day,minute)*(.00020+severity*.00005);
-      const base=-(.00045+severity*.00028+(alignedDown?.00008:0)+(act.name==='hot'?.00005:0));
-      if(v9Unit(s.code,day,minute,'v28-down-relief')<(.14-severity*.025))return Math.max(-.00014,Math.min(.00038,.00013+v9Normal('v28-down-relief-n',s.code,day,minute)*.00013));
-      return Math.max(-.00155,Math.min(-.00012,base+jitter));
-    }
-    if(u<pFall+pSide){
-      const n=v9Normal('v28-down-side',s.code,day,minute)*(.00028+severity*.00005);
-      const drag=-(.000010+severity*.000020+(alignedDown?.000025:0))+(alignedUp?.000035:0);
-      return Math.max(-.00058,Math.min(.00048,n+drag));
-    }
-    const pullback=v9Unit(s.code,day,minute,'v28-down-rpb')<(.38+severity*.06);
-    if(pullback)return -(.00010+severity*.00012)+v9Normal('v28-down-rpb-n',s.code,day,minute)*.00015;
-    return Math.max(-.00020,Math.min(.00090,.00042+severity*.00016+v9Normal('v28-down-rup',s.code,day,minute)*.00020));
-  }
+// 전환 순간의 V27 가격 = 새 엔진의 시작 가격.
+// 이 scale은 종목마다 한 번 계산되고 세션 내 계속 동일하다.
+function v29MigrationScale(s){
+  const anchor=v29SessionAnchorDay();
+  const key=s.code+'|'+anchor;
+  if(V29_SCALE_CACHE.has(key))return V29_SCALE_CACHE.get(key);
 
-  if(changeRate>=upTrigger){
-    const heat=Math.max(0,Math.min(1,(changeRate-upTrigger)/Math.max(.35,.82-upTrigger)));
-    const len=10+Math.floor(v9Unit(s.code,day,Math.floor(minute/11),'v28-up-len')*11),block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v28-up-path');
-    let pContinue=.29-heat*.045+(alignedUp?.030:0)-(alignedDown?.025:0);
-    pContinue=Math.max(.22,Math.min(.35,pContinue));
-    let pFade=.34+heat*.055+(alignedDown?.030:0)-(alignedUp?.015:0);
-    pFade=Math.max(.29,Math.min(.44,pFade));
-    const pChurn=Math.max(.24,1-pContinue-pFade);
-    if(u<pContinue){const n=v9Normal('v28-up-cont',s.code,day,minute)*(.00019+heat*.00004);return Math.max(.00014,Math.min(.00122,.00060+heat*.00022+n))}
-    if(u<pContinue+pChurn){const n=v9Normal('v28-up-churn',s.code,day,minute)*(.00050+heat*.00010),drag=-heat*.00012+(alignedUp?.000015:0);return Math.max(-.00120,Math.min(.00100,n+drag))}
-    const n=v9Normal('v28-up-fade',s.code,day,minute)*.00019;
-    if(v9Unit(s.code,day,minute,'v28-up-relief')<.15)return Math.max(-.00010,Math.min(.00040,.00013+n));
-    return Math.max(-.00148,Math.min(-.00012,-(.00058+heat*.00040)+n));
-  }
-  return 0;
+  const tt=v29TransitionTick();
+  const legacy=v29LegacyRawPriceAt(s,tt);
+  const model=v29ModelRaw(s,tt);
+  const scale=(legacy?.price>0&&model?.price>0)?legacy.price/model.price:1;
+  const safe=Math.max(.20,Math.min(5,scale));
+  V29_SCALE_CACHE.set(key,safe);
+  return safe;
+}
+
+v9RawPriceAt=function v29RawPriceAt(s,t=marketTick()){
+  const tt=v29TransitionTick();
+
+  // 배포 당일 장 마감까지는 기존 V27 가격을 그대로 보여준다.
+  if(Date.now()<V29_TRANSITION_MS || t<tt)return v29LegacyRawPriceAt(s,t);
+
+  const raw=v29ModelRaw(s,t),scale=v29MigrationScale(s);
+  return {
+    ...raw,
+    price:Math.max(1,Math.round(raw.price*scale/10)*10),
+    open:Math.max(1,Math.round(raw.open*scale/10)*10)
+  };
 };
+priceAt=v9RawPriceAt;
 
-// V18에서 방향을 바꾸지 않고 난수만 소비하던 무의미한 효과는 V28 결과에 관여하지 않는다.
-// 현재 실제 postMove는 위 v28PostMove 하나이며, 구버전 V18~V25 postMove 정의는 호환용 코드일 뿐 실행되지 않는다.
-
-// ---------- P3. 오래된 주문가격 악용 차단 ----------
-const v28OrderSheetBase=orderSheet;
+// P3 — 주문창 가격은 5초만 유효.
+const v29OrderSheetBase=orderSheet;
 orderSheet=function(type){
-  const out=v28OrderSheetBase(type);
+  const out=v29OrderSheetBase(type);
   if(pendingOrder&&pendingOrder.code)pendingOrder.at=Date.now();
   return out;
 };
-const v28TradeBase=trade;
+const v29TradeBase=trade;
 trade=async function(type,qty){
   if(pendingOrder&&Date.now()-(+pendingOrder.at||0)>5000){
-    pendingOrder=null;document.querySelector('.overlay')?.remove();
+    pendingOrder=null;
+    document.querySelector('.overlay')?.remove();
     return toast('가격이 변동되어 주문이 만료됐어요. 다시 주문해주세요');
   }
-  return v28TradeBase(type,qty);
+  return v29TradeBase(type,qty);
 };
 
-// ---------- 홈 보상카드 표시 보장 ----------
-const v28HomeBase=home;
+// 홈 보상카드 표시 보장
+const v29HomeBase=home;
 home=function(){
-  let html=v28HomeBase();
+  let html=v29HomeBase();
   if(typeof hourlyRewardCard==='function'&&!html.includes('data-hourly-reward')){
     const card=hourlyRewardCard(),marker='<div class="cards home-balance">';
     if(html.includes(marker))html=html.replace(marker,card+marker);
@@ -1994,6 +2059,24 @@ home=function(){
   return html;
 };
 
-try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear();V23_QUOTE_CACHE?.clear?.()}catch(e){}
-window.__marketV28={version:28,stage:1,continuousSessionDays:true,postMove:'v28PostMove',staleQuoteMs:5000,rewardHomeGuaranteed:true};
-</script></body></html>
+try{
+  v9PriceCache?.clear?.();
+  referenceScaleCache?.clear?.();
+  dayOpenCache?.clear?.();
+  priceCache?.clear?.();
+  V23_QUOTE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV29={
+  version:29,
+  transitionAt:'2026-08-27T08:00:00+09:00',
+  transitionSafe:true,
+  legacyBeforeTransition:true,
+  continuousSessionDays:true,
+  postMove:'v29PostMove',
+  staleQuoteMs:5000,
+  rewardHomeGuaranteed:true
+};
+</script>
+
+</body></html>
