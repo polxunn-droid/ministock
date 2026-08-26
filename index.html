@@ -92,7 +92,7 @@ function normal(r){return Math.sqrt(-2*Math.log(Math.max(r(),1e-9)))*Math.cos(2*
 function marketTickAt(ms){const d=new Date(ms),start=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),day=Math.round((start-MARKET_EPOCH)/DAY_MS),elapsed=Math.max(0,Math.min(DAY_MS-1,ms-start));return day*DAY_STEPS+Math.floor(elapsed/DAY_MS*DAY_STEPS)}
 // 실제 24시간 = 게임 내 30분으로 압축(48배속). "지금(기준 시점)"을 앵커로 삼아서 앞으로만 빨라지고,
 // 기준가 계산(MARKET_REFERENCE_TICK 등)은 이 함수를 거치지 않고 marketTickAt을 직접 쓰기 때문에 영향받지 않는다.
-const GAME_SPEED=48;
+const GAME_SPEED=24;
 function acceleratedMs(ms){return MARKET_REFERENCE_AT+(ms-MARKET_REFERENCE_AT)*GAME_SPEED}
 function marketTick(){return marketTickAt(acceleratedMs(Date.now()))}
 function priceAt(s,t=marketTick()){const day=Math.floor(t/390),minute=((t%390)+390)%390;let p=s.base;const start=Math.max(0,day-365);for(let d=start;d<day;d++){const r=rnd(hash('day',s.code,d)),m=rnd(hash('market',d));let ret=(s.drift-s.sigma*s.sigma/2)+s.sigma*normal(r)+s.beta*.006*normal(m);if(r()<({blue:.001,growth:.006,theme:.035,junk:.09}[s.tier]))ret+=(r()<.52?1:-1)*(.05+r()*.25);p*=Math.exp(Math.max(-.3,Math.min(.3,ret)))}const open=p;for(let i=0;i<=minute;i++){const r=rnd(hash('tick',s.code,day,i)),m=rnd(hash('mtick',day,i));let sig=s.sigma/Math.sqrt(390),ret=s.drift/390+sig*normal(r)+s.beta*.003*normal(m);if(r()<({blue:.0002,growth:.001,theme:.004,junk:.009}[s.tier]))ret+=(r()<.5?1:-1)*(.05+r()*.18);p*=Math.exp(ret);p=Math.max(open*.7,Math.min(open*1.3,p))}return{price:Math.max(1,Math.round(p/10)*10),open:Math.round(open/10)*10,day,minute}}
