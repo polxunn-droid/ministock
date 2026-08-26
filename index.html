@@ -25,6 +25,22 @@
 .rumor-wrap{margin:14px 0 28px;position:relative;overflow:hidden;border:1px solid #e5dcff;border-radius:18px;background:linear-gradient(135deg,#f7f2ff,#fff)}
 .rumor-head{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 7px;color:#6f52b5;font-weight:800;font-size:14px}.rumor-head small{font-size:10px;color:#9b8ec6;font-weight:700}
 .rumor-viewport{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.rumor-viewport::-webkit-scrollbar{display:none}.rumor-track{display:flex}.rumor-card{min-width:100%;scroll-snap-align:start;padding:8px 16px 18px;min-height:89px}.rumor-card b{display:block;margin-bottom:6px;color:#30343b;font-size:13px}.rumor-card p{margin:0;line-height:1.48;font-size:14px;word-break:keep-all}.rumor-card small{display:block;margin-top:7px;color:var(--muted);font-size:10px}.rumor-dots{display:flex;gap:5px;justify-content:center;padding:0 0 10px}.rumor-dot{width:5px;height:5px;border-radius:50%;background:#d9d1ee}.rumor-dot.on{background:#6f52b5;width:14px;border-radius:5px}
+
+/* ============ V26 — 보유 ETF 긴 종목명 레이아웃 잘림 수정 ============
+   긴 ETF 명칭이 가운데 열의 최소 폭을 밀어 우측 평가금액이 화면 밖으로 나가던 문제를 수정.
+   종목명은 한 줄 말줄임 처리하고 평가금액 영역은 모바일에서도 항상 확보한다. */
+.holding{grid-template-columns:44px minmax(0,1fr) 128px!important}
+.holding>div:nth-child(2){min-width:0;overflow:hidden}
+.holding .name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.holding .sub{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.holding .price{width:128px;min-width:128px;max-width:128px;overflow:visible;text-align:right;white-space:nowrap;font-size:15px}
+.holding .price small{font-size:12px;white-space:nowrap}
+.portfolio-list .holding{grid-template-columns:44px minmax(0,1fr) 128px!important}
+@media(max-width:359px){
+  .holding,.portfolio-list .holding{grid-template-columns:40px minmax(0,1fr) 112px!important;gap:9px}
+  .holding .price{width:112px;min-width:112px;max-width:112px;font-size:14px}
+  .holding .price small{font-size:11px}
+}
 </style></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
