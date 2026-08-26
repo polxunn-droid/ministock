@@ -2896,29 +2896,25 @@ try{
 function v39Clamp(x,a,b){return Math.max(a,Math.min(b,x));}
 const v39ExtremeBase=v11ExtremeDrive;
 
-v11ExtremeDrive=function v40TailDistanceBalancedExtreme(s,day,minute,currentChange=0){
+v11ExtremeDrive=function v41TailPercentSpaceExtreme(s,day,minute,currentChange=0){
   let ret=Number(v39ExtremeBase(s,day,minute,currentChange))||0;
   if(s?.isETF || ret===0)return ret;
 
-  // 현재 등락률은 기존 raw loop에서 직접 전달되지 않으므로,
-  // 같은 day/minute의 deterministic state를 이용해 하방 이벤트의
-  // 깊이 보정을 단계적으로 누적한다. 방향확률 자체는 그대로.
-  if(ret<0){
-    const block=Math.floor(minute/18);
-    const depthSeed=v9Unit(s.code,day,block,'v39-down-depth');
-    // 대부분은 약한 보정, 일부 하방 이벤트만 긴 tail.
-    // 평균 약 1.13배, 최대 약 1.42배.
-    const mult=1.04 + depthSeed*.20
-      + (depthSeed>.86 ? (depthSeed-.86)/.14*.18 : 0);
-    ret*=mult;
-  }else{
-    // 상방은 V38 그대로에 가깝게 두되 극단 이벤트만 아주 소폭 압축.
-    const block=Math.floor(minute/18);
-    const u=v9Unit(s.code,day,block,'v39-up-cap');
-    ret*=.97+u*.04; // 0.97~1.01
-  }
+  /*
+    가격은 exp(ret)로 움직이므로 같은 log-return 충격은
+    이미 오른 종목에서 퍼센트 상승폭을 더 크게, 이미 내린 종목에서는
+    퍼센트 하락폭을 더 작게 보이게 한다.
+    방향 확률은 건드리지 않고 Extreme의 '크기'만 현재 가격공간에 맞춰 보정.
+  */
+  const cc=v39Clamp(Number(currentChange)||0,-.72,.95);
+  let scale=1/(1+cc);
+  // 한 틱에서 과도한 폭발/반등을 막는 연속형 안전 범위.
+  scale=v39Clamp(scale,.68,1.65);
 
-  return v39Clamp(ret,-.00215,.00178);
+  // 꼬리 보정은 extreme 성분에만 적용. 일반 noise/regime/momentum은 그대로.
+  ret*=scale;
+
+  return v39Clamp(ret,-.00235,.00205);
 };
 
 window.__marketV39={
@@ -2963,6 +2959,21 @@ window.__marketV40={
   postMoveChanged:false,
   executionGuardPreserved:true,
   etfRoutingPreserved:true
+};
+</script>
+
+
+<script>
+window.__marketV41={
+ version:41,
+ baseVersion:40,
+ currentChangeUsedInExtremeMagnitude:true,
+ percentSpaceScale:'clamp(1/(1+currentChange),0.68,1.65)',
+ directionProbabilityChanged:false,
+ regimeChanged:false,
+ marketImpulseChanged:false,
+ postMoveChanged:false,
+ shockPercentSymmetryPreserved:true
 };
 </script>
 
