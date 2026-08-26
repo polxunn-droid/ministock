@@ -129,7 +129,7 @@ function v3VisualPrice(s){const t=marketTick(),a=realisticPriceAt(s,t),b=realist
 window.__marketTest={tick:marketTick,pricesAtTick:t=>STOCKS.map(s=>displayedAt(s,t).price),referencePrices:{...MARKET_REFERENCE_PRICES}};
 const memory={};const LocalStore={async loadMe(id){try{return JSON.parse(localStorage.getItem('mockstock:'+id))}catch{return memory[id]}},async saveMe(id,v){v.marketVersion=5;try{localStorage.setItem('mockstock:'+id,JSON.stringify(v))}catch{memory[id]=v}}};
 const nicknameKey=name=>encodeURIComponent(cleanNickname(name).normalize('NFKC').toLocaleLowerCase('ko-KR'));
-const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=this.db.collection('ranking').orderBy('totalValue','desc').limit(100).onSnapshot(snapshot=>{this.rankingRows=snapshot.docs.map(doc=>({uid:doc.id,...doc.data()})).filter(x=>typeof x.nickname==='string'&&x.nickname.trim()&&x.nickname!=='게스트'&&Number.isFinite(x.totalValue)&&Number.isFinite(x.pnlRate));if(state&&view==='ranking'&&!selected&&!document.querySelector('.overlay'))render()},()=>{this.online=false});return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,8000-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<8000){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
+const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,8000-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<8000){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
 let userId=(()=>{try{return localStorage.getItem('mockstock:uid')||''}catch{return''}})(),state=null,view='home',selected=null,accountView=false,sort='value',sectorFilter='전체',assetFilter='stock',chartRange='day',chartMode='line',lastChartTick=-1,chartHoverIndex=-1,trading=false,pendingOrder=null;
 function total(){let v=state?.cash||0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=h.qty*smoothPriceAt(s,Date.now())}return v}
 function unrealizedPnl(){let v=0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=(smoothPriceAt(s,Date.now())-h.avg)*h.qty}return v}
@@ -957,6 +957,78 @@ discover=function(watch=false){
 };
 window.__marketV14={version:14,kospi:gameKospiQuote,kospiBase:GAME_KOSPI_BASE,dynamic:true,meanReversion:false};
 
+
+
+/* ============ V16 FIX — 짧은 플레이 활발성 실제 반영 (2026-08-26) ============
+   - Activity 지속시간 3~10분으로 단축
+   - active/hot 비중 소폭 확대
+   - 개별주에만 2~5분 숨은 변동성 burst 추가
+   - 최대 +120% / -80% 안전장치는 기존 V11 그대로 유지
+   - ETF 제외 / UI에 상태 노출 없음
+*/
+const v16ActivityPrevious=v11Activity;
+v11Activity=function(s,day,minute){
+  if(s?.isETF)return v16ActivityPrevious(s,day,minute);
+  // 1틱≈29.5초. 한 활동성 상태가 6~20틱(약 3~10분) 지속된다.
+  const seed=Math.floor(minute/12),len=6+Math.floor(v9Unit(s.code,day,seed,'v16-act-len')*15),block=Math.floor(minute/len);
+  const u=v9Unit(s.code,day,block,'v16-activity');
+  // tier는 결과를 정하지 않고 활발 상태 확률에만 약하게 영향.
+  const tierBias={blue:-.025,growth:0,theme:.020,junk:.035}[s.tier]||0;
+  const x=Math.max(0,Math.min(.999,u+tierBias));
+  let a;
+  if(x<.23)a={name:'quiet',mult:.54,flow:.68};
+  else if(x<.63)a={name:'normal',mult:1.18,flow:1.16};
+  else if(x<.90)a={name:'active',mult:2.55,flow:2.65};
+  else a={name:'hot',mult:4.35,flow:4.70};
+  // V12 섹터 순환 효과는 유지하되 정답이 되지 않도록 약하게만 추가한다.
+  const sectors=[...new Set(STOCKS.filter(z=>!z.isETF).map(z=>z.sector))];
+  const rotBlock=Math.floor(minute/36),hotSector=sectors[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,sectors.length)];
+  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  return a;
+};
+
+// 2~5분간 이어지는 숨은 변동성 폭발. 별도 '주도주'를 선정하지 않고
+// 현재 Regime/Momentum/Activity가 겹칠수록 진입 확률만 높아진다.
+function v16BurstDrive(s,day,minute){
+  if(s?.isETF)return 0;
+  const act=v11Activity(s,day,minute),reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  if(act.name!=='active'&&act.name!=='hot')return 0;
+  const blockLen=4+Math.floor(v9Unit(s.code,day,Math.floor(minute/8),'v16-burst-len')*7); // 4~10틱≈2~5분
+  const block=Math.floor(minute/blockLen),r=rnd(hash('v16-burst',s.code,day,block));
+  const baseChance={blue:.055,growth:.085,theme:.120,junk:.155}[s.tier]||.08;
+  const align=(mom&&((reg.bias>0&&mom>0)||(reg.bias<0&&mom<0)))?1.35:1;
+  const hot=act.name==='hot'?1.30:1;
+  if(r()>Math.min(.28,baseChance*align*hot))return 0;
+  // 방향은 추세가 강하면 그쪽 확률이 높지만 반전 burst도 가능하다.
+  let dir;
+  const d=r();
+  if(mom&&d<.68)dir=Math.sign(mom); else if(reg.bias&&d<.84)dir=Math.sign(reg.bias); else dir=r()<.5?-1:1;
+  const mag=(act.name==='hot'?.00155:.00095)+r()*(act.name==='hot'?.00285:.00185);
+  return dir*mag;
+}
+const v16ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function(s,day,minute){
+  const base=Number(v16ExtremeBase(s,day,minute))||0;
+  const burst=v16BurstDrive(s,day,minute);
+  // 둘이 겹쳐도 한 틱이 과도해지지 않게 합산 상한을 둔다.
+  return Math.max(-.0065,Math.min(.0065,base+burst));
+};
+
+// 2초 미세변동은 화면이 살아있는 느낌만 강화하고 큰 손익은 30초 엔진에서 만든다.
+const v16MicroBase=v12MicroFactor;
+v12MicroFactor=function(s,ms){
+  if(!marketSessionInfo(ms).open||s?.isETF)return 1;
+  const base=v16MicroBase(s,ms);
+  const t=sessionTick(ms),day=Math.floor(t/390),minute=((t%390)+390)%390,act=v11Activity(s,day,minute);
+  if(act.name!=='active'&&act.name!=='hot')return base;
+  const slot=Math.floor(ms/2000),extra=v9Normal('v16-micro',s.code,slot)*(act.name==='hot'?.00016:.00009);
+  return base*Math.exp(extra);
+};
+
+// 기존 가격 캐시에 V13 상태가 남아 있을 수 있으므로 새 엔진 기준으로 초기화.
+v9PriceCache.clear();v9OpenCache.clear();referenceScaleCache.clear();
+window.__marketV16={version:16,activityMinutes:'3-10',burstMinutes:'2-5',rankingRealtimeListener:false};
+
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
 
@@ -1064,84 +1136,3 @@ setInterval(()=>{
 (function v15WaitReady(){if(state&&Store.online&&Store.db&&Store.uid){Store.scheduleScore(false);if(view==='ranking')loadHourlyRanking(false);return}setTimeout(v15WaitReady,900)})();
 window.__rankingV15={version:15,slot:rankSlotInfo,load:loadHourlyRanking};
 </script></body></html>
-
-<script>
-/* ============ V16 — Short-session activity tuning (2026-08-26) ============
-   목표: 5~20분 플레이에서도 시장에 사건이 보이도록 활동성 전환을 단축하고,
-   일부 종목에 2~5분짜리 숨은 변동성 폭발을 허용한다. ETF 제외.
-   표시용 상태/정답 신호는 추가하지 않는다.
-*/
-(function(){
-  const priorActivity=v11Activity;
-
-  // 1) Activity 지속시간 3~10분 수준(6~20 메인틱)으로 단축 + active/hot 비중 소폭 상향.
-  v11Activity=function(s,day,minute){
-    if(s?.isETF) return priorActivity(s,day,minute);
-    const anchor=Math.floor(minute/13);
-    const len=6+Math.floor(v9Unit(s.code,day,anchor,'v16-act-len')*15); // 6~20 ticks
-    const block=Math.floor(minute/len);
-    const tierBias={blue:-.025,growth:0,theme:.020,junk:.035}[s.tier]||0;
-    const x=Math.max(0,Math.min(.999,v9Unit(s.code,day,block,'v16-activity')+tierBias));
-    let a;
-    if(x<.24)a={name:'quiet',mult:.55,flow:.68};
-    else if(x<.62)a={name:'normal',mult:1.22,flow:1.18};
-    else if(x<.89)a={name:'active',mult:2.65,flow:2.75};
-    else a={name:'hot',mult:4.55,flow:4.85};
-
-    // 기존 섹터 순환 효과를 약하게 유지한다. 정답이 되지 않도록 강도는 제한.
-    const sectors=[...new Set(STOCKS.filter(z=>!z.isETF).map(z=>z.sector))];
-    const rotBlock=Math.floor(minute/36);
-    const hotSector=sectors.length?sectors[hash('v16-sector-rotation',day,rotBlock)%sectors.length]:null;
-    if(hotSector&&s.sector===hotSector){
-      const boost=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;
-      a={...a,mult:a.mult*boost,flow:a.flow*(1+(boost-1)*1.25)};
-    }
-    return a;
-  };
-
-  // 2) 2~5분 숨은 변동성 폭발. 방향 자체를 확정하지 않고 현재 추세와 반대 방향도 허용.
-  function v16VolBurst(s,day,minute){
-    if(s?.isETF)return 0;
-    const window=10; // 새 후보는 약 5분마다 평가
-    const block=Math.floor(minute/window), start=block*window;
-    const chance={blue:.105,growth:.145,theme:.190,junk:.225}[s.tier]||.14;
-    if(v9Unit(s.code,day,block,'v16-volburst-on')>=chance)return 0;
-    const duration=4+Math.floor(v9Unit(s.code,day,block,'v16-volburst-len')*7); // 4~10 ticks = 약 2~5분
-    const age=minute-start;if(age<0||age>=duration)return 0;
-    const act=v11Activity(s,day,minute),reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
-    const trend=Math.sign((reg?.bias||0)+(mom||0));
-    const flip=v9Unit(s.code,day,block,'v16-volburst-dir');
-    // 68%는 현재 추세 쪽, 32%는 역방향/반전 가능. 추세가 없으면 양방향 균등.
-    const dir=trend ? (flip<.68?trend:-trend) : (flip<.5?-1:1);
-    const hot=act?.name==='hot', active=act?.name==='active';
-    const base=hot?.00165:active?.00125:.00095;
-    const mag=base+v9Unit(s.code,day,block,'v16-volburst-mag')*(hot?.00235:active?.00185:.00145);
-    // 시작/끝이 갑자기 끊기지 않도록 가운데가 강한 envelope.
-    const phase=(age+1)/(duration+1), envelope=.62+.38*Math.sin(Math.PI*phase);
-    return dir*mag*envelope;
-  }
-
-  // 3) 기존 V13 가속 위에 burst를 합성. 최대치가 아니라 발생 빈도/전개 속도를 높인다.
-  const priorExtreme=v11ExtremeDrive;
-  v11ExtremeDrive=function(s,day,minute){
-    if(s?.isETF)return 0;
-    const base=Number(priorExtreme(s,day,minute))||0;
-    const burst=v16VolBurst(s,day,minute);
-    return Math.max(-.0065,Math.min(.0065,base+burst));
-  };
-
-  // 4) 미세 움직임도 아주 소폭만 상향. 큰 수익/손실은 메인 엔진이 담당한다.
-  const priorMicro=v12MicroFactor;
-  v12MicroFactor=function(s,ms){
-    if(s?.isETF||!marketSessionInfo(ms).open)return 1;
-    const base=Number(priorMicro(s,ms))||1;
-    const t=sessionTick(ms),day=Math.floor(t/390),minute=((t%390)+390)%390;
-    const act=v11Activity(s,day,minute);
-    const k=act?.name==='hot'?1.16:act?.name==='active'?1.10:1.04;
-    return Math.exp(Math.log(Math.max(.98,Math.min(1.02,base)))*k);
-  };
-
-  try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
-  window.__marketV16={version:16,activityTicks:'6-20',burstTicks:'4-10',focus:'short-session-activity'};
-})();
-</script>
