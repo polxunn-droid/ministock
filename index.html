@@ -1385,6 +1385,85 @@ const v23StockByCode=code=>V23_STOCK_BY_CODE.get(code);
 window.__marketV23={version:23,focus:'performance',quoteCacheMs:1000,uiRefreshMs:1000,chartRefreshMs:750,marketRulesChanged:false};
 
 
+/* ============ V24 — 급하락 추세 지속력 보강 ============
+   목적: 상승측은 그대로 유지하고, 이미 형성된 강한 하락이 중간에서 너무 빨리
+   횡보로 죽는 현상만 완화한다. 틱당 낙폭을 무작정 키우지 않고 '지속시간'을 늘린다.
+
+   원칙
+   1) -16% 이하 개별주부터 하락 tail 로직을 적용한다. 특정 -30% 선은 의미가 없다.
+   2) -24% 이하에서는 추가하락 상태가 더 오래 유지될 수 있다.
+   3) 즉시 강한 V자 반등은 V22보다 더 희귀하게 유지한다.
+   4) 하락 중 작은 반등은 허용하지만, 강한 하락 Regime/Momentum이면 다시 밀릴 수 있다.
+   5) ETF와 상승측 로직은 건드리지 않는다. +120% / -90% 최종 안전장치 유지.
+*/
+const v24PostBase=v11PostMove;
+v11PostMove=function(s,day,minute,changeRate){
+  if(s?.isETF || changeRate>-.16)return v24PostBase(s,day,minute,changeRate);
+
+  const abs=Math.abs(changeRate);
+  const severity=Math.max(0,Math.min(1,(abs-.16)/.58));
+  const deep=Math.max(0,Math.min(1,(abs-.24)/.46));
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
+  const alignedDown=(reg.bias<0&&mom<0),alignedUp=(reg.bias>0&&mom>0);
+
+  // 14~25틱(약 7~12.5분) 동안 숨은 하락 성격이 유지될 수 있게 해
+  // 강한 하락이 3~5분 만에 횡보로 죽는 현상을 줄인다.
+  const len=14+Math.floor(v9Unit(s.code,day,Math.floor(minute/11),'v24-tail-len')*12);
+  const block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'v24-tail-path');
+
+  // 추가하락 비중을 늘리되 특정 낙폭 숫자에서 갑자기 바뀌지 않도록 연속적으로 조정.
+  let pFall=.54 + severity*.07 + deep*.055 + (alignedDown?.055:0) - (alignedUp?.025:0);
+  pFall=Math.max(.50,Math.min(.72,pFall));
+
+  // V자 급반등은 매우 희귀. 상승 정렬이 되어도 상한을 낮게 둔다.
+  let pRebound=.045 - severity*.014 - deep*.010 + (alignedUp?.018:0) - (alignedDown?.012:0);
+  pRebound=Math.max(.015,Math.min(.060,pRebound));
+  const pSide=Math.max(.22,1-pFall-pRebound);
+
+  // ① 하락 지속: 틱당 힘은 과도하게 키우지 않고 음의 바이어스를 오래 유지.
+  if(u<pFall){
+    const jitter=v9Normal('v24-tail-fall',s.code,day,minute)*(.00019+severity*.00005);
+    const activityBoost=(act?.name==='hot'?.00016:act?.name==='active'?.00009:0);
+    const base=-(.00074+severity*.00042+deep*.00022+(alignedDown?.00017:0)+activityBoost);
+    // 약한 양봉/되돌림은 드물게 허용해 직선 패턴을 피한다.
+    const relief=v9Unit(s.code,day,minute,'v24-relief')<(.10-severity*.025);
+    if(relief)return Math.max(-.00012,Math.min(.00038,.00016+v9Normal('v24-relief-n',s.code,day,minute)*.00013));
+    return Math.max(-.00225,Math.min(-.00018,base+jitter));
+  }
+
+  // ② 저점 횡보: 완전 중립보다 약한 하방 기울기를 유지해 '바닥 확정' 신호를 없앤다.
+  if(u<pFall+pSide){
+    const n=v9Normal('v24-tail-side',s.code,day,minute)*(.00024+severity*.00005);
+    const drag=-(.000035+deep*.000055+(alignedDown?.000065:0))+(alignedUp?.000025:0);
+    return Math.max(-.00058,Math.min(.00036,n+drag));
+  }
+
+  // ③ 희귀 반등: 반등 상태에서도 되밀림 가능성이 높다.
+  const pullback=v9Unit(s.code,day,minute,'v24-tail-rebound-pb')<(.58+severity*.08);
+  if(pullback)return -(.00018+severity*.00020)+v9Normal('v24-tail-rpb',s.code,day,minute)*.00012;
+  const rebound=.00030+severity*.00013+v9Normal('v24-tail-rup',s.code,day,minute)*.00015;
+  return Math.max(-.00024,Math.min(.00062,rebound));
+};
+
+// 이미 하락 Regime + 하락 Momentum이 정렬된 '활발한' 종목만 낮은 확률로
+// 지속력 보너스를 받는다. 새 하락 종목을 랜덤으로 만들어내지는 않는다.
+const v24ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function(s,day,minute){
+  let base=Number(v24ExtremeBase(s,day,minute))||0;
+  if(s?.isETF)return base;
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
+  if(!(reg.bias<0&&mom<0) || (act?.name!=='active'&&act?.name!=='hot'))return base;
+  const block=Math.floor(minute/11),u=v9Unit(s.code,day,block,'v24-down-persist');
+  const chance={blue:.026,growth:.040,theme:.055,junk:.070}[s.tier]||.035;
+  if(u>=chance)return base;
+  const mag=(act.name==='hot'?.00042:.00025)+v9Unit(s.code,day,block,'v24-down-persist-mag')*(act.name==='hot'?.00058:.00034);
+  return Math.max(-.0085,Math.min(.0085,base-mag));
+};
+
+try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear();V23_QUOTE_CACHE?.clear?.()}catch(e){}
+window.__marketV24={version:24,focus:'downtrend-persistence',upperUnchanged:true,lowerLimit:'-90%',vReboundSuppressed:true,etfExcluded:true};
+
+
 
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
