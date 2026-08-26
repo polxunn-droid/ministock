@@ -1161,6 +1161,51 @@ try{v9PriceCache.clear();v9OpenCache.clear();referenceScaleCache.clear();dayOpen
 window.__marketV18={version:18,focus:'dopamine-rumor',rumors:v18RumorCards,volumeSafe:true};
 
 
+/* ============ V19 — 급하락 꼬리 보강 / 상승·하락 체감 균형 ============
+   - V18의 상승 도파민은 유지
+   - -14% 이하 급락 종목에도 상승측과 비슷한 수준의 후속 경로를 부여
+   - 추가하락 / 급반등 후 재하락 / 하락종료(반등) 모두 가능
+   - ETF 제외, +120% / -80% 최종 안전장치는 기존 그대로 유지
+*/
+const v19PostBase=v11PostMove;
+v11PostMove=function(s,day,minute,changeRate){
+  if(s?.isETF || changeRate>-.14)return v19PostBase(s,day,minute,changeRate);
+  const abs=Math.abs(changeRate),heat=Math.min(1,(abs-.14)/.48),block=Math.floor(minute/20),u=v9Unit(s.code,day,block,'v19-down-path'),phase=minute%20;
+
+  // ① 추가하락: 약 35~39%. 이미 많이 빠졌을수록 아주 소폭 낮춰 폭주를 방지한다.
+  const continueFall=.39-heat*.04;
+  if(u<continueFall)return -(.00108+heat*.00034);
+
+  // ② 급반등 후 재하락: 낙폭과대 반등이 나와도 추세가 끝났다고 보장하지 않는다.
+  if(u<.75){
+    return phase<9
+      ? (.00162+heat*.00118)
+      : -(.00094+heat*.00062);
+  }
+
+  // ③ 하락 종료/회복: 강한 반등이 나올 수 있어 급락주 매수가 필승이 되지도, 항상 더 빠지지도 않는다.
+  return .00072+heat*.00092;
+};
+
+// 하락 방향의 중형 가속이 상승보다 지나치게 적게 누적되는 경우를 완만하게 보정한다.
+// '하락 종목 선정'은 하지 않고, 이미 하락 Regime/Momentum이 정렬된 경우에만 낮은 확률로 보너스가 붙는다.
+const v19ExtremeBase=v11ExtremeDrive;
+v11ExtremeDrive=function(s,day,minute){
+  let base=Number(v19ExtremeBase(s,day,minute))||0;
+  if(s?.isETF)return base;
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute),act=v11Activity(s,day,minute);
+  if(!(reg.bias<0&&mom<0) || (act.name!=='active'&&act.name!=='hot'))return base;
+  const block=Math.floor(minute/7),u=v9Unit(s.code,day,block,'v19-down-boost');
+  const chance={blue:.018,growth:.028,theme:.042,junk:.055}[s.tier]||.025;
+  if(u>=chance)return base;
+  const mag=(act.name==='hot'?.00052:.00030)+v9Unit(s.code,day,block,'v19-down-boost-mag')*(act.name==='hot'?.00082:.00048);
+  return Math.max(-.0085,Math.min(.0085,base-mag));
+};
+
+try{v9PriceCache.clear();referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear()}catch(e){}
+window.__marketV19={version:19,focus:'downside-balance',downContinuation:'35-39%',etfExcluded:true};
+
+
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=300){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=120&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 
 
