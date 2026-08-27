@@ -656,7 +656,7 @@ function v9CanonicalPriceAtMs(s,ms=Date.now()){
 fastOffsetAt=function(){return 0};
 fastVisualPriceAt=v9CanonicalPriceAtMs;
 smoothPriceAt=v9CanonicalPriceAtMs;
-quote=function(s){const t=marketTick(),a=v9DisplayedAt(s,t),price=v9CanonicalPriceAtMs(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100,act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.2,Math.abs(reg.bias+mom)*4200),j=.72+rnd(hash('v11vol',s.code,a.day,Math.floor(a.minute/2)))*.72,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}};
+quote=function(s){const t=marketTick(),a=v9DisplayedAt(s,t),price=v9CanonicalPriceAtMs(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100,act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.2,Math.abs(reg.bias+mom)*4200),j=.72+rnd(hash('v11vol',s.code,a.day,Math.floor(a.minute/2)))()*.72,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}};
 rawQuote=quote;
 
 // 기존 하루 한 종목 ±8~30% 강제 목표 이벤트는 V9 엔진에서 사용하지 않는다.
@@ -720,7 +720,7 @@ displayedAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v10St
 fastVisualPriceAt=function(s,ms=Date.now()){return s?.isETF?etfCanonicalPriceAtMs(s,ms):v10StockCanonicalPriceAtMs(s,ms)};
 smoothPriceAt=fastVisualPriceAt;
 quote=function(s){
-  if(!s?.isETF){const t=marketTick(),a=v10StockDisplayedAt(s,t),price=v10StockCanonicalPriceAtMs(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100,act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.2,Math.abs(reg.bias+mom)*4200),j=.72+rnd(hash('v11vol',s.code,a.day,Math.floor(a.minute/2)))*.72,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}}
+  if(!s?.isETF){const t=marketTick(),a=v10StockDisplayedAt(s,t),price=v10StockCanonicalPriceAtMs(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100,act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.2,Math.abs(reg.bias+mom)*4200),j=.72+rnd(hash('v11vol',s.code,a.day,Math.floor(a.minute/2)))()*.72,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}}
   const t=marketTick(),a=etfDisplayedAt(s,t),price=etfCanonicalPriceAtMs(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100;
   return {...a,price,change,volume:Math.round((180000+Math.abs(change)*90000)*(1+rnd(hash('etfvol',s.code,a.day,a.minute))()))};
 };
@@ -837,8 +837,8 @@ fastVisualPriceAt=function(s,ms=Date.now()){return s?.isETF?v12EtfPriceAtMs(s,ms
 smoothPriceAt=fastVisualPriceAt;
 quote=function(s){
   const t=sessionTick(),a=s?.isETF?etfDisplayedAt(s,t):v10StockDisplayedAt(s,t),price=fastVisualPriceAt(s,Date.now()),change=(price-a.open)/Math.max(1,a.open)*100;
-  if(s?.isETF){const volume=Math.round((125000+Math.abs(change)*19000)*(0.82+rnd(hash('etf-vol',s.code,a.day,Math.floor(a.minute/3)))*.55));return {...a,price,change,volume}}
-  const act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.4,Math.abs(reg.bias+mom)*4400),j=.70+rnd(hash('v12vol',s.code,a.day,Math.floor(a.minute/2)))*.76,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}
+  if(s?.isETF){const volume=Math.round((125000+Math.abs(change)*19000)*(0.82+rnd(hash('etf-vol',s.code,a.day,Math.floor(a.minute/3)))()*.55));return {...a,price,change,volume}}
+  const act=v11Activity(s,a.day,a.minute),reg=v9Regime(s,a.day,a.minute),mom=v9Momentum(s,a.day,a.minute),trend=1+Math.min(2.4,Math.abs(reg.bias+mom)*4400),j=.70+rnd(hash('v12vol',s.code,a.day,Math.floor(a.minute/2)))()*.76,volume=Math.round((70000+Math.abs(change)*10500)*act.flow*trend*j);return {...a,price,change,volume}
 };
 rawQuote=quote;
 
@@ -913,7 +913,7 @@ quote=function(s){
   if(!Number.isFinite(volume)||volume<0){
     const day=Number.isFinite(q.day)?q.day:Math.floor(sessionTick()/390),minute=Number.isFinite(q.minute)?q.minute:0;
     const change=Number.isFinite(q.change)?Math.abs(q.change):0;
-    const fallback=(s?.isETF?140000:85000)*(1+Math.min(8,change*.16))*(.82+rnd(hash('v13-volume-fallback',s?.code||'x',day,Math.floor(minute/2)))*.7);
+    const fallback=(s?.isETF?140000:85000)*(1+Math.min(8,change*.16))*(.82+rnd(hash('v13-volume-fallback',s?.code||'x',day,Math.floor(minute/2)))()*.7);
     volume=fallback;
   }
   return {...q,volume:Math.max(0,Math.round(volume))};
@@ -1148,7 +1148,7 @@ quote=function(s){
   if(!Number.isFinite(v)||v<0){
     const t=sessionTick(),day=Number.isFinite(q.day)?q.day:Math.floor(t/390),minute=Number.isFinite(q.minute)?q.minute:((t%390)+390)%390,ch=Number.isFinite(q.change)?Math.abs(q.change):0;
     const act=s?.isETF?{flow:1}:v11Activity(s,day,minute),flow=Number.isFinite(+act?.flow)?Math.max(.35,+act.flow):1;
-    v=(s?.isETF?135000:82000)*(1+Math.min(6,ch*.14))*flow*(.82+rnd(hash('v18-volume-safe',s?.code||'x',day,Math.floor(minute/2)))*.64);
+    v=(s?.isETF?135000:82000)*(1+Math.min(6,ch*.14))*flow*(.82+rnd(hash('v18-volume-safe',s?.code||'x',day,Math.floor(minute/2)))()*.64);
   }
   return {...q,volume:Math.max(1,Math.round(Number.isFinite(v)?v:100000))};
 };
@@ -3735,6 +3735,280 @@ window.__marketV46={
   searchIntersectionObserver:true,
   hiddenSchedulerPaused:true,
   v44v45CachesPreserved:true
+};
+</script>
+
+
+<script>
+/* ============ V47 — 탭 전환 지연 집중 최적화 ============
+   기능/화면/시장 규칙 변경 없음.
+   영상에서 보이는 0.5~1초 탭 전환 지연의 핵심 원인:
+   discover()/watch 진입 때 300종목 quote를 동기 계산하고 HTML을 만든 뒤
+   첫 화면이 나타나는 구조.
+
+   개선:
+   1) 발견용 전체 quote snapshot을 idle chunk로 미리 계산.
+   2) 발견/관심 render 시 최근 snapshot을 즉시 재사용.
+   3) stale snapshot이어도 화면은 즉시 열고 뒤에서 새 snapshot 준비.
+   4) nav 클릭 시 active 상태를 먼저 paint한 다음 render.
+*/
+
+const V47_DISCOVER_SNAPSHOT=new Map();
+let V47_SNAPSHOT_AT=0;
+let V47_BUILDING=false;
+let V47_BUILD_TOKEN=0;
+const V47_REAL_QUOTE=quote;
+
+function v47Idle(cb){
+  if('requestIdleCallback' in window)
+    return requestIdleCallback(cb,{timeout:80});
+  return setTimeout(()=>cb({timeRemaining:()=>8,didTimeout:true}),0);
+}
+
+function v47BuildSnapshot(force=false){
+  if(document.hidden||V47_BUILDING)return;
+  if(!force && V47_DISCOVER_SNAPSHOT.size===STOCKS.length && Date.now()-V47_SNAPSHOT_AT<3500)return;
+  V47_BUILDING=true;
+  const token=++V47_BUILD_TOKEN;
+  const fresh=new Map();
+  let i=0;
+
+  const step=deadline=>{
+    if(token!==V47_BUILD_TOKEN){V47_BUILDING=false;return}
+    const started=performance.now();
+    // 한 task에서 너무 오래 막지 않도록 최대 약 5ms / 14종목.
+    let n=0;
+    while(i<STOCKS.length && n<14 && (deadline?.timeRemaining?.()>1 || performance.now()-started<5)){
+      const s=STOCKS[i++];
+      try{fresh.set(s.code,V47_REAL_QUOTE(s))}catch(e){}
+      n++;
+    }
+    if(i<STOCKS.length){
+      v47Idle(step);
+    }else{
+      V47_DISCOVER_SNAPSHOT.clear();
+      for(const [k,v] of fresh)V47_DISCOVER_SNAPSHOT.set(k,v);
+      V47_SNAPSHOT_AT=Date.now();
+      V47_BUILDING=false;
+    }
+  };
+  v47Idle(step);
+}
+
+// 앱이 떠 있는 동안 처음 한 번 미리 준비.
+setTimeout(()=>v47BuildSnapshot(true),120);
+
+// 현재 최종 discover를 감싸서 render 순간에는 precomputed quote 사용.
+const v47DiscoverBase=discover;
+discover=function(watch=false){
+  const age=Date.now()-V47_SNAPSHOT_AT;
+  const usable=V47_DISCOVER_SNAPSHOT.size>0 && age<12000;
+  if(!usable){
+    // snapshot이 아직 없으면 다음 진입을 위해 백그라운드 준비.
+    v47BuildSnapshot(true);
+    return v47DiscoverBase(watch);
+  }
+
+  const real=quote;
+  quote=function(s){
+    return V47_DISCOVER_SNAPSHOT.get(s?.code)||real(s);
+  };
+  try{
+    return v47DiscoverBase(watch);
+  }finally{
+    quote=real;
+    rawQuote=quote;
+    // 3.5초 이상 된 snapshot은 화면을 막지 않고 뒤에서 갱신.
+    if(age>3500)setTimeout(()=>v47BuildSnapshot(true),0);
+  }
+};
+
+// 화면 전환 후 다음 discover 진입을 미리 준비.
+const v47RenderBase=render;
+render=function(){
+  v47RenderBase();
+  if(view!=='discover'&&view!=='watch'){
+    setTimeout(()=>v47BuildSnapshot(false),50);
+  }
+};
+
+// nav는 클릭 반응을 먼저 화면에 보여주고 무거운 render는 다음 task로 넘김.
+const v47BindBase=bind;
+bind=function(){
+  v47BindBase();
+
+  document.querySelectorAll('.nav [data-view]').forEach(btn=>{
+    btn.onclick=e=>{
+      e.preventDefault();
+      const next=btn.dataset.view;
+      if(!next||next===view)return;
+
+      // 즉각적인 터치 피드백.
+      document.querySelectorAll('.nav [data-view]').forEach(x=>x.classList.toggle('active',x===btn));
+      view=next;
+
+      // browser가 active 상태를 먼저 paint할 시간을 준다.
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          render();
+        },0);
+      });
+    };
+  });
+};
+
+// 관심 탭은 원본 코드가 전체 300종목 quote 후 필터하는 구조.
+// snapshot이 있으면 계산비용은 O(1) lookup으로 줄어든다.
+// 관심 종목이 없으면 다음 진입을 위해 snapshot만 갱신하고 즉시 유지.
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    V47_BUILD_TOKEN++;
+    V47_BUILDING=false;
+  }else{
+    setTimeout(()=>v47BuildSnapshot(false),100);
+  }
+},{passive:true});
+
+window.__marketV47={
+  version:47,
+  focus:'instant-navigation',
+  marketRulesChanged:false,
+  uiChanged:false,
+  discoverQuotePrewarm:true,
+  chunkSize:14,
+  snapshotFreshMs:3500,
+  snapshotMaxUseMs:12000,
+  navPaintBeforeRender:true
+};
+</script>
+
+
+<script>
+/* ============ V48 — V29 근본 캐시 복원 + 거래량/KOSPI 복구 ============
+   시장 가격 결과/확률/체결 규칙 변경 없음.
+
+   1) V29 v9RawPriceAt 최종 tick cache 복원
+      - 같은 종목/같은 game tick 가격을 다시 minute 0부터 재생하지 않음
+      - 반환값은 원 함수와 동일한 결과를 그대로 저장/재사용
+   2) V29 OPEN/CLOSE cache 상한 관리
+   3) 거래량 rnd(seed)() 누락은 원본 정의부에서 수정
+   4) 최종 refreshLive 뒤 KOSPI를 gameKospiQuote() 값으로 다시 동기화
+*/
+
+// ---------- 1. V29 raw tick exact cache ----------
+const V48_RAW_TICK_CACHE=new Map();
+const V48_RAW_BASE=v9RawPriceAt;
+let V48_LAST_RAW_DAY=null;
+
+v9RawPriceAt=function v48CachedRawPriceAt(s,t=marketTick()){
+  if(!s)return V48_RAW_BASE(s,t);
+  const day=Math.floor(t/390);
+  const key=s.code+'|'+t;
+
+  // 오래된 게임일 데이터가 무한 누적되지 않게 새 day 진입 시 정리.
+  if(V48_LAST_RAW_DAY!==day){
+    V48_LAST_RAW_DAY=day;
+    if(V48_RAW_TICK_CACHE.size>5000)V48_RAW_TICK_CACHE.clear();
+  }
+
+  const hit=V48_RAW_TICK_CACHE.get(key);
+  if(hit)return hit;
+
+  const q=V48_RAW_BASE(s,t);
+  V48_RAW_TICK_CACHE.set(key,q);
+
+  // 현재/인접 틱 위주로 충분히 유지하면서 무한 증가 방지.
+  if(V48_RAW_TICK_CACHE.size>6500){
+    const remove=V48_RAW_TICK_CACHE.size-4800;
+    let n=0;
+    for(const k of V48_RAW_TICK_CACHE.keys()){
+      V48_RAW_TICK_CACHE.delete(k);
+      if(++n>=remove)break;
+    }
+  }
+  return q;
+};
+
+// priceAt이 최종 raw cache를 반드시 통과하도록 라우터 재확인.
+priceAt=function(s,t=marketTick()){
+  return s?.isETF ? etfDisplayedAt(s,t) : v9RawPriceAt(s,t);
+};
+
+// ---------- 2. V29 open/close cache upper bound ----------
+function v48TrimV29Caches(){
+  const trim=(m,max,keep)=>{
+    if(!m||m.size<=max)return;
+    const cut=m.size-keep;
+    let n=0;
+    for(const k of m.keys()){
+      m.delete(k);
+      if(++n>=cut)break;
+    }
+  };
+  trim(V29_OPEN_CACHE,5000,3500);
+  trim(V29_CLOSE_CACHE,5000,3500);
+  trim(V29_SCALE_CACHE,1200,900);
+}
+let V48_CACHE_TRIM_TICK=0;
+
+// ---------- 3. KOSPI live overwrite guard ----------
+function v48RefreshKospi(){
+  try{
+    const k=gameKospiQuote();
+    const iq=document.querySelector('.index b');
+    if(iq){
+      const cls=k.change<0?'down':'gain';
+      const txt=`${k.level.toFixed(2)} ${pct(k.change)}`;
+      if(iq.textContent!==txt)iq.textContent=txt;
+      iq.className=cls;
+    }
+
+    // 발견 화면의 방향 표시도 같은 KOSPI를 사용.
+    const strip=[...document.querySelectorAll('.strip>div')].find(el=>el.textContent.trim().startsWith('코스피'));
+    const b=strip?.querySelector('b');
+    if(b){
+      const label=Math.abs(k.change)<.03?'보합':k.change>0?'상승':'하락';
+      if(b.textContent!==label)b.textContent=label;
+      b.className=k.change<0?'down':'gain';
+    }
+  }catch(e){}
+}
+
+const V48_REFRESH_BASE=refreshLive;
+refreshLive=function(){
+  const out=V48_REFRESH_BASE();
+  v48RefreshKospi();
+
+  // 약 30초에 한 번만 캐시 상한 정리.
+  const now=Date.now();
+  if(now-V48_CACHE_TRIM_TICK>30000){
+    V48_CACHE_TRIM_TICK=now;
+    v48TrimV29Caches();
+  }
+  return out;
+};
+
+// header가 처음 그려질 때도 KOSPI는 이미 V14 gameKospiQuote를 사용하므로 유지.
+// 1초 뒤 refresh에서 옛 삼성전자 임시식으로 되돌아가는 것만 위에서 차단한다.
+
+// 기존 성능 prewarm(V47)은 이제 V48 raw cache도 같이 데우므로 그대로 활용.
+try{
+  V48_RAW_TICK_CACHE.clear();
+  V23_QUOTE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_TICK_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV48={
+  version:48,
+  focus:'core-price-cache-volume-kospi',
+  marketRulesChanged:false,
+  exactRawTickCache:true,
+  v29CacheBounded:true,
+  volumeRndInvocationFixed:true,
+  kospiLiveUsesGameIndex:true,
+  v47PrewarmPreserved:true
 };
 </script>
 
