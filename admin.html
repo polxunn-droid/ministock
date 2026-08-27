@@ -187,6 +187,10 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
 const firebaseConfig={apiKey:"AIzaSyD5fQcqEpUY_ChwUdT5KlMLAzI9hzHPvEs",authDomain:"mini-stock-1c189.firebaseapp.com",projectId:"mini-stock-1c189",storageBucket:"mini-stock-1c189.firebasestorage.app",messagingSenderId:"680510173510",appId:"1:680510173510:web:15319b15831f9543c03547"};
 const ADMIN_UID='7Rp29EsVDkcgDCz5T9VYn7L5AeB2';
 
+if(!window.firebase){
+  document.getElementById('login-err').textContent='Firebase SDK를 불러오지 못했어요. 새로고침 후 다시 시도해주세요.';
+  throw new Error('Firebase SDK unavailable');
+}
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
 const $=s=>document.querySelector(s);
@@ -198,27 +202,83 @@ function toast(text){const el=document.createElement('div');el.className='toast'
 let people=[],selected=new Set(),search='',unsubPeople=null,unsubHistory=null,unsubStockHistory=null;
 
 /* ---------- 로그인 ---------- */
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+/* V3 AUTH FIX — iOS Safari/모바일 환경 로그인 안정화
+   - persistence 설정이 끝난 뒤 로그인 진행
+   - auth/network-request-failed 는 짧은 지연 후 1회만 재시도
+   - 실패 지점을 사용자에게 구분해서 표시
+   - 관리자 UID / Firestore / 지급 로직은 변경하지 않음
+*/
+let ADMIN_AUTH_PERSISTENCE_READY=null;
+
+async function ensureAdminAuthPersistence(){
+  if(!ADMIN_AUTH_PERSISTENCE_READY){
+    ADMIN_AUTH_PERSISTENCE_READY=(async()=>{
+      try{
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        return 'LOCAL';
+      }catch(localErr){
+        console.warn('관리자 LOCAL persistence 실패',localErr?.code||localErr?.message);
+        try{
+          await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+          return 'SESSION';
+        }catch(sessionErr){
+          console.warn('관리자 SESSION persistence 실패',sessionErr?.code||sessionErr?.message);
+          await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+          return 'NONE';
+        }
+      }
+    })();
+  }
+  return ADMIN_AUTH_PERSISTENCE_READY;
+}
+
+function adminAuthErrorText(error){
+  const code=String(error?.code||'');
+  if(code.includes('invalid-credential')||code.includes('wrong-password')||code.includes('user-not-found'))
+    return '이메일 또는 비밀번호가 올바르지 않아요.';
+  if(code.includes('too-many-requests'))
+    return '시도가 너무 많아요. 잠시 후 다시 시도해주세요.';
+  if(code.includes('operation-not-allowed'))
+    return 'Firebase 콘솔에서 이메일/비밀번호 로그인을 켜주세요.';
+  if(code.includes('network-request-failed'))
+    return 'Firebase 인증 서버 연결에 실패했어요. 네트워크를 확인한 뒤 다시 시도해주세요.';
+  return '로그인 실패: '+(error?.message||code||'알 수 없는 오류');
+}
+
+async function adminSignInWithRetry(email,password){
+  await ensureAdminAuthPersistence();
+  try{
+    return await auth.signInWithEmailAndPassword(email,password);
+  }catch(error){
+    const code=String(error?.code||'');
+    if(!code.includes('network-request-failed'))throw error;
+    console.warn('관리자 로그인 네트워크 오류 — 1회 재시도');
+    await new Promise(resolve=>setTimeout(resolve,900));
+    return await auth.signInWithEmailAndPassword(email,password);
+  }
+}
 
 $('#signin').onclick=async()=>{
   const email=$('#email').value.trim(),password=$('#password').value;
-  $('#login-err').textContent='';
-  if(!email||!password)return $('#login-err').textContent='이메일과 비밀번호를 입력해주세요.';
+  const err=$('#login-err');
+  err.textContent='';
+  if(!email||!password)return err.textContent='이메일과 비밀번호를 입력해주세요.';
   $('#signin').disabled=true;
+  err.textContent='Firebase 인증 서버에 연결 중…';
   try{
-    const cred=await auth.signInWithEmailAndPassword(email,password);
+    const cred=await adminSignInWithRetry(email,password);
     if(cred.user.uid!==ADMIN_UID){
       await auth.signOut();
-      $('#login-err').textContent='관리자 계정이 아니에요. (UID 불일치)';
+      err.textContent='관리자 계정이 아니에요. (UID 불일치)';
+      return;
     }
+    err.textContent='';
   }catch(error){
-    const code=error?.code||'';
-    $('#login-err').textContent=
-      code.includes('invalid-credential')||code.includes('wrong-password')||code.includes('user-not-found')?'이메일 또는 비밀번호가 올바르지 않아요.':
-      code.includes('too-many-requests')?'시도가 너무 많아요. 잠시 후 다시 시도해주세요.':
-      code.includes('operation-not-allowed')?'Firebase 콘솔에서 이메일/비밀번호 로그인을 켜주세요.':
-      '로그인 실패: '+(error?.message||code);
-  }finally{$('#signin').disabled=false}
+    console.error('관리자 로그인 실패',error);
+    err.textContent=adminAuthErrorText(error);
+  }finally{
+    $('#signin').disabled=false;
+  }
 };
 $('#password').addEventListener('keydown',e=>{if(e.key==='Enter')$('#signin').click()});
 $('#signout').onclick=()=>auth.signOut();
