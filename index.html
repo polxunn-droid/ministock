@@ -5209,4 +5209,132 @@ window.__marketV54={
 };
 </script>
 
+
+<script>
+/* ============ V55 — 급상승/급하락 표시값 충돌 완전 분리 ============
+   실제 원인:
+   - 기존 공용 refreshLive/V43 observer가 [data-quote]를 1초마다 전일종가 등락률로 덮어씀.
+   - 동시에 공용 로직이 그 값의 부호로 row.hidden을 바꿔 순위가 1,3,4,7...처럼 비어 보일 수 있었음.
+   - V53/V54 정렬 계산 자체는 최근 5분이었지만 표시/숨김만 과거 로직에 다시 덮였던 것.
+
+   수정:
+   - mover 전용 표시는 data-v55-mover-quote 사용. 공용 [data-quote] 경로에서 완전 격리.
+   - mover 행은 공용 hidden 제어 대상이 되지 않음.
+   - 최근 5분 값으로 정렬/표시/순위번호를 같은 스냅샷에서 한번에 갱신.
+   - 거래량/종목상세/KOSPI/시장엔진/성능 캐시는 변경 없음.
+*/
+
+function v55MoverRowsHtml(now=Date.now()){
+  const rows=v54MoverSnapshot(now);
+  if(!rows.length)return `<div class="empty">${sort==='rise'?'최근 5분 상승 종목이 없어요':'최근 5분 하락 종목이 없어요'}</div>`;
+  return rows.map((x,i)=>`<div class="stock v55-mover-row" data-stock="${x.s.code}">
+    <div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div>
+    <div>
+      <div class="name">${x.s.name}</div>
+      <small class="${x.change<0?'down':'gain'}" data-v55-mover-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.change)}</small>
+    </div>
+    <button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>
+  </div>`).join('');
+}
+
+// 초기 mover 화면도 공용 data-quote를 쓰지 않도록 renderer 교체.
+v53MoverRowsHtml=v55MoverRowsHtml;
+
+// V54 incremental updater를 최근 5분 전용 attribute로 완전 교체.
+v53RefreshMoverList=function v55RefreshMoverList(force=false){
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  const list=document.getElementById('v53-mover-list');
+  if(!list)return;
+  const now=Date.now();
+  if(!force && now-V54_LAST_REFRESH<V52_LIVE_CACHE_MS)return;
+  V54_LAST_REFRESH=now;
+
+  const data=v54MoverSnapshot(now);
+  if(!data.length){
+    const msg=sort==='rise'?'최근 5분 상승 종목이 없어요':'최근 5분 하락 종목이 없어요';
+    if(list.dataset.v55Empty!==msg){list.innerHTML=`<div class="empty">${msg}</div>`;list.dataset.v55Empty=msg}
+    return;
+  }
+  delete list.dataset.v55Empty;
+
+  const existing=new Map([...list.querySelectorAll('.stock[data-stock]')].map(el=>[el.dataset.stock,el]));
+  const wanted=new Set();
+
+  data.forEach((x,i)=>{
+    wanted.add(x.s.code);
+    let row=existing.get(x.s.code);
+    if(!row){
+      row=document.createElement('div');
+      row.className='stock v55-mover-row';
+      row.dataset.stock=x.s.code;
+      row.innerHTML=`<div class="row"><span class="rank-num"></span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small data-v55-mover-quote="${x.s.code}"></small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>`;
+      row.onclick=e=>{
+        if(e.target.closest('[data-watch]'))return;
+        selected=STOCKS.find(s=>s.code===row.dataset.stock);
+        chartRange='day';chartMode='line';chartHoverIndex=-1;
+        $('#app').innerHTML=detail(selected);bind();
+      };
+      const heart=row.querySelector('[data-watch]');
+      if(heart)heart.onclick=e=>{
+        e.stopPropagation();
+        const c=heart.dataset.watch;
+        state.watch=state.watch.includes(c)?state.watch.filter(v=>v!==c):[...state.watch,c];
+        Store.saveMe(userId,state);
+        heart.textContent=state.watch.includes(c)?'♥':'♡';
+      };
+    }
+
+    // 공용 refresh가 이전에 남긴 hidden 상태까지 강제로 제거.
+    row.classList.remove('hidden');
+    row.classList.add('v55-mover-row');
+
+    const rank=row.querySelector('.rank-num');
+    if(rank)rank.textContent=String(i+1);
+
+    // 혹시 V53/V54에서 만들어진 옛 data-quote 노드가 남아있으면 전용 속성으로 전환.
+    let qel=row.querySelector('[data-v55-mover-quote]');
+    if(!qel){
+      qel=row.querySelector('[data-quote]');
+      if(qel){
+        qel.removeAttribute('data-quote');
+        qel.setAttribute('data-v55-mover-quote',x.s.code);
+      }
+    }
+    if(qel){
+      qel.textContent=`${fmt(x.q.price)}원 · ${pct(x.change)}`;
+      qel.className=x.change<0?'down':'gain';
+    }
+
+    const heart=row.querySelector('[data-watch]');
+    if(heart)heart.textContent=state.watch.includes(x.s.code)?'♥':'♡';
+
+    const at=list.children[i];
+    if(at!==row)list.insertBefore(row,at||null);
+  });
+
+  existing.forEach((row,code)=>{if(!wanted.has(code))row.remove()});
+};
+
+// 기존 공용 refreshLive가 mover를 건드렸는지 매번 마지막에 전용 updater가 복구.
+const V55_REFRESH_BASE=refreshLive;
+refreshLive=function(){
+  const out=V55_REFRESH_BASE();
+  v53RefreshMoverList(false);
+  return out;
+};
+
+window.__marketV55={
+  version:55,
+  basedOn:54,
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  liveMoverWindowMin:5,
+  moverQuoteAttribute:'data-v55-mover-quote',
+  genericQuoteOverwriteBlocked:true,
+  genericHiddenConflictBlocked:true,
+  kospiV52Preserved:true,
+  performanceCachesPreserved:true
+};
+</script>
+
 </body></html>
