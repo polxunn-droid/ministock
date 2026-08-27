@@ -519,7 +519,7 @@ function v9RawPriceAt(s,t=marketTick()){
     if(shock.ret){const shockLog=Math.log1p(Math.max(-.95,shock.ret));p*=Math.exp(shockLog);center*=Math.exp(shockLog*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));}
     const slumpBias=i<slumpUntil?-.000045:0;
     // 평소 종목은 기존처럼 잔잔하되, 활동성이 높은 종목만 의미 있게 움직인다.
-    const sigma=.00032*vol*act.mult;
+    const sigma=v66MarketSigma(p,.00032*vol*act.mult);
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
     const currentChange=p/open-1;
     const extreme=v11ExtremeDrive(s,day,i,currentChange),post=v11PostMove(s,day,i,currentChange);
@@ -539,7 +539,7 @@ referenceScaleCache.clear();dayOpenCache.clear();priceCache.clear();
 
 // 표시 기준가 보정은 유지하되 이후 모든 가격 사용처는 동일한 V9 시장가격을 사용한다.
 function v9DisplayedAt(s,t=marketTick()){
-  const raw=v9RawPriceAt(s,t),scale=referenceScale(s);return {...raw,price:Math.max(1,Math.round(raw.price*scale/10)*10),open:Math.max(1,Math.round(raw.open*scale/10)*10)};
+  const raw=v9RawPriceAt(s,t),scale=referenceScale(s);return {...raw,price:v65RoundPrice(raw.price*scale),open:v65RoundPrice(raw.open*scale)};
 }
 displayedAt=v9DisplayedAt;
 function v9CanonicalPriceAtMs(s,ms=Date.now()){
@@ -733,7 +733,7 @@ function v12MicroFactor(s,ms){
 }
 function v12StockPriceAtMs(s,ms=Date.now()){
   const ems=effectiveMarketRealMs(ms),gms=acceleratedMs(ems),d=new Date(gms),start=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),f=(gms-start)/DAY_MS*DAY_STEPS,t=marketTickAt(gms),a=v10StockDisplayedAt(s,t),b=v10StockDisplayedAt(s,t+1),phase=f-Math.floor(f),x=phase*phase*(3-2*phase),base=a.price+(b.price-a.price)*x;
-  return Math.max(1,Math.round(base*v12MicroFactor(s,ms)/10)*10);
+  return v65RoundPrice(base*v12MicroFactor(s,ms));
 }
 function v12EtfPriceAtMs(s,ms=Date.now()){
   const ems=effectiveMarketRealMs(ms),gms=acceleratedMs(ems),d=new Date(gms),start=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),f=(gms-start)/DAY_MS*DAY_STEPS,t=marketTickAt(gms),a=etfDisplayedAt(s,t),b=etfDisplayedAt(s,t+1),phase=f-Math.floor(f),x=phase*phase*(3-2*phase);
@@ -1759,7 +1759,7 @@ function v29RawWithOpen(s,day,minute,open){
       if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
     }
     const slumpBias=i<slumpUntil?-.000045:0;
-    const sigma=.00032*vol*act.mult;
+    const sigma=v66MarketSigma(p,.00032*vol*act.mult);
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
     const currentChange=p/open-1;
     const extreme=v11ExtremeDrive(s,day,i,currentChange),post=v11PostMove(s,day,i,currentChange);
@@ -1800,7 +1800,7 @@ function v29ModelDayOpen(s,day){
 function v29ModelRaw(s,t){
   const day=Math.floor(t/390),minute=((t%390)+390)%390,open=v29ModelDayOpen(s,day);
   const p=v29RawWithOpen(s,day,minute,open);
-  return {price:Math.max(1,Math.round(p/10)*10),open:Math.max(1,Math.round(open/10)*10),day,minute};
+  return {price:v65RoundPrice(p),open:v65RoundPrice(open),day,minute};
 }
 
 // 전환 순간의 V27 가격 = 새 엔진의 시작 가격.
@@ -1828,8 +1828,8 @@ v9RawPriceAt=function v29RawPriceAt(s,t=marketTick()){
   const raw=v29ModelRaw(s,t),scale=v29MigrationScale(s);
   return {
     ...raw,
-    price:Math.max(1,Math.round(raw.price*scale/10)*10),
-    open:Math.max(1,Math.round(raw.open*scale/10)*10)
+    price:v65RoundPrice(raw.price*scale),
+    open:v65RoundPrice(raw.open*scale)
   };
 };
 priceAt=function(s,t=marketTick()){
@@ -2387,7 +2387,7 @@ trade=async function v35Trade(type,qty){
 
   // KRX식 호가단위 단순화: 기존 게임과 동일하게 10원 단위.
   const execRaw=livePrice*(type==='buy'?1+slip:1-slip);
-  const exec=Math.max(10,Math.round(execRaw/10)*10);
+  const exec=v65RoundPrice(execRaw);
 
   pendingOrder.price=exec;
   pendingOrder.v35={
@@ -3893,7 +3893,7 @@ v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
     }
 
     const slumpBias=i<slumpUntil?-.000045:0;
-    const sigma=.00032*vol*act.mult;
+    const sigma=v66MarketSigma(p,.00032*vol*act.mult);
     const noise=v9Normal(s.code,day,i,'idio')*sigma;
     const currentChange=p/open-1;
     const extreme=v11ExtremeDrive(s,day,i,currentChange);
@@ -5090,7 +5090,7 @@ trade=async function v62Trade(type,qty){
   const livePrice=Math.max(1,+live?.price||+pendingOrder.price||1);
   const notional=livePrice*qty;
   const slip=(typeof v35SlipRate==='function')?v35SlipRate(notional):0;
-  const exec=Math.max(10,Math.round((livePrice*(1+slip))/10)*10);
+  const exec=v65RoundPrice(livePrice*(1+slip));
 
   const assets=Math.max(0,total());
   const current=v62LeveragedValue();
@@ -5377,6 +5377,100 @@ window.__marketV64={
   shockProbabilityChanged:false,shockMagnitudeChanged:false,
   marketSpeedChanged:false,executionRulesChanged:false,
   firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V65 — 화면 정체 직접 해소 ============
+   V64가 상태 전환만 보정해 실제 화면의 2초 미세변동/10원 반올림 정체를
+   충분히 해소하지 못한 문제를 직접 수정한다.
+
+   - 5천원 미만 1원, 5만원 미만 5원, 그 이상 10원 단위
+   - 조용한 종목도 약 1.5초마다 최소 1~2호가 움직일 수 있는 미세변동 하한
+   - 가격이 비싼 종목의 미세변동은 과도하게 커지지 않도록 상한 유지
+   - 화면가·평가가·주문 확정 체결가에 같은 호가 반올림 사용
+*/
+function v65TickSize(price){
+  const p=Math.max(1,Number(price)||1);
+  return p<5000?1:p<50000?5:10;
+}
+function v65RoundPrice(price){
+  const p=Math.max(1,Number(price)||1),tick=v65TickSize(p);
+  return Math.max(tick,Math.round(p/tick)*tick);
+}
+
+v12MicroFactor=function v65LiveMicroFactor(s,ms=Date.now()){
+  if(!marketSessionInfo(ms).open||s?.isETF)return 1;
+  const t=sessionTick(ms),day=Math.floor(t/390),minute=((t%390)+390)%390;
+  const act=v11Activity(s,day,minute),reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const reference=Math.max(1,v10StockDisplayedAt(s,t)?.price||s.referencePrice||s.base||1);
+  const unitMs=1500,slot=Math.floor(ms/unitMs),phase=((ms%unitMs)+unitMs)%unitMs/unitMs;
+  const x=phase*phase*(3-2*phase);
+
+  // 기존 tier 성격은 유지하되 quiet에서도 화면이 멈추지 않을 만큼의 최소폭을 보장한다.
+  const tierAmp={blue:.00024,growth:.00032,theme:.00040,junk:.00050}[s.tier]||.00032;
+  const activityAmp=Math.min(1.55,.82+Math.max(.55,act.mult||1)*.20);
+  const oneTick=v65TickSize(reference)/reference;
+  const floorAmp=Math.min(.00135,oneTick*1.35);
+  const amp=Math.max(tierAmp*activityAmp,floorAmp);
+
+  const n0=v9Normal('v65-live',s.code,slot),n1=v9Normal('v65-live',s.code,slot+1);
+  const noise=(n0+(n1-n0)*x)*amp;
+  const lean=Math.max(-.00022,Math.min(.00022,((reg.bias||0)+(Number(mom)||0))*.55));
+  return Math.exp(noise+lean);
+};
+
+// v12StockPriceAtMs는 위에서 v65RoundPrice를 사용하도록 교체되어 있고,
+// fastVisualPriceAt/smoothPriceAt/quote는 해당 함수를 동적으로 호출한다.
+try{
+  V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV65={
+  version:65,basedOn:64,focus:'visible-price-liveness',microSlotMs:1500,
+  tickSizeBands:[[0,1],[5000,5],[50000,10]],minimumVisibleTicks:1.35,
+  displayExecutionTickUnified:true,mainPathChanged:false,
+  shockProbabilityChanged:false,shockMagnitudeChanged:false,
+  firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V66 — 메인 시장가격 정체 근본 수정 ============
+   - 화면용 랜덤 흔들림을 제거하고 메인 누적 가격만 표시
+   - 저가주도 메인 틱마다 호가단위에 맞는 최소 누적 변동성을 확보
+   - 메인 원시가격/이전종가/표시가격/체결가의 호가 반올림 통일
+   - 각 틱의 변화는 다음 틱 가격에 실제 누적되므로 제자리 왕복용 효과가 아님
+*/
+function v66MarketSigma(price,baseSigma){
+  const p=Math.max(1,Number(price)||1),base=Math.max(0,Number(baseSigma)||0);
+  // 조용한 저가주도 15초 메인 틱에서 약 0.85호가 표준편차를 확보한다.
+  const tickFloor=v65TickSize(p)/p*.85;
+  return Math.max(base,tickFloor);
+}
+
+// V65의 독립적인 1.5초 랜덤 흔들림은 제거한다.
+// v12StockPriceAtMs가 현재 메인 틱과 다음 메인 틱을 보간하므로
+// 화면은 실제 누적 경로를 따라 계속 움직인다.
+v12MicroFactor=function v66NoSyntheticWobble(){return 1};
+
+try{
+  v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
+  V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
+  priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV66={
+  version:66,basedOn:65,focus:'cumulative-market-price-liveness',
+  syntheticMicroWobble:false,minimumMainTickStdDev:.85,
+  mainTickSeconds:DAY_MS/DAY_STEPS/MARKET_V9_SPEED/1000,
+  lowPriceRoundingFixed:true,cumulativePath:true,
+  displayExecutionTickUnified:true,shockProbabilityChanged:false,
+  shockMagnitudeChanged:false,firebaseSchemaChanged:false,rankingChanged:false
 };
 </script>
 </body></html>
