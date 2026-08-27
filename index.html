@@ -5497,4 +5497,141 @@ window.__marketV57={
   firebaseWritesAdded:0
 };
 </script>
+
+<script>
+/* ============ V58 — 시간대별 랭킹 정리 (수익금 TOP 5) ============
+   목표
+   - 각 완료된 1시간 구간의 수익금(pnl) 기준 TOP 5만 표시.
+   - 수익금 + 수익률은 함께 표시.
+   - 랭킹 화면 진입/새로고침이 자기 점수 제출 트리거가 되지 않음.
+   - 점수 제출은 구간 종료 후 백그라운드에서 자동 수행.
+   - 같은 완료 구간 점수는 사용자당 1회 확정 저장.
+   - 시장/가격/거래/랭킹 외 기능 변경 없음.
+*/
+
+// V50 조회를 대체: 랭킹 읽기 전에 자기 점수를 제출하지 않는다.
+async function v58LoadSlot(slot,force=false){
+  if(!slot||!Store.online||!Store.db||Store.v50RankLoading)return;
+  if(!force&&Store.v50RankRows[slot.key])return;
+  Store.v50RankLoading=true;
+  try{
+    const snap=await Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key)
+      .collection('scores').orderBy('pnl','desc').limit(5).get();
+    Store.v50RankRows[slot.key]=snap.docs.map((d,i)=>{
+      const x=d.data()||{};
+      return {
+        uid:d.id,
+        nickname:String(x.nickname||''),
+        pnl:+x.pnl||0,
+        rate:+x.rate||0,
+        label:String(x.slotLabel||slot.label),
+        rank:i+1
+      };
+    }).filter(x=>x.nickname&&x.nickname!=='게스트');
+  }catch(e){
+    console.warn('시간대 랭킹 조회 실패',e?.code||e?.message);
+    if(!Store.v50RankRows[slot.key])Store.v50RankRows[slot.key]=[];
+  }finally{
+    Store.v50RankLoading=false;
+    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
+  }
+}
+v50LoadSlot=v58LoadSlot;
+
+// UI: 수익금 순 TOP 5, 수익률은 보조 표시.
+ranks=function(){
+  const slots=v50CompletedSlots(), slot=v50SelectedSlot();
+  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
+
+  // 이 슬롯을 아직 한 번도 읽지 않았다면 1회만 읽는다.
+  // 랭킹 진입 자체가 자기 점수 write를 발생시키지는 않는다.
+  if(slot&&!Store.v50RankRows[slot.key]&&!Store.v50RankLoading)setTimeout(()=>v58LoadSlot(slot,false),0);
+  const rows=slot?(Store.v50RankRows[slot.key]||[]):[];
+
+  const tabs=slots.length?`<div class="filter-row" style="overflow-x:auto;white-space:nowrap">
+    ${slots.map(s=>`<button class="chip ${s.key===slot?.key?'active':''}" data-v50-slot="${s.key}">${s.label}</button>`).join('')}
+  </div>`:'';
+
+  const row=(r,i)=>`<div class="rankrow ${r.uid===Store.uid?'me':''}">
+    <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
+    <div><b>${r.nickname}</b>${r.uid===Store.uid?' <small>나</small>':''}</div>
+    <div class="price ${r.pnl<0?'down':'gain'}">${sign(r.pnl)}원
+      <small class="${r.rate<0?'down':'gain'}">${pct(r.rate)}</small>
+    </div>
+  </div>`;
+
+  return shell(`${header('랭킹')}
+    <div class="between"><h2>시간대별 랭킹</h2>${status}</div>
+    <div class="rank-refresh-note">각 시간 구간이 끝난 뒤 수익금 순으로 확정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
+    ${tabs}
+    ${!slot?`<div class="ranking-empty">첫 랭킹은 09:00에 확정됩니다.</div>`:
+      `<div class="rank-snapshot-head"><b>${slot.label}</b><span>구간 확정 결과</span></div>
+       <h2>TOP 5</h2>
+       ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.v50RankLoading?'랭킹을 불러오는 중이에요.':'아직 등록된 결과가 없어요.'}</div>`}`}
+  `,'ranking');
+};
+
+// 슬롯 버튼: 이미 읽은 구간은 캐시를 즉시 표시, 처음 보는 구간만 1회 read.
+const V58_BIND_BASE=bind;
+bind=function(){
+  V58_BIND_BASE();
+  document.querySelectorAll('[data-v50-slot]').forEach(btn=>{
+    btn.onclick=()=>{
+      Store.v50SelectedSlot=btn.dataset.v50Slot;
+      const slot=v50CompletedSlots().find(x=>x.key===Store.v50SelectedSlot);
+      render();
+      if(slot&&!Store.v50RankRows[slot.key])v58LoadSlot(slot,false);
+    };
+  });
+};
+
+// 자동 제출은 랭킹 화면과 완전히 분리.
+// 앱이 열려 있는 참가자는 구간 종료 후 최대 30초 안에 자동 확정 저장.
+let V58_LAST_SUBMIT_CHECK=0;
+async function v58AutoSubmit(){
+  if(document.hidden||!Store.online||!Store.db||!state)return;
+  const now=Date.now();
+  if(now-V58_LAST_SUBMIT_CHECK<25000)return;
+  V58_LAST_SUBMIT_CHECK=now;
+  await v50SubmitCompletedSlots();
+}
+setInterval(v58AutoSubmit,30000);
+
+// 연결 직후/앱 복귀 시 놓친 완료구간을 자동 제출.
+(function v58Ready(){
+  if(state&&Store.online&&Store.db){v58AutoSubmit();return}
+  setTimeout(v58Ready,1200);
+})();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(v58AutoSubmit,300)});
+window.addEventListener('focus',()=>setTimeout(v58AutoSubmit,300));
+
+// 새로운 구간이 막 완료되면 랭킹 화면에 있을 때만 1회 조회.
+// 화면 진입/새로고침마다 강제 갱신하지 않는다.
+let V58_LAST_COMPLETED_KEY='';
+setInterval(()=>{
+  if(document.hidden)return;
+  const slots=v50CompletedSlots();
+  const latest=slots.at(-1);
+  const key=latest?.key||'';
+  if(key&&key!==V58_LAST_COMPLETED_KEY){
+    V58_LAST_COMPLETED_KEY=key;
+    // 제출들이 도착할 시간을 조금 준 뒤 한 번만 읽는다.
+    if(view==='ranking')setTimeout(()=>v58LoadSlot(latest,true),15000);
+  }
+},5000);
+
+window.__rankingV58={
+  version:58,
+  basedOn:50,
+  sort:'pnl-desc',
+  limit:5,
+  display:['pnl','rate'],
+  submitTrigger:'slot-completion-background',
+  rankingEntryTriggersWrite:false,
+  forcedReloadOnEveryEntry:false,
+  marketRulesChanged:false,
+  firebaseExtraRealtimeListener:false
+};
+</script>
+
 </body></html>
