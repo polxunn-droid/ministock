@@ -678,7 +678,10 @@ const ETF_STOCKS=[
   ]),
   etfDef('0183V0','KIWOOM 삼성전자&SK하이닉스채권혼합50',11660,'채권혼합',[
     ['005930',.25],['000660',.25]
-  ],.50)
+  ],.50),
+  // V59 테스트 ETF: 별도 랜덤/뉴스/업종 효과 없이 게임 속 삼성전자 가격만 ±2배 추종
+  {...etfDef('SAMS2L','삼성전자 레버리지 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:2},
+  {...etfDef('SAMS2I','삼성전자 인버스 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:-2}
 ];
 for(const e of ETF_STOCKS)if(!STOCKS.some(s=>s.code===e.code))STOCKS.push(e);
 
@@ -696,6 +699,15 @@ function etfBondRatio(s,t){
 }
 const v10StockDisplayedAt=v9DisplayedAt,v10StockCanonicalPriceAtMs=v9CanonicalPriceAtMs;
 function etfRatioAtTick(s,t){
+  // V59 삼성전자 2X 테스트 ETF는 오직 삼성전자 시장가 변화만 사용한다.
+  // 기준시점 대비 삼성전자 수익률 × (+2 / -2)를 ETF 기준가 20,000원에 그대로 반영한다.
+  if(s?.linkedCode&&Number.isFinite(+s.leverage)){
+    const u=STOCKS.find(x=>x.code===s.linkedCode&&!x.isETF);
+    if(u){
+      const a=Math.max(1,v10StockDisplayedAt(u,ETF_REFERENCE_TICK).price),b=Math.max(1,v10StockDisplayedAt(u,t).price);
+      return Math.max(.05,1+(b/a-1)*(+s.leverage));
+    }
+  }
   let ratio=0;
   for(const [u,w] of etfNormalizedComponents(s)){
     const a=Math.max(1,v10StockDisplayedAt(u,ETF_REFERENCE_TICK).price),b=Math.max(1,v10StockDisplayedAt(u,t).price);
@@ -772,7 +784,7 @@ bind=function(){
   document.querySelectorAll('[data-asset]').forEach(b=>b.onclick=()=>{assetFilter=b.dataset.asset;sectorFilter='전체';sort='value';render()});
 };
 
-window.__marketV10={version:11,etfs:ETF_STOCKS.map(x=>x.code),asset:()=>assetFilter};
+window.__marketV10={version:11.1,etfs:ETF_STOCKS.map(x=>x.code),asset:()=>assetFilter};
 
 
 
