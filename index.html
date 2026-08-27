@@ -48,27 +48,6 @@
 .hourly-reward-body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}.hourly-reward-copy b{display:block;font-size:15px;margin-bottom:4px}.hourly-reward-copy small{display:block;color:var(--muted);line-height:1.45;font-size:11px}.hourly-reward-btn{min-width:92px;height:44px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-weight:850;font-size:13px;padding:0 14px}.hourly-reward-btn:disabled{background:#e9edf2;color:#8b95a1}.hourly-reward-done{color:#3182f6!important}
 .reward-pop{position:fixed;inset:0;background:#0006;z-index:55;display:grid;place-items:center;padding:22px}.reward-result{width:min(100%,360px);background:#fff;border-radius:26px;padding:28px 22px 24px;text-align:center;box-shadow:0 18px 50px #0000002e;animation:up .24s ease}.reward-gift{font-size:48px;line-height:1;margin-bottom:12px}.reward-rarity{display:inline-block;padding:6px 11px;border-radius:999px;background:#eef4ff;color:#3182f6;font-size:11px;font-weight:850}.reward-rarity.rare{background:#f5efff;color:#7950c8}.reward-rarity.jackpot{background:#fff5db;color:#a66b00}.reward-result h2{font-size:20px;margin:14px 0 5px}.reward-value{font-size:29px;font-weight:900;letter-spacing:-.8px;color:#191f28;margin:3px 0}.reward-result p{font-size:12px;line-height:1.55;color:var(--muted);margin:10px 0 0}.reward-result .primary{width:100%;margin-top:18px}
 @media(max-width:359px){.hourly-reward{padding:14px}.hourly-reward-body{grid-template-columns:1fr}.hourly-reward-btn{width:100%}}
-
-
-/* ============ V? — iOS 하단 네비게이션 겹침 보정 ============
-   Safari에서 고정 네비/안내문이 보유종목 글자 위로 비쳐 보이던 문제를 방지한다.
-   시장/가격 로직에는 영향 없음. */
-.screen{padding-bottom:calc(170px + env(safe-area-inset-bottom))}
-.nav{
-  bottom:max(15px,env(safe-area-inset-bottom));
-  background:#fff;
-  box-shadow:0 8px 28px #4d59672b;
-}
-.notice{
-  bottom:calc(92px + env(safe-area-inset-bottom));
-  background:#fff;
-  padding:5px 8px;
-  border-radius:8px;
-}
-@media(min-width:500px){
-  .nav{bottom:33px}
-  .notice{bottom:109px}
-}
 </style></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
@@ -5737,4 +5716,183 @@ window.__marketV70={
   firebaseSchemaChanged:false,rankingChanged:false
 };
 </script>
+
+
+<script>
+/* ============ V71 — 영구 누적 장기시장 + 실시장가 연동 KOSPI ============
+   목표
+   1) 패치 당일 현재 표시가격/보유자산/수익률에 점프를 만들지 않는다.
+   2) 다음 실제 거래일부터 장기 시장 국면(침체/약세/횡보/상승/강세)을 영구 누적한다.
+   3) 365일 뒤 과거 상승·하락분이 사라지는 장기 평균회귀를 만들지 않는다.
+   4) KOSPI는 3000 근처 표시보정이 아니라, 패치 시점의 실제 구성종목 가중 시장가치를 기준으로 산출한다.
+   5) KOSPI 상·하한/목표값 복귀/표시 증폭을 두지 않는다.
+   6) 기존 장중 종목별 regime/momentum/shock/체결 규칙은 그대로 보존한다.
+*/
+const V71_TRANSITION_MS=Date.parse('2026-08-27T15:40:00+09:00');
+const V71_ANCHOR_DAY=v68SessionPosition(V71_TRANSITION_MS).day;
+const V71_BASE_VISUAL=fastVisualPriceAt;
+const V71_BASE_SMOOTH=smoothPriceAt;
+const V71_BASE_QUOTE=quote;
+const V71_BASE_KOSPI=gameKospiQuote;
+
+// 장기 국면은 20~90게임일 동안 지속되며, 다음 국면과 길이는 미리 목표값을 두지 않고 결정론적 난수로 정한다.
+// 장기 기대값은 아주 약한 우상향이지만, 수개월~수년 침체/하락 경로도 충분히 가능하다.
+const V71_MACRO_STATES=[
+  {name:'crash',    p:.06, drift:-.00180},
+  {name:'bear',     p:.16, drift:-.00075},
+  {name:'softBear', p:.12, drift:-.00025},
+  {name:'side',     p:.20, drift: 0},
+  {name:'bull',     p:.31, drift: .00055},
+  {name:'boom',     p:.15, drift: .00115}
+];
+const V71_SEGMENTS=[];
+function v71EnsureSegments(day){
+  if(day<=V71_ANCHOR_DAY)return;
+  let start=V71_SEGMENTS.length?V71_SEGMENTS.at(-1).end+1:V71_ANCHOR_DAY+1;
+  let idx=V71_SEGMENTS.length;
+  while(start<=day){
+    const dur=20+Math.floor(v9Unit('v71-macro-duration',idx)*71); // 20~90일
+    const u=v9Unit('v71-macro-state',idx);
+    let acc=0,state=V71_MACRO_STATES.at(-1);
+    for(const x of V71_MACRO_STATES){acc+=x.p;if(u<acc){state=x;break}}
+    // 같은 국면이 연속으로 뽑혀도 허용: 실제로 긴 강세/침체가 자연스럽게 생길 수 있다.
+    V71_SEGMENTS.push({index:idx,start,end:start+dur-1,name:state.name,drift:state.drift,duration:dur});
+    start+=dur;idx++;
+  }
+}
+function v71RegimeAt(day){
+  if(day<=V71_ANCHOR_DAY)return {name:'anchor',drift:0,start:V71_ANCHOR_DAY,end:V71_ANCHOR_DAY,duration:1};
+  v71EnsureSegments(day);
+  // 최근 세그먼트부터 확인하면 일반적인 현재가 호출은 거의 O(1).
+  for(let i=V71_SEGMENTS.length-1;i>=0;i--){const s=V71_SEGMENTS[i];if(day>=s.start&&day<=s.end)return s}
+  return V71_SEGMENTS[0];
+}
+
+// 누적 로그팩터. 과거를 잘라내거나 1로 되돌리는 로직이 없다.
+const V71_MACRO_LOG_CACHE=new Map([[V71_ANCHOR_DAY,0]]);
+let V71_MACRO_LAST_DAY=V71_ANCHOR_DAY,V71_MACRO_LAST_LOG=0;
+function v71MacroLog(day){
+  day=Math.floor(day);
+  if(day<=V71_ANCHOR_DAY)return 0; // 패치 이전 역사/패치 당일 가격은 그대로
+  const hit=V71_MACRO_LOG_CACHE.get(day);if(hit!==undefined)return hit;
+  if(day<V71_MACRO_LAST_DAY){
+    let log=0;
+    for(let d=V71_ANCHOR_DAY+1;d<=day;d++){
+      const reg=v71RegimeAt(d);
+      log+=reg.drift+v9Normal('v71-macro-noise',d)*.00220;
+    }
+    V71_MACRO_LOG_CACHE.set(day,log);return log;
+  }
+  for(let d=V71_MACRO_LAST_DAY+1;d<=day;d++){
+    const reg=v71RegimeAt(d);
+    V71_MACRO_LAST_LOG+=reg.drift+v9Normal('v71-macro-noise',d)*.00220;
+    V71_MACRO_LOG_CACHE.set(d,V71_MACRO_LAST_LOG);
+  }
+  V71_MACRO_LAST_DAY=day;
+  return V71_MACRO_LAST_LOG;
+}
+function v71MacroFactorForDay(day){return Math.exp(v71MacroLog(day))}
+function v71DayFromMs(ms){return v68SessionPosition(ms).day}
+function v71AssetMacroFactor(s,day){
+  const log=v71MacroLog(day);
+  if(!s?.isETF)return Math.exp(log);
+  // ETF는 시장 공통분을 대략적인 노출도만큼 반영. 인버스/레버리지는 leverage 부호/배수를 따른다.
+  const lev=Number.isFinite(+s.leverage)?+s.leverage:Math.max(0,1-(+s.bondWeight||0));
+  return Math.exp(log*lev);
+}
+
+// 화면/차트/전일종가가 모두 같은 장기시장 팩터를 보도록 최종 가격 라우터에 적용한다.
+fastVisualPriceAt=function v71LongMarketVisual(s,ms=Date.now()){
+  const base=Math.max(1,Number(V71_BASE_VISUAL(s,ms))||1);
+  const f=ms<V71_TRANSITION_MS?1:v71AssetMacroFactor(s,v71DayFromMs(ms));
+  const px=base*f;
+  return s?.isETF?Math.max(5,Math.round(px/5)*5):v65RoundPrice(px);
+};
+smoothPriceAt=fastVisualPriceAt;
+
+// quote는 매매/평가금액/랭킹에도 쓰이므로 동일 가격을 사용한다.
+quote=function v71LongMarketQuote(s){
+  const q=V71_BASE_QUOTE(s)||{};
+  if(!s)return q;
+  const now=Date.now(),day=v71DayFromMs(now),f=now<V71_TRANSITION_MS?1:v71AssetMacroFactor(s,day);
+  const price=s?.isETF?Math.max(5,Math.round((+q.price||1)*f/5)*5):v65RoundPrice((+q.price||1)*f);
+  const open=s?.isETF?Math.max(5,Math.round((+q.open||1)*f/5)*5):v65RoundPrice((+q.open||1)*f);
+  const prevMs=v67SessionPrevCloseMs(now);
+  const prevClose=Math.max(1,fastVisualPriceAt(s,prevMs));
+  const change=(price-prevClose)/prevClose*100;
+  return {...q,price,open,prevClose,change};
+};
+rawQuote=quote;
+
+// KOSPI: 패치 순간의 현재 지수값과 현재 구성종목 시장가치를 동시에 앵커로 고정.
+// 이후에는 실제 구성종목의 앵커 대비 가중 가격변화만 반영한다. 3000 복귀/1.85배 표시증폭/상하한 없음.
+const V71_KOSPI_ANCHOR_LEVEL=Math.max(1,Number(V71_BASE_KOSPI(V71_TRANSITION_MS)?.level)||GAME_KOSPI_BASE);
+const V71_KOSPI_ANCHOR_PRICE=new Map();
+for(const s of STOCKS){
+  if(s.isETF)continue;
+  V71_KOSPI_ANCHOR_PRICE.set(s.code,Math.max(1,Number(V71_BASE_VISUAL(s,V71_TRANSITION_MS))||1));
+}
+function v71KospiMarketRatio(ms){
+  let weighted=0,totalW=0;
+  for(const s of STOCKS){
+    if(s.isETF)continue;
+    const w=kospiWeight(s);if(!(w>0))continue;
+    const anchor=V71_KOSPI_ANCHOR_PRICE.get(s.code)||1;
+    const px=Math.max(1,fastVisualPriceAt(s,ms));
+    weighted+=w*(px/anchor);totalW+=w;
+  }
+  return weighted/Math.max(.000001,totalW);
+}
+function v71SessionOpenMs(ms){
+  const p=v68SessionPosition(ms);return p.open;
+}
+gameKospiQuote=function v71MarketValueKospi(ms=Date.now()){
+  if(ms<V71_TRANSITION_MS)return V71_BASE_KOSPI(ms);
+  const level=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(ms);
+  const openMs=v71SessionOpenMs(ms);
+  const open=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(openMs);
+  return {level,open,change:(level/open-1)*100};
+};
+
+// 검증용: 실제 배포 경로와 같은 macro/regime 함수를 사용해 장기 경로를 빠르게 검사한다.
+// baseMarketNoise는 수백 종목 평균 후 남는 완만한 시장 공통 성분을 보수적으로 근사한다.
+function v71Simulation(days=3650,scenario=0){
+  let log=0,min=1,max=1,peak=1,maxDD=0,curState='',stateChanges=0;
+  const samples=[];
+  let segStart=0,segEnd=-1,segDrift=0,segName='';
+  const nextSeg=(d)=>{
+    const idx=Math.floor(d/1e6)+scenario*100003+stateChanges;
+    const dur=20+Math.floor(v9Unit('v71-sim-duration',idx)*71);
+    const u=v9Unit('v71-sim-state',idx);let acc=0,st=V71_MACRO_STATES.at(-1);
+    for(const x of V71_MACRO_STATES){acc+=x.p;if(u<acc){st=x;break}}
+    segStart=d;segEnd=d+dur-1;segDrift=st.drift;segName=st.name;stateChanges++;
+  };
+  nextSeg(1);
+  for(let d=1;d<=days;d++){
+    if(d>segEnd)nextSeg(d);
+    const noise=v9Normal('v71-sim-macro',scenario,d)*.00220;
+    const baseMarketNoise=v9Normal('v71-sim-base',scenario,d)*.00115;
+    log+=segDrift+noise+baseMarketNoise;
+    const f=Math.exp(log);min=Math.min(min,f);max=Math.max(max,f);peak=Math.max(peak,f);maxDD=Math.max(maxDD,1-f/peak);
+    if(d===1||d===30||d===90||d===180||d===365||d===730||d===1825||d===3650||d===days)samples.push({day:d,factor:f,index:V71_KOSPI_ANCHOR_LEVEL*f,state:segName});
+  }
+  return {days,scenario,anchor:V71_KOSPI_ANCHOR_LEVEL,final:V71_KOSPI_ANCHOR_LEVEL*Math.exp(log),min:V71_KOSPI_ANCHOR_LEVEL*min,max:V71_KOSPI_ANCHOR_LEVEL*max,maxDrawdownPct:maxDD*100,stateChanges,samples};
+}
+
+try{
+  V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_TICK_CACHE?.clear?.();
+  V52_LIVE_MOVER_CACHE?.clear?.();V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+  V49_KOSPI_CACHE?.clear?.();chartHistoryCache?.clear?.();
+}catch(e){}
+
+window.__marketV71={
+  version:71,basedOn:70,transitionAt:'2026-08-27T15:40:00+09:00',anchorDay:V71_ANCHOR_DAY,
+  anchorKospi:V71_KOSPI_ANCHOR_LEVEL,permanentAccumulation:true,rolling365Reset:false,
+  kospiMethod:'anchor-weighted-current-market-value',kospiMeanReversion:false,kospiHardRange:false,
+  displayAmplifierRemoved:true,macroSegmentDays:[20,90],macroStates:V71_MACRO_STATES.map(x=>x.name),
+  expectedLongRunBias:'slightly-positive-but-unbounded-both-directions',
+  simulate:v71Simulation,regimeAt:v71RegimeAt,macroFactor:v71MacroFactorForDay
+};
+</script>
+
 </body></html>
