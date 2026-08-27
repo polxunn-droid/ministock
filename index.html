@@ -5274,4 +5274,109 @@ window.__marketV58={
   hiddenWorkPaused:true
 };
 </script>
+
+<script>
+/* ============ V64 — 정체 완화 + 시장 상태 부드러운 전환 ============
+   체감 목표:
+   - quiet 구간이 너무 얼어붙지 않도록 평시 움직임 보강
+   - active/hot 구간의 갑작스러운 폭발은 소폭 완화
+   - 국면·모멘텀·변동성·활동성·후속경로가 블록 경계에서 즉시
+     바뀌지 않고 약 1~2분에 걸쳐 점진적으로 전환
+
+   안전성:
+   - 2026-08-27 14:30 KST 이전 가격 경로는 변경하지 않음
+   - 충격 발생확률/충격 크기/상하한/체결/Firebase/랭킹은 변경하지 않음
+*/
+const V64_TRANSITION_MS=Date.parse('2026-08-27T14:30:00+09:00');
+const V64_TRANSITION_TICK=sessionTick(V64_TRANSITION_MS);
+const V64_TRANSITION_DAY=Math.floor(V64_TRANSITION_TICK/390);
+const V64_TRANSITION_MINUTE=((V64_TRANSITION_TICK%390)+390)%390;
+const V64_BLEND_MINUTES=14; // V63 상태시간 기준 실제 약 1~2분
+
+function v64Active(day,minute){
+  return day>V64_TRANSITION_DAY || (day===V64_TRANSITION_DAY&&minute>V64_TRANSITION_MINUTE);
+}
+function v64Ramp(day,minute){
+  if(!v64Active(day,minute))return 0;
+  if(day>V64_TRANSITION_DAY)return 1;
+  return Math.max(0,Math.min(1,(minute-V64_TRANSITION_MINUTE)/V64_BLEND_MINUTES));
+}
+function v64CausalAverage(getter,day,minute,selector){
+  // 미래 상태를 미리 반영하지 않고 현재~과거 4지점을 평균한다.
+  const offsets=[0,4,9,14],weights=[.42,.29,.19,.10];
+  let sum=0,totalWeight=0;
+  for(let i=0;i<offsets.length;i++){
+    const m=Math.max(0,minute-offsets[i]);
+    const value=Number(selector(getter(day,m)));
+    if(Number.isFinite(value)){sum+=value*weights[i];totalWeight+=weights[i]}
+  }
+  return totalWeight?sum/totalWeight:0;
+}
+
+const V64_REGIME_BASE=v9Regime;
+const V64_MOMENTUM_BASE=v9Momentum;
+const V64_VOLATILITY_BASE=v9Volatility;
+const V64_ACTIVITY_BASE=v11Activity;
+const V64_POSTMOVE_BASE=v11PostMove;
+
+v9Regime=function v64SmoothRegime(s,day,minute){
+  const cur=V64_REGIME_BASE(s,day,minute),r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avg=v64CausalAverage((d,m)=>V64_REGIME_BASE(s,d,m),day,minute,x=>x?.bias||0);
+  return {...cur,bias:(cur.bias||0)*(1-r)+avg*r};
+};
+
+v9Momentum=function v64SmoothMomentum(s,day,minute){
+  const cur=Number(V64_MOMENTUM_BASE(s,day,minute))||0,r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avg=v64CausalAverage((d,m)=>V64_MOMENTUM_BASE(s,d,m),day,minute,x=>x||0);
+  return cur*(1-r)+avg*r;
+};
+
+v9Volatility=function v64SmoothVolatility(s,day,minute){
+  const cur=Math.max(.1,Number(V64_VOLATILITY_BASE(s,day,minute))||1),r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avg=v64CausalAverage((d,m)=>V64_VOLATILITY_BASE(s,d,m),day,minute,x=>x||1);
+  // 저변동은 보강하고 고변동은 눌러 평시/폭발 구간의 격차를 줄인다.
+  const balanced=avg<.85?avg*1.18:avg>1.35?1.35+(avg-1.35)*.82:avg;
+  return cur*(1-r)+balanced*r;
+};
+
+v11Activity=function v64BalancedActivity(s,day,minute){
+  const cur=V64_ACTIVITY_BASE(s,day,minute),r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avgMult=v64CausalAverage((d,m)=>V64_ACTIVITY_BASE(s,d,m),day,minute,x=>x?.mult||1);
+  const avgFlow=v64CausalAverage((d,m)=>V64_ACTIVITY_BASE(s,d,m),day,minute,x=>x?.flow||1);
+  const balance=x=>x<.75?x*1.20:x>2?2+(x-2)*.86:x*1.04;
+  return {
+    ...cur,
+    mult:(cur.mult||1)*(1-r)+balance(avgMult)*r,
+    flow:(cur.flow||1)*(1-r)+balance(avgFlow)*r
+  };
+};
+
+v11PostMove=function v64SmoothPostMove(s,day,minute,changeRate){
+  const cur=Number(V64_POSTMOVE_BASE(s,day,minute,changeRate))||0,r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avg=v64CausalAverage((d,m)=>V64_POSTMOVE_BASE(s,d,m,changeRate),day,minute,x=>x||0);
+  return cur*(1-r)+avg*r;
+};
+
+// 전환 뒤 아직 계산되지 않은 틱부터 새 경로가 이어지도록 런타임 캐시만 정리한다.
+try{
+  v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
+  V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
+  priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV64={
+  version:64,basedOn:63,transitionAt:'2026-08-27T14:30:00+09:00',
+  transitionBlendMinutes:'about 1-2 real minutes',quietBoost:.18,
+  hotCompression:.14,causalBlend:true,futureStateLeak:false,
+  shockProbabilityChanged:false,shockMagnitudeChanged:false,
+  marketSpeedChanged:false,executionRulesChanged:false,
+  firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
 </body></html>
