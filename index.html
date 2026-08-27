@@ -6324,7 +6324,9 @@ function v75MakeEvent(day, slot, index, sectors, stocks){
   const reactRoll = r();
   // REAL 45% / PRICED 25% / NOISE 20% / REVERSE 10% (요구사항 기본값), credibility가 낮을수록 REVERSE/NOISE 비중이 약간 늘어나도록 살짝 보정
   const reverseBoost = (1-cred)*.10;
-  const pReal=.45-reverseBoost*.4, pPriced=.25, pNoise=.20+reverseBoost*.2, pReverse=.10+reverseBoost*.2;
+  // V78: 기사 문구만 따라가는 단순전략의 우위를 조금 더 낮춘다.
+  // REAL을 줄이고 PRICED/NOISE 비중을 늘리되, 뉴스 자체의 정보가치를 없애지는 않는다.
+  const pReal=.36-reverseBoost*.30, pPriced=.28, pNoise=.25+reverseBoost*.15, pReverse=.11+reverseBoost*.15;
   const sum=pReal+pPriced+pNoise+pReverse;
   let reaction='real';
   if(reactRoll < pReal/sum) reaction='real';
@@ -6422,7 +6424,7 @@ function v75EventImpactFor(ev, code, sector, day, minute){
     dirEffect = ev.sentiment * v75ReactionCurve(ev, phase);
   }
 
-  const baseMag0 = .000075 + ev.severity*.0002; // 사건 하나의 생애주기 누적 목표(중앙값 약 0.1%대)
+  const baseMag0 = .0000675 + ev.severity*.00018; // V78: 직접 뉴스효과 약 10% 완화 // 사건 하나의 생애주기 누적 목표(중앙값 약 0.1%대)
   const tailRoll = rnd(v75PhraseHash('tail', ev.id))();
   const tailMul = tailRoll>.95 ? 2.5+(tailRoll-.95)*70 : (tailRoll>.65 ? 2.3 : 1); // 여러 사건이 겹치는 극단상황을 흉내낸 드문 증폭
   const baseMag = baseMag0*tailMul;
@@ -6581,6 +6583,214 @@ window.__marketV77={version:77,discoverNews:'latest-active',marketHours:'08:00-2
 .v77-latest-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.v77-latest-head b{color:#6f52b5;font-size:14px}.v77-latest-head small{color:#8b95a1;font-size:10px;font-weight:750}
 .v77-latest-title{display:block;font-size:13px;line-height:1.5;font-weight:700;word-break:keep-all}.v77-latest-more{display:block;margin-top:8px;color:#8b95a1;font-size:10.5px}
 [data-v77-market-time] small{display:block;margin-top:3px;font-size:10px;font-weight:850}.v77-open{color:#20a36a!important}.v77-closed{color:#f04452!important}
+</style>
+
+
+<script id="v78-market-board-ui">
+const V78_CAT_ORDER=['all','breaking','global','market','industry','company','rumor'];
+const V78_CAT_LABEL={all:'전체',breaking:'속보',global:'글로벌',market:'시장',industry:'산업',company:'기업',rumor:'찌라시'};
+let V78_BOARD_FILTER='all';
+
+function v78NewsAge(ev,minute){
+  const ageTick=Math.max(0,minute-ev.startTick);
+  const ageMin=Math.round(ageTick*((23*60+30-8*60)/390));
+  return ageMin<1?'방금 전':`${ageMin}분 전`;
+}
+function v78TargetTag(ev){
+  if(ev.target?.kind==='stock')return ev.target.stock?.name||'개별종목';
+  if(ev.target?.kind==='sector')return ev.target.sector||'업종';
+  return '시장전체';
+}
+function v78NewsBody(ev){
+  const target=v78TargetTag(ev);
+  const pool={
+    global:`글로벌 변수의 영향이 ${target}에 어떻게 반영될지 시장의 해석이 엇갈리고 있습니다.`,
+    market:`수급과 시장 흐름이 함께 움직이는 가운데 ${target}의 단기 반응을 지켜볼 필요가 있습니다.`,
+    industry:`관련 업종에 관심이 유입되고 있지만 실제 영향은 종목별로 다르게 나타날 수 있습니다.`,
+    company:`기업 관련 재료가 확인되고 있으나 세부 조건과 후속 공시 여부가 변수입니다.`,
+    rumor:`확인되지 않은 내용이 포함될 수 있어 후속 확인 전까지 변동성에 유의할 필요가 있습니다.`,
+    breaking:`빠르게 전해진 재료로 초기 반응과 이후 흐름이 달라질 수 있습니다.`
+  };
+  return pool[ev.cat]||'시장 반응은 여러 재료에 따라 달라질 수 있습니다.';
+}
+function v78CategoryPill(cat){
+  return `<span class="v78-cat v78-${cat}">${V78_CAT_LABEL[cat]||cat}</span>`;
+}
+function v78NewsCard(ev,minute){
+  const tags=[v78TargetTag(ev)];
+  if(ev.followUpOf)tags.push('후속');
+  return `<article class="v78-news-card">
+    <div class="v78-news-meta">${v78CategoryPill(ev.cat)}<time>${v78NewsAge(ev,minute)}</time></div>
+    <h3>${ev.title}</h3>
+    <p>${v78NewsBody(ev)}</p>
+    <div class="v78-tags">${tags.map(x=>`<span>${x}</span>`).join('')}</div>
+  </article>`;
+}
+function v78BoardListHtml(){
+  const t=sessionTick(),minute=((t%390)+390)%390;
+  let list=v75GetActiveNewsCached();
+  if(V78_BOARD_FILTER!=='all')list=list.filter(e=>e.cat===V78_BOARD_FILTER);
+  if(!list.length)return `<div class="v78-news-empty">현재 표시할 활성 뉴스가 없습니다.</div>`;
+  return `<div class="v78-board-list">${list.map(ev=>v78NewsCard(ev,minute)).join('')}</div>`;
+}
+function v78BoardHeaderHtml(){
+  return `<div class="v78-board-head">
+    <div><h2>시장 상황판</h2><p>여러 사건을 함께 보고 시장의 흐름을 판단하세요</p></div>
+    <span class="v78-live"><i></i>LIVE</span>
+  </div>
+  <div class="v78-filter-row">${V78_CAT_ORDER.map(k=>`<button type="button" data-v78-filter="${k}" class="${V78_BOARD_FILTER===k?'on':''}">${V78_CAT_LABEL[k]}</button>`).join('')}</div>`;
+}
+function v78BindBoardFilters(board){
+  board.querySelectorAll('[data-v78-filter]').forEach(b=>b.onclick=()=>{
+    V78_BOARD_FILTER=b.dataset.v78Filter;
+    board.querySelectorAll('[data-v78-filter]').forEach(x=>x.classList.toggle('on',x.dataset.v78Filter===V78_BOARD_FILTER));
+    const body=board.querySelector('[data-v78-list]');
+    if(body)body.innerHTML=v78BoardListHtml();
+  });
+}
+const V78_OPEN_SUMMARY_BASE=openMarketSummary;
+openMarketSummary=function(){
+  V78_OPEN_SUMMARY_BASE();
+  const sheet=document.querySelector('.overlay:last-of-type .sheet');
+  if(!sheet)return;
+  // V75/V76가 추가한 기존 "실시간 이슈" 블록만 찾아 새 디자인으로 교체.
+  const headings=[...sheet.querySelectorAll('h2')];
+  const oldHeading=headings.find(h=>h.textContent.trim()==='실시간 이슈');
+  const oldBoard=oldHeading?.parentElement;
+  if(oldBoard)oldBoard.remove();
+
+  const head=sheet.querySelector('.sheet-head');
+  if(head){
+    head.style.display='none';
+  }
+  const board=document.createElement('section');
+  board.className='v78-board';
+  board.innerHTML=`${v78BoardHeaderHtml()}<div data-v78-list>${v78BoardListHtml()}</div>`;
+  sheet.prepend(board);
+  v78BindBoardFilters(board);
+
+  let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+  const timer=setInterval(()=>{
+    if(document.hidden||!document.body.contains(sheet)){clearInterval(timer);return}
+    const nowSig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+    if(nowSig===sig)return; sig=nowSig;
+    const body=board.querySelector('[data-v78-list]');if(body)body.innerHTML=v78BoardListHtml();
+  },5000);
+};
+window.__marketV78={version:78,newsSignal:'reduced',boardDesign:'clean-demo-inspired',closeFreezeAudit:true};
+</script>
+
+<style id="v78-market-board-style">
+.v78-board{margin:-2px 0 0}.v78-board-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:4px 0 18px;border-bottom:1px solid var(--line)}
+.v78-board-head h2{margin:0;font-size:27px;letter-spacing:-1px}.v78-board-head p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.v78-live{display:flex;align-items:center;gap:6px;color:#8b95a1;font-size:11px;padding-top:8px}.v78-live i{width:8px;height:8px;border-radius:50%;background:#20c997;box-shadow:0 0 0 5px #20c99718}
+.v78-filter-row{display:flex;gap:8px;overflow-x:auto;margin:0 -20px;padding:14px 20px 12px;border-bottom:1px solid var(--line);scrollbar-width:none}.v78-filter-row::-webkit-scrollbar{display:none}
+.v78-filter-row button{border:0;background:#f2f4f6;color:#6b7684;border-radius:999px;min-width:58px;height:40px;padding:0 15px;font-size:12px;white-space:nowrap}.v78-filter-row button.on{background:#191f28;color:#fff;font-weight:800}
+.v78-board-list{max-height:54dvh;overflow-y:auto;overscroll-behavior:contain}.v78-news-card{padding:18px 0 19px;border-bottom:1px solid var(--line)}
+.v78-news-meta{display:flex;align-items:center;gap:9px;margin-bottom:10px}.v78-news-meta time{color:#9aa4b2;font-size:11px}.v78-cat{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;background:#f2f4f6;color:#4e5968}
+.v78-global{background:#eef4ff;color:#3867d6}.v78-market{background:#edf9f3;color:#188760}.v78-industry{background:#fff6e8;color:#a66b00}.v78-company{background:#f3efff;color:#7153b7}.v78-rumor{background:#fff0f1;color:#d94b57}.v78-breaking{background:#fff0f1;color:#d94b57}
+.v78-news-card h3{font-size:15px;line-height:1.45;margin:0 0 8px;letter-spacing:-.25px}.v78-news-card p{font-size:12px;line-height:1.55;color:#6b7684;margin:0 0 11px;word-break:keep-all}
+.v78-tags{display:flex;gap:6px;flex-wrap:wrap}.v78-tags span{background:#f7f8fa;color:#8b95a1;border-radius:999px;padding:6px 9px;font-size:10px}
+.v78-news-empty{text-align:center;color:var(--muted);padding:42px 12px}.overlay .sheet:has(.v78-board){padding-top:24px}
+</style>
+
+
+<script id="v79-news-close-state">
+/* ============ V79 — 장 마감 뉴스 표시 정리 ============
+   장중: LIVE + 활성뉴스만 표시, 각 뉴스는 기존 duration 종료 시 자동 소멸.
+   마감 후: 가격/뉴스 영향은 23:30에 그대로 정지하되,
+            상황판 UI에는 '직전 장 마감 시점의 주요 뉴스'로 남겨 다음 장 08:00까지 참고 가능.
+   다음 장 08:00: 새 game day로 전환되며 전일 뉴스 목록은 자동 교체된다.
+*/
+function v79NewsBoardState(ms=Date.now()){
+  const info=marketSessionInfo(ms);
+  if(info.open)return {open:true,label:'LIVE',title:'시장 상황판',desc:'여러 사건을 함께 보고 시장의 흐름을 판단하세요'};
+  const mins=info.mins;
+  if(mins>=MARKET_CLOSE_MIN){
+    return {open:false,label:'마감',title:'시장 상황판',desc:'오늘 장 마감 시점의 주요 뉴스를 보여드립니다'};
+  }
+  return {open:false,label:'마감',title:'시장 상황판',desc:'직전 장 마감 시점의 주요 뉴스를 보여드립니다'};
+}
+
+function v79BoardHeaderHtml(){
+  const st=v79NewsBoardState();
+  return `<div class="v78-board-head">
+    <div><h2>${st.title}</h2><p>${st.desc}</p></div>
+    <span class="${st.open?'v78-live':'v79-closed-badge'}"><i></i>${st.label}</span>
+  </div>
+  <div class="v78-filter-row">${V78_CAT_ORDER.map(k=>`<button type="button" data-v78-filter="${k}" class="${V78_BOARD_FILTER===k?'on':''}">${V78_CAT_LABEL[k]}</button>`).join('')}</div>`;
+}
+
+function v79NewsAge(ev,minute){
+  if(!marketSessionInfo().open)return '마감 시점';
+  return v78NewsAge(ev,minute);
+}
+
+function v79NewsCard(ev,minute){
+  const tags=[v78TargetTag(ev)];
+  if(ev.followUpOf)tags.push('후속');
+  return `<article class="v78-news-card">
+    <div class="v78-news-meta">${v78CategoryPill(ev.cat)}<time>${v79NewsAge(ev,minute)}</time></div>
+    <h3>${ev.title}</h3>
+    <p>${v78NewsBody(ev)}</p>
+    <div class="v78-tags">${tags.map(x=>`<span>${x}</span>`).join('')}</div>
+  </article>`;
+}
+
+function v79BoardListHtml(){
+  const t=sessionTick(),minute=((t%390)+390)%390;
+  let list=v75GetActiveNewsCached();
+  if(V78_BOARD_FILTER!=='all')list=list.filter(e=>e.cat===V78_BOARD_FILTER);
+  if(!list.length){
+    return `<div class="v78-news-empty">${marketSessionInfo().open?'현재 표시할 활성 뉴스가 없습니다.':'직전 장 마감 시점에 남아 있던 주요 뉴스가 없습니다.'}</div>`;
+  }
+  return `<div class="v78-board-list">${list.map(ev=>v79NewsCard(ev,minute)).join('')}</div>`;
+}
+
+// V78 보드 함수의 최종 출력만 교체한다.
+v78BoardHeaderHtml=v79BoardHeaderHtml;
+v78BoardListHtml=v79BoardListHtml;
+
+// 발견탭 최신뉴스 카드도 마감 상태를 명확히 표시한다.
+const V79_LATEST_BASE=v77LatestNewsHtml;
+v77LatestNewsHtml=function(){
+  const list=typeof v75GetActiveNewsCached==='function'?v75GetActiveNewsCached():[];
+  const ev=list[0],open=marketSessionInfo().open;
+  const title=ev?.title||(open?'현재 뚜렷한 신규 이슈가 없습니다':'직전 장 마감 시점의 주요 뉴스가 없습니다');
+  const cat=ev?.cat&&V75_CATEGORY?.[ev.cat]?.label?V75_CATEGORY[ev.cat].label:'시장';
+  return `<button class="v77-latest-news" type="button" data-latest-news aria-label="뉴스와 시장 상황판 보기">
+    <span class="v77-latest-head"><b>✦ ${open?'최신 뉴스보기':'장 마감 뉴스보기'}</b><small>${cat}</small></span>
+    <span class="v77-latest-title">${title}</span>
+    <span class="v77-latest-more">시장 상황판 열기 ›</span>
+  </button>`;
+};
+
+// 5초 갱신에서도 마감 후 '최신'이라는 표현이 다시 살아나지 않도록 보정.
+const V79_REFRESH_BASE=v77RefreshDiscoverMeta;
+v77RefreshDiscoverMeta=function(){
+  V79_REFRESH_BASE();
+  if(view!=='discover'||selected||document.hidden)return;
+  const btn=document.querySelector('[data-latest-news]');
+  if(!btn)return;
+  const open=marketSessionInfo().open;
+  const b=btn.querySelector('.v77-latest-head b');
+  const list=v75GetActiveNewsCached(),ev=list[0];
+  const t=btn.querySelector('.v77-latest-title');
+  if(b)b.textContent=open?'✦ 최신 뉴스보기':'✦ 장 마감 뉴스보기';
+  if(t&&!ev)t.textContent=open?'현재 뚜렷한 신규 이슈가 없습니다':'직전 장 마감 시점의 주요 뉴스가 없습니다';
+};
+
+window.__marketV79={
+  version:79,
+  intradayNewsExpiry:true,
+  closedBoard:'last-close-snapshot-until-next-open',
+  priceImpactAfterClose:false,
+  nextOpenReset:'08:00'
+};
+</script>
+<style id="v79-news-close-style">
+.v79-closed-badge{display:flex;align-items:center;gap:6px;color:#f04452;font-size:11px;font-weight:800;padding-top:8px}
+.v79-closed-badge i{width:8px;height:8px;border-radius:50%;background:#f04452;box-shadow:0 0 0 5px #f0445214}
 </style>
 
 </body></html>
