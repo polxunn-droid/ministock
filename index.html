@@ -5201,4 +5201,77 @@ window.__marketV63={
   continuitySafe:true
 };
 </script>
+
+<script>
+/* ============ V58 — 모바일 발열 추가 최적화 ============
+   목표: 가격 경로/시장 속도/체결/Firebase/화면 기능은 그대로 유지하면서
+   화면이 켜져 있을 때의 불필요한 CPU wake-up과 전체종목 재계산 빈도만 낮춘다.
+
+   1) live scheduler: 250ms -> 500ms
+      - 실제 숫자 갱신은 기존 1초 제한을 그대로 사용하므로 시세 표시 체감은 유지.
+      - 상세 차트는 가격이 실제 바뀔 때만 redraw하는 V46 최적화도 그대로 유지.
+   2) 급상승/급하락 전체종목 재정렬: 2.5초 -> 5초
+      - 탭 진입/필터 클릭(force)은 즉시 계산.
+   3) 발견 탭 전체 quote snapshot prewarm: 불필요한 3.5초 재생성을 막고
+      유효 snapshot은 최대 12초까지 재사용. 비어 있거나 12초 이상 지난 경우만 재생성.
+   4) hidden 상태에서는 기존처럼 모든 주기 작업 정지.
+*/
+
+const V58_LIVE_SCHEDULER_MS=500;
+const V58_MOVER_REFRESH_MS=5000;
+const V58_SNAPSHOT_REFRESH_MS=12000;
+
+// 1. 기존 V46 타이머를 저주기로 교체한다.
+try{
+  if(V46_NEXT_TIMER){clearTimeout(V46_NEXT_TIMER);V46_NEXT_TIMER=0}
+  v46ScheduleLive=function v58ScheduleLive(delay=V58_LIVE_SCHEDULER_MS){
+    if(V46_NEXT_TIMER || document.hidden)return;
+    V46_NEXT_TIMER=setTimeout(()=>{
+      V46_NEXT_TIMER=0;
+      if(document.hidden)return;
+      V46_IN_LIVE_LOOP=true;
+      try{v45LiveLoopBase(performance.now())}
+      finally{V46_IN_LIVE_LOOP=false}
+      v46ScheduleLive(V58_LIVE_SCHEDULER_MS);
+    },Math.max(80,Number(delay)||V58_LIVE_SCHEDULER_MS));
+  };
+  v46ScheduleLive(80);
+}catch(e){console.warn('V58 scheduler 적용 실패',e)}
+
+// 2. 급상승/급하락은 5초마다만 전체 universe를 재정렬한다.
+const V58_MOVER_BASE=v53RefreshMoverList;
+let V58_LAST_MOVER_REFRESH=0;
+v53RefreshMoverList=function v58CoolMoverRefresh(force=false){
+  if(force){V58_LAST_MOVER_REFRESH=Date.now();return V58_MOVER_BASE(true)}
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  const now=Date.now();
+  if(now-V58_LAST_MOVER_REFRESH<V58_MOVER_REFRESH_MS)return;
+  V58_LAST_MOVER_REFRESH=now;
+  return V58_MOVER_BASE(true);
+};
+
+// 3. 발견 탭 사전계산은 snapshot이 없거나 12초 이상 지난 때만 수행한다.
+const V58_SNAPSHOT_BASE=v47BuildSnapshot;
+v47BuildSnapshot=function v58CoolSnapshot(force=false){
+  if(document.hidden||V47_BUILDING)return;
+  const complete=V47_DISCOVER_SNAPSHOT.size===STOCKS.length;
+  const age=Date.now()-V47_SNAPSHOT_AT;
+  if(complete && age<V58_SNAPSHOT_REFRESH_MS)return;
+  return V58_SNAPSHOT_BASE(true);
+};
+
+window.__marketV58={
+  version:58,
+  focus:'thermal-efficiency',
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  firebaseReadsAdded:0,
+  firebaseWritesAdded:0,
+  liveSchedulerMs:V58_LIVE_SCHEDULER_MS,
+  liveNumbersRefreshMs:1000,
+  moverRefreshMs:V58_MOVER_REFRESH_MS,
+  discoverSnapshotRefreshMs:V58_SNAPSHOT_REFRESH_MS,
+  hiddenWorkPaused:true
+};
+</script>
 </body></html>
