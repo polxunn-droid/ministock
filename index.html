@@ -3601,4 +3601,141 @@ window.__marketV45={
 };
 </script>
 
+
+<script>
+/* ============ V46 — scheduler/차트/검색 반응속도 최적화 ============
+   기능·화면·시장 가격경로·확률·체결 규칙 변경 없음.
+   V45의 1초 quote cache, V44의 차트/52주 cache 유지.
+
+   핵심:
+   - V45 liveLoop wrapper의 60fps rAF 재귀를 실제 저주기 scheduler로 차단
+   - 상세 차트는 가격/범위/모드가 실제 바뀐 경우에만 redraw
+   - hidden 상태에서는 scheduler 정지
+   - 검색 결과 visibility는 IntersectionObserver로 추적
+*/
+
+// 1) V45가 호출하는 requestAnimationFrame 재귀를 liveLoop 실행 중에만 흡수.
+//    다른 UI 애니메이션의 rAF는 건드리지 않는다.
+let V46_IN_LIVE_LOOP=false;
+let V46_NEXT_TIMER=0;
+const V46_NATIVE_RAF=window.requestAnimationFrame.bind(window);
+
+function v46ScheduleLive(delay=250){
+  if(V46_NEXT_TIMER || document.hidden)return;
+  V46_NEXT_TIMER=setTimeout(()=>{
+    V46_NEXT_TIMER=0;
+    if(document.hidden)return;
+    V46_IN_LIVE_LOOP=true;
+    try{ v45LiveLoopBase(performance.now()); }
+    finally{ V46_IN_LIVE_LOOP=false; }
+    v46ScheduleLive(250);
+  },delay);
+}
+
+// liveLoop 전용 rAF 요청만 무시하고 timer scheduler가 다음 실행을 담당.
+const V46_RAF_PROXY=window.requestAnimationFrame;
+window.requestAnimationFrame=function(cb){
+  if(V46_IN_LIVE_LOOP && (cb===liveLoop || cb?.name==='v45CoolLiveLoop')){
+    return 0;
+  }
+  return V46_RAF_PROXY.call(window,cb);
+};
+
+// 기존 V45 liveLoop를 외부에서 호출해도 재귀 rAF 없이 1회만 수행.
+liveLoop=function v46ScheduledLiveLoop(t){
+  if(document.hidden)return;
+  V46_IN_LIVE_LOOP=true;
+  try{ v45LiveLoopBase(t||performance.now()); }
+  finally{ V46_IN_LIVE_LOOP=false; }
+};
+
+// 2) 상세 차트: 같은 가격/같은 range/mode면 다시 canvas 전체 redraw하지 않음.
+const v46DrawChartBase=drawChart;
+let V46_CHART_SIG='';
+drawChart=function(s,hover=-1){
+  if(!s)return v46DrawChartBase(s,hover);
+  // hover 중에는 즉시 그려야 포인터 UX 유지.
+  if(hover>=0)return v46DrawChartBase(s,hover);
+  const q=quote(s);
+  const sig=[s.code,chartRange,chartMode,q.price].join('|');
+  if(sig===V46_CHART_SIG)return;
+  V46_CHART_SIG=sig;
+  return v46DrawChartBase(s,hover);
+};
+
+// 화면 전환/종목 선택 후에는 반드시 새로 그리도록 bind 때 signature 초기화.
+const v46BindBase=bind;
+bind=function(){
+  V46_CHART_SIG='';
+  v46BindBase();
+};
+
+// 3) 검색 결과도 getBoundingClientRect 전수검사 대신 observer 사용.
+const V46_SEARCH_VISIBLE=new Set();
+let V46_SEARCH_OBSERVER=null;
+if('IntersectionObserver' in window){
+  V46_SEARCH_OBSERVER=new IntersectionObserver(entries=>{
+    for(const e of entries){
+      if(e.isIntersecting)V46_SEARCH_VISIBLE.add(e.target);
+      else V46_SEARCH_VISIBLE.delete(e.target);
+    }
+  },{root:null,rootMargin:'180px 0px',threshold:0});
+}
+function v46ObserveSearchRows(){
+  if(!V46_SEARCH_OBSERVER)return;
+  V46_SEARCH_OBSERVER.disconnect();
+  V46_SEARCH_VISIBLE.clear();
+  document.querySelectorAll('[data-search-stock]').forEach(el=>V46_SEARCH_OBSERVER.observe(el));
+}
+const v46RefreshSearchBase=refreshSearchQuotes;
+refreshSearchQuotes=function(){
+  if(!V46_SEARCH_OBSERVER)return v46RefreshSearchBase();
+  if(!V46_SEARCH_VISIBLE.size){
+    v46ObserveSearchRows();
+    return;
+  }
+  for(const el of [...V46_SEARCH_VISIBLE]){
+    if(!el.isConnected){V46_SEARCH_VISIBLE.delete(el);continue}
+    const s=V43_STOCK_BY_CODE.get(el.dataset.searchStock);
+    const box=el.querySelector('.price'),small=box?.querySelector('small');
+    if(!s||!box)continue;
+    const q=quote(s),pt=`${fmt(q.price)}원`;
+    if(box.firstChild?.textContent!==pt)box.firstChild.textContent=pt;
+    if(small){
+      const st=pct(q.change);
+      if(small.textContent!==st)small.textContent=st;
+      small.className=q.change<0?'down':'gain';
+    }
+  }
+};
+
+// 4) background에서 scheduler 완전 정지, 복귀 때 한 번 즉시 갱신.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    if(V46_NEXT_TIMER){clearTimeout(V46_NEXT_TIMER);V46_NEXT_TIMER=0}
+  }else{
+    V46_CHART_SIG='';
+    try{refreshLive()}catch(e){}
+    try{if(selected)drawChart(selected)}catch(e){}
+    v46ScheduleLive(80);
+  }
+},{passive:true});
+
+// 최초 scheduler 시작.
+v46ScheduleLive(80);
+
+window.__marketV46={
+  version:46,
+  focus:'scheduler-and-render-efficiency',
+  marketRulesChanged:false,
+  uiChanged:false,
+  recursiveLiveRAFRemoved:true,
+  schedulerMs:250,
+  chartRedrawOnlyOnPriceChange:true,
+  searchIntersectionObserver:true,
+  hiddenSchedulerPaused:true,
+  v44v45CachesPreserved:true
+};
+</script>
+
 </body></html>
