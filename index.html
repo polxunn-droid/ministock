@@ -4596,4 +4596,190 @@ window.__marketV50={
 };
 </script>
 
+
+<script>
+/* ============ V51 — 관리자 주식 지급 수신 ============
+   - 관리자 stock_grants 문서 수신
+   - createdAtMs 시점의 모의시장가를 취득가로 확정
+   - 동일 지급 중복 수령 방지(claims/{uid})
+   - 보유주식에 자동 합산, 팝업은 1회만 표시
+   - 지급가가 평균매입가에 반영되므로 지급 자체는 투자수익으로 잡히지 않음
+*/
+const V51_NORMALIZE_BASE=normalizeState;
+normalizeState=function(v){
+  const out=V51_NORMALIZE_BASE(v);
+  out.stockGrants=(Array.isArray(v?.stockGrants)?v.stockGrants:[])
+    .filter(g=>g&&typeof g.id==='string'&&typeof g.stockCode==='string'&&Number.isFinite(+g.qty))
+    .map(g=>({
+      id:String(g.id),stockCode:String(g.stockCode),stockName:String(g.stockName||''),
+      qty:Math.max(1,Math.floor(+g.qty)),grantPrice:Math.max(1,Math.round(+g.grantPrice||1)),
+      title:String(g.title||'').slice(0,60),message:String(g.message||'').slice(0,500),
+      at:Number.isFinite(+g.at)?+g.at:Date.now(),acked:!!g.acked
+    })).slice(-200);
+  out.stockGrantCutoff=Number.isFinite(+v?.stockGrantCutoff)?+v.stockGrantCutoff:0;
+  return out;
+};
+
+function v51StockGrantPopup(g){
+  return new Promise(resolve=>{
+    const el=document.createElement('div');
+    el.className='grant-pop';
+    el.innerHTML=`<div class="grant-card">
+      <span class="grant-badge">주식 지급</span>
+      <p class="grant-title">${escHtml(g.title||'관리자 주식 보상이 도착했어요')}</p>
+      <p class="grant-amount">${escHtml(g.stockName)} ${fmt(g.qty)}주</p>
+      <p class="grant-meta">지급가 ${fmt(g.grantPrice)}원 · 지급 시각 시장가 기준</p>
+      ${g.message?`<div class="grant-msg">${escHtml(g.message)}</div>`:''}
+      <p class="grant-meta">${new Date(g.at).toLocaleString('ko-KR')} · 보유주식에 자동 반영되었어요</p>
+      <button class="primary" data-stock-grant-ok>확인했어요</button>
+    </div>`;
+    el.addEventListener('click',e=>{
+      if(!e.target.closest('[data-stock-grant-ok]'))return;
+      e.stopPropagation();el.remove();resolve();
+    });
+    document.body.append(el);
+  });
+}
+
+const StockGrantWatch={
+  started:false,showing:false,unsub:null,
+  start(){
+    if(this.started||!Store.online||!Store.db||!Store.uid||!state)return;
+    this.started=true;
+    if(!Number.isFinite(+state.stockGrantCutoff)||+state.stockGrantCutoff<=0){
+      state.stockGrantCutoff=(state.tradeLog?.length||state.nickname)?1:Date.now();
+      Store.saveMe(userId,state);
+    }
+    this.unsub=Store.db.collection('stock_grants').orderBy('createdAtMs','desc').limit(80)
+      .onSnapshot(snap=>{
+        const list=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(+a.createdAtMs||0)-(+b.createdAtMs||0));
+        this.apply(list);
+      },error=>console.warn('주식 지급 수신 실패',error?.code||error?.message));
+  },
+  async apply(list){
+    if(!state)return;
+    let changed=false;
+    for(const g of list){
+      const qty=Math.floor(+g.qty||0),code=String(g.stockCode||'');
+      if(qty<1||!code)continue;
+      const all=g.targets==='all',mine=all||(Array.isArray(g.targets)&&g.targets.includes(Store.uid));
+      if(!mine)continue;
+      if((state.stockGrants||[]).some(x=>x.id===g.id)){this.ensureClaim(g);continue}
+      const at=Number.isFinite(+g.createdAtMs)?+g.createdAtMs:Date.now();
+      if(all&&at<(+state.stockGrantCutoff||0))continue;
+      const s=STOCKS.find(x=>x.code===code);
+      if(!s)continue;
+
+      // 지급문서 생성 시각의 결정론적 모의시장가.
+      const grantPrice=Math.max(1,Math.round(fastVisualPriceAt(s,at)/10)*10);
+      const reserved=await this.reserve(g,grantPrice);
+      if(!reserved)continue;
+
+      const h=state.holdings[s.code]||{qty:0,avg:0};
+      const oldQty=Math.max(0,+h.qty||0),oldAvg=Math.max(0,+h.avg||0);
+      h.avg=(oldAvg*oldQty+grantPrice*qty)/Math.max(1,oldQty+qty);
+      h.qty=oldQty+qty;
+      state.holdings[s.code]=h;
+
+      state.stockGrants=[...(state.stockGrants||[]),{
+        id:g.id,stockCode:s.code,stockName:s.name,qty,grantPrice,
+        title:String(g.title||''),message:String(g.message||''),at,acked:false
+      }].slice(-200);
+      changed=true;
+    }
+    if(changed){
+      await Store.saveMe(userId,state);
+      try{await recordEquity(true)}catch(e){}
+      Store.pushMyScore(true);
+      if(!selected&&!document.querySelector('.overlay'))render();
+    }
+    this.flush();
+  },
+  async reserve(g,grantPrice){
+    if(!Store.online||!Store.db||!Store.uid)return false;
+    try{
+      const ref=Store.db.collection('stock_grants').doc(g.id).collection('claims').doc(Store.uid);
+      return await Store.db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);
+        if(snap.exists)return false;
+        tx.set(ref,{
+          uid:Store.uid,nickname:state?.nickname||'',
+          stockCode:String(g.stockCode||''),stockName:String(g.stockName||''),
+          qty:Math.floor(+g.qty||0),grantPrice:Math.round(grantPrice),
+          claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return true;
+      });
+    }catch(error){console.warn('주식 지급 중복 확인 실패',error?.code||error?.message);return false}
+  },
+  async ensureClaim(g){
+    if(!Store.online||!Store.db||!Store.uid)return;
+    const local=(state.stockGrants||[]).find(x=>x.id===g.id);
+    if(!local)return;
+    try{
+      const ref=Store.db.collection('stock_grants').doc(g.id).collection('claims').doc(Store.uid);
+      await Store.db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);
+        if(!snap.exists)tx.set(ref,{
+          uid:Store.uid,nickname:state?.nickname||'',stockCode:local.stockCode,
+          stockName:local.stockName,qty:local.qty,grantPrice:local.grantPrice,
+          claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+    }catch(error){console.warn('기존 주식 지급 기록 확인 실패',error?.code||error?.message)}
+  },
+  async flush(){
+    if(this.showing||!state)return;
+    const pending=(state.stockGrants||[]).filter(g=>!g.acked);
+    if(!pending.length)return;
+    if(document.querySelector('.overlay')){setTimeout(()=>this.flush(),1500);return}
+    this.showing=true;
+    for(const g of pending){
+      await v51StockGrantPopup(g);
+      g.acked=true;
+      await Store.saveMe(userId,state);
+    }
+    this.showing=false;
+    if(!selected&&!document.querySelector('.overlay'))render();
+  }
+};
+
+// 거래내역에 관리자 주식 지급도 표시.
+const V51_OPEN_TRADE_LOG_BASE=openTradeLog;
+openTradeLog=function(){
+  const rows=[
+    ...(state?.tradeLog||[]).map(x=>({kind:'trade',at:+x.at||0,x})),
+    ...(state?.grants||[]).map(g=>({kind:'grant',at:+g.at||0,x:g})),
+    ...(state?.stockGrants||[]).map(g=>({kind:'stockGrant',at:+g.at||0,x:g}))
+  ].sort((a,b)=>b.at-a.at);
+  const html=rows.length?rows.map(r=>{
+    if(r.kind==='stockGrant'){
+      const g=r.x;
+      return `<div class="log-row"><b class="tag-grant">주식 지급 · ${escHtml(g.stockName)}</b><b>${fmt(g.qty)}주</b><small>${new Date(g.at).toLocaleString('ko-KR')} · 지급가 ${fmt(g.grantPrice)}원${g.message?' · '+escHtml(g.message):''}</small></div>`;
+    }
+    if(r.kind==='grant'){
+      const g=r.x,plus=g.amount>=0;
+      return `<div class="log-row"><b class="tag-grant">${plus?'원화 지급':'원화 차감'} · ${escHtml(g.title||'관리자')}</b><b class="${plus?'gain':'down'}">${plus?'+':'-'}${fmt(Math.abs(g.amount))}원</b><small>${new Date(g.at).toLocaleString('ko-KR')}${g.message?' · '+escHtml(g.message):''}</small></div>`;
+    }
+    const x=r.x,s=STOCKS.find(v=>v.code===x.code);
+    if(!s)return '';
+    return `<div class="log-row"><b class="${x.type==='buy'?'gain':'down'}">${x.type==='buy'?'매수':'매도'} · ${escHtml(s.name)}</b><b>${fmt(x.price*x.qty)}원</b><small>${new Date(x.at).toLocaleString('ko-KR')} · ${fmt(x.price)}원 × ${fmt(x.qty)}주</small></div>`;
+  }).join(''):'<div class="empty">아직 거래내역이 없어요.</div>';
+  document.body.insertAdjacentHTML('beforeend',`<div class="overlay"><div class="sheet"><div class="sheet-head"><h2>거래내역</h2>${closeButton()}</div><div class="log-list">${html}</div></div></div>`);
+};
+
+(function waitStockGrantReady(){
+  if(state&&Store.online&&Store.db&&Store.uid){StockGrantWatch.start();return}
+  setTimeout(waitStockGrantReady,700);
+})();
+
+window.__marketV51={
+  version:51,
+  marketRulesChanged:false,
+  adminStockGrant:true,
+  grantPriceBasis:'market-at-createdAtMs',
+  duplicateClaimProtection:true
+};
+</script>
+
 </body></html>
