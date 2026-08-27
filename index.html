@@ -5337,4 +5337,120 @@ window.__marketV55={
 };
 </script>
 
+
+<script>
+/* ============ V56 — 급상승/급하락을 거래량형 실시간 정렬로 통일 ============
+   목적:
+   - 최근 5분 수익률(V52~V55)을 제거하고, 화면에 이미 사용하는 quote(s).change
+     즉 "현재가 vs 전일 종가" 등락률을 급상승/급하락 정렬 기준으로 사용.
+   - 거래량 탭처럼 현재 스냅샷을 주기적으로 다시 계산/정렬.
+   - 시장 가격 생성, 거래량, KOSPI, 매매, Firebase, 랭킹 로직은 변경하지 않음.
+   - V55 전용 DOM 격리는 유지해 공용 refreshLive와의 표시/hidden 충돌 방지.
+*/
+
+function v56MoverSnapshot(){
+  let rows=v53MoverUniverse().map(s=>{
+    const q=quote(s);
+    return {s,q,change:Number(q.change)||0};
+  });
+  rows=rows.filter(x=>sort==='rise'?x.change>0:x.change<0);
+  rows.sort((a,b)=>sort==='rise'?b.change-a.change:a.change-b.change);
+  return rows;
+}
+
+function v56MoverRowsHtml(){
+  const rows=v56MoverSnapshot();
+  if(!rows.length)return `<div class="empty">${sort==='rise'?'현재 상승 종목이 없어요':'현재 하락 종목이 없어요'}</div>`;
+  return rows.map((x,i)=>`<div class="stock v55-mover-row" data-stock="${x.s.code}">
+    <div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div>
+    <div><div class="name">${x.s.name}</div><small class="${x.change<0?'down':'gain'}" data-v55-mover-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.change)}</small></div>
+    <button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>
+  </div>`).join('');
+}
+
+// 초기 화면도 전일 종가 대비 현재 등락률 기준.
+v53MoverRowsHtml=v56MoverRowsHtml;
+
+let V56_LAST_REFRESH=0;
+v53RefreshMoverList=function v56RefreshMoverList(force=false){
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  const list=document.getElementById('v53-mover-list');
+  if(!list)return;
+  const now=Date.now();
+  // 기존 성능 한도(2.5초)를 그대로 사용. Firebase I/O 없음.
+  if(!force && now-V56_LAST_REFRESH<V52_LIVE_CACHE_MS)return;
+  V56_LAST_REFRESH=now;
+
+  const data=v56MoverSnapshot();
+  if(!data.length){
+    const msg=sort==='rise'?'현재 상승 종목이 없어요':'현재 하락 종목이 없어요';
+    if(list.dataset.v56Empty!==msg){list.innerHTML=`<div class="empty">${msg}</div>`;list.dataset.v56Empty=msg}
+    return;
+  }
+  delete list.dataset.v56Empty;
+
+  const existing=new Map([...list.querySelectorAll('.stock[data-stock]')].map(el=>[el.dataset.stock,el]));
+  const wanted=new Set();
+
+  data.forEach((x,i)=>{
+    wanted.add(x.s.code);
+    let row=existing.get(x.s.code);
+    if(!row){
+      row=document.createElement('div');
+      row.className='stock v55-mover-row';
+      row.dataset.stock=x.s.code;
+      row.innerHTML=`<div class="row"><span class="rank-num"></span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small data-v55-mover-quote="${x.s.code}"></small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>`;
+      row.onclick=e=>{
+        if(e.target.closest('[data-watch]'))return;
+        selected=STOCKS.find(s=>s.code===row.dataset.stock);
+        chartRange='day';chartMode='line';chartHoverIndex=-1;
+        $('#app').innerHTML=detail(selected);bind();
+      };
+      const heart=row.querySelector('[data-watch]');
+      if(heart)heart.onclick=e=>{
+        e.stopPropagation();
+        const c=heart.dataset.watch;
+        state.watch=state.watch.includes(c)?state.watch.filter(v=>v!==c):[...state.watch,c];
+        Store.saveMe(userId,state);
+        heart.textContent=state.watch.includes(c)?'♥':'♡';
+      };
+    }
+
+    row.classList.remove('hidden');
+    row.classList.add('v55-mover-row');
+    const rank=row.querySelector('.rank-num');
+    if(rank && rank.textContent!==String(i+1))rank.textContent=String(i+1);
+    const qel=row.querySelector('[data-v55-mover-quote]');
+    if(qel){
+      const text=`${fmt(x.q.price)}원 · ${pct(x.change)}`;
+      if(qel.textContent.trim()!==text)qel.textContent=text;
+      const cls=x.change<0?'down':'gain';
+      if(qel.className!==cls)qel.className=cls;
+    }
+    const heart=row.querySelector('[data-watch]');
+    if(heart){
+      const mark=state.watch.includes(x.s.code)?'♥':'♡';
+      if(heart.textContent!==mark)heart.textContent=mark;
+    }
+    const at=list.children[i];
+    if(at!==row)list.insertBefore(row,at||null);
+  });
+  existing.forEach((row,code)=>{if(!wanted.has(code))row.remove()});
+};
+
+window.__marketV56={
+  version:56,
+  basedOn:55,
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  moverBasis:'current-vs-previous-close',
+  moverRefreshMs:V52_LIVE_CACHE_MS,
+  firebaseReadsAdded:0,
+  firebaseWritesAdded:0,
+  v55DomIsolationPreserved:true,
+  kospiV52Preserved:true,
+  performanceCachesPreserved:true
+};
+</script>
+
 </body></html>
