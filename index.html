@@ -4386,4 +4386,214 @@ window.__marketV49={
 };
 </script>
 
+
+<script>
+/* ============ V50 — 장중 고정 1시간 구간 랭킹 ============
+   시장 엔진/가격/확률/체결/성능 최적화는 V49 그대로 유지.
+
+   랭킹 기준:
+   08:00~09:00 → 09시 결과
+   09:00~10:00 → 10시 결과
+   ...
+   22:00~23:00 → 23시 결과
+   23:00~23:30 → 장마감 결과
+
+   진행 중 구간은 랭킹에 올리지 않고, 구간 종료 후 1회 확정 저장.
+   순위는 구간 수익률 기준, 수익금도 함께 표시.
+*/
+const V50_MARKET_OPEN_HOUR=8;
+const V50_MARKET_CLOSE_HOUR=23;
+const V50_MARKET_CLOSE_MINUTE=30;
+const V50_SLOT_COLLECTION='ranking_hourly';
+
+function v50Pad(n){return String(n).padStart(2,'0')}
+function v50DateKey(d=new Date()){
+  return `${d.getFullYear()}${v50Pad(d.getMonth()+1)}${v50Pad(d.getDate())}`;
+}
+function v50DayStart(d=new Date()){
+  const x=new Date(d); x.setHours(0,0,0,0); return x.getTime();
+}
+function v50SessionBounds(d=new Date()){
+  const base=v50DayStart(d);
+  return {
+    open:base+V50_MARKET_OPEN_HOUR*3600000,
+    close:base+V50_MARKET_CLOSE_HOUR*3600000+V50_MARKET_CLOSE_MINUTE*60000
+  };
+}
+function v50CompletedSlots(now=Date.now()){
+  const d=new Date(now), b=v50SessionBounds(d), out=[];
+  if(now<=b.open)return out;
+  for(let h=8;h<23;h++){
+    const start=v50DayStart(d)+h*3600000;
+    const end=start+3600000;
+    if(now>=end)out.push({start,end,label:`${v50Pad(h)}:00~${v50Pad(h+1)}:00`,key:`${v50DateKey(d)}_${v50Pad(h+1)}00`});
+  }
+  const lastStart=v50DayStart(d)+23*3600000;
+  if(now>=b.close)out.push({start:lastStart,end:b.close,label:'23:00~23:30',key:`${v50DateKey(d)}_2330`});
+  return out;
+}
+function v50PointNear(ms,preferBefore=true){
+  const arr=(state?.equityHistory||[]).filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value));
+  if(!arr.length)return null;
+  let best=null,dist=Infinity;
+  for(const x of arr){
+    const delta=(+x.at)-ms;
+    if(preferBefore && delta>5*60*1000)continue;
+    const ad=Math.abs(delta);
+    if(ad<dist){best=x;dist=ad}
+  }
+  // 15분 이상 떨어진 점은 정확한 시간구간 점수로 쓰지 않음.
+  return dist<=15*60*1000?best:null;
+}
+function v50SlotMetric(slot){
+  const a=v50PointNear(slot.start,false), z=v50PointNear(slot.end,false);
+  if(!a||!z)return null;
+  const ap=Number.isFinite(+a.principal)?+a.principal:null;
+  const zp=Number.isFinite(+z.principal)?+z.principal:null;
+  let pnl;
+  if(ap!=null&&zp!=null){
+    pnl=((+z.value)-zp)-((+a.value)-ap);
+  }else{
+    pnl=(+z.value)-(+a.value);
+  }
+  const rate=pnl/Math.max(1,+a.value)*100;
+  return {pnl:Math.round(pnl),rate:+rate.toFixed(4),startValue:Math.round(+a.value),endValue:Math.round(+z.value)};
+}
+
+Store.v50SubmittedSlots=Store.v50SubmittedSlots||new Set();
+Store.v50RankRows=Store.v50RankRows||{};
+Store.v50RankLoading=false;
+Store.v50SelectedSlot=null;
+
+async function v50SubmitCompletedSlots(){
+  if(!Store.online||!Store.db||!Store.uid||!state||!state.nickname||state.nickname==='게스트')return;
+  for(const slot of v50CompletedSlots()){
+    if(Store.v50SubmittedSlots.has(slot.key))continue;
+    const m=v50SlotMetric(slot);
+    if(!m)continue;
+    const ref=Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key).collection('scores').doc(Store.uid);
+    try{
+      await ref.set({
+        nickname:cleanNickname(state.nickname),
+        pnl:m.pnl,
+        rate:m.rate,
+        slotKey:slot.key,
+        slotLabel:slot.label,
+        startAtMs:slot.start,
+        endAtMs:slot.end,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:false});
+      Store.v50SubmittedSlots.add(slot.key);
+    }catch(e){
+      console.warn('시간대 랭킹 저장 실패',slot.key,e?.code||e?.message);
+    }
+  }
+}
+
+async function v50LoadSlot(slot,force=false){
+  if(!slot||!Store.online||!Store.db||Store.v50RankLoading)return;
+  if(!force&&Store.v50RankRows[slot.key])return;
+  Store.v50RankLoading=true;
+  try{
+    await v50SubmitCompletedSlots();
+    const snap=await Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key)
+      .collection('scores').orderBy('rate','desc').limit(10).get();
+    Store.v50RankRows[slot.key]=snap.docs.map((d,i)=>{
+      const x=d.data()||{};
+      return {uid:d.id,nickname:String(x.nickname||''),pnl:+x.pnl||0,rate:+x.rate||0,label:String(x.slotLabel||slot.label),rank:i+1};
+    }).filter(x=>x.nickname&&x.nickname!=='게스트');
+  }catch(e){
+    console.warn('시간대 랭킹 조회 실패',e?.code||e?.message);
+    Store.v50RankRows[slot.key]=[];
+  }finally{
+    Store.v50RankLoading=false;
+    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
+  }
+}
+
+function v50SelectedSlot(){
+  const slots=v50CompletedSlots();
+  if(!slots.length)return null;
+  let s=slots.find(x=>x.key===Store.v50SelectedSlot);
+  if(!s)s=slots[slots.length-1];
+  Store.v50SelectedSlot=s.key;
+  return s;
+}
+
+ranks=function(){
+  const slots=v50CompletedSlots(), slot=v50SelectedSlot();
+  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
+  if(slot&&!Store.v50RankRows[slot.key]&&!Store.v50RankLoading)setTimeout(()=>v50LoadSlot(slot),0);
+  const rows=slot?(Store.v50RankRows[slot.key]||[]):[];
+
+  const tabs=slots.length?`<div class="filter-row" style="overflow-x:auto;white-space:nowrap">
+    ${slots.map(s=>`<button class="chip ${s.key===slot?.key?'active':''}" data-v50-slot="${s.key}">${s.label}</button>`).join('')}
+  </div>`:'';
+
+  const row=(r,i)=>`<div class="rankrow ${r.uid===Store.uid?'me':''}">
+    <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
+    <div><b>${r.nickname}</b>${r.uid===Store.uid?' <small>나</small>':''}</div>
+    <div class="price ${r.pnl<0?'down':'gain'}">${sign(r.pnl)}원
+      <small class="${r.rate<0?'down':'gain'}">${pct(r.rate)}</small>
+    </div>
+  </div>`;
+
+  return shell(`${header('랭킹')}
+    <div class="between"><h2>시간대별 랭킹</h2>${status}</div>
+    <div class="rank-refresh-note">각 시간 구간이 끝난 뒤 수익률로 순위를 확정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
+    ${tabs}
+    ${!slot?`<div class="ranking-empty">첫 랭킹은 09:00에 확정됩니다.</div>`:
+      `<div class="rank-snapshot-head"><b>${slot.label}</b><span>구간 확정 결과</span></div>
+       <h2>TOP 10</h2>
+       ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.v50RankLoading?'랭킹을 불러오는 중이에요.':'아직 등록된 결과가 없어요.'}</div>`}`}
+  `,'ranking');
+};
+
+// 랭킹 슬롯 버튼
+const V50_BIND_BASE=bind;
+bind=function(){
+  V50_BIND_BASE();
+  document.querySelectorAll('[data-v50-slot]').forEach(btn=>{
+    btn.onclick=()=>{
+      Store.v50SelectedSlot=btn.dataset.v50Slot;
+      const slot=v50CompletedSlots().find(x=>x.key===Store.v50SelectedSlot);
+      if(slot)v50LoadSlot(slot,true);
+      render();
+    };
+  });
+};
+
+// 매분 종료된 슬롯이 있으면 1회 제출. 실시간 점수 write 없음.
+setInterval(()=>{
+  if(document.hidden||!Store.online||!state)return;
+  v50SubmitCompletedSlots();
+},60*1000);
+
+// 랭킹 진입 시 최신 완료 슬롯 로드.
+let V50_LAST_VIEW=view;
+setInterval(()=>{
+  if(document.hidden)return;
+  if(view==='ranking'&&V50_LAST_VIEW!=='ranking'){
+    const s=v50SelectedSlot();
+    if(s)v50LoadSlot(s,true);
+  }
+  V50_LAST_VIEW=view;
+},1000);
+
+// V49 rolling ranking writer/reader는 최종 UI에서 사용하지 않음.
+// 기존 ranking/{uid} 호환 문서는 관리자/기존 기능용으로 유지.
+
+window.__marketV50={
+  version:50,
+  marketRulesChanged:false,
+  performanceEngineChanged:false,
+  rankingMode:'fixed-market-hour-slots',
+  firstSlot:'08:00~09:00',
+  lastSlot:'23:00~23:30',
+  liveRanking:false,
+  rankingPrimary:'rate',
+  rankingDisplay:['pnl','rate']
+};
+</script>
+
 </body></html>
