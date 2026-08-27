@@ -1767,6 +1767,7 @@ function v29RawWithOpen(s,day,minute,open){
     center*=Math.exp((reg.bias+slumpBias)*.25);
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));
     ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
+    ret=v70EnsureCumulativeMove(s,day,i,p,ret,reg,mom);
     ret=Math.max(-.012,Math.min(.012,ret));
     p*=Math.exp(ret);
     p=Math.max(open*.10,Math.min(open*2.20,p));
@@ -3907,6 +3908,7 @@ v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
     center*=Math.exp((reg.bias+slumpBias)*.25);
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));
     ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
+    ret=v70EnsureCumulativeMove(s,day,i,p,ret,reg,mom);
     ret=Math.max(-.012,Math.min(.012,ret));
     p*=Math.exp(ret);
     p=Math.max(open*.10,Math.min(open*2.20,p));
@@ -5471,6 +5473,247 @@ window.__marketV66={
   lowPriceRoundingFixed:true,cumulativePath:true,
   displayExecutionTickUnified:true,shockProbabilityChanged:false,
   shockMagnitudeChanged:false,firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V67 — 실제 장 단위 전일 종가 고정 ============
+   문제:
+   - V57은 15배속 내부 게임일의 직전 종가를 사용해 약 96분마다
+     등락률 기준이 바뀌고 급상승/급하락 수익률이 초기화됐다.
+
+   수정:
+   - 실제 날짜의 전날 23:30 모의가격을 당일 전일 종가로 사용
+   - 당일 08:00~23:30 동안 모든 종목의 기준가를 고정
+   - 내부 게임 day/tick 전환은 가격 경로에만 사용하고 등락률 기준과 분리
+   - 가격 엔진/15배속/급등락/체결/Firebase는 변경하지 않음
+*/
+const V67_PREV_CLOSE_CACHE=new Map();
+
+function v67SessionPrevCloseMs(ms=Date.now()){
+  const d=new Date(ms);
+  d.setDate(d.getDate()-1);
+  d.setHours(23,30,0,0);
+  return d.getTime();
+}
+
+v411PrevClose=function v67RealSessionPrevClose(s,ms=Date.now()){
+  if(!s)return 1;
+  const anchor=v67SessionPrevCloseMs(ms),key=s.code+'|'+anchor;
+  const hit=V67_PREV_CLOSE_CACHE.get(key);
+  if(hit!==undefined)return hit;
+  const value=Math.max(1,Number(fastVisualPriceAt(s,anchor))||1);
+  // 현재/인접 실제 거래일만 유지한다.
+  if(V67_PREV_CLOSE_CACHE.size>STOCKS.length*3)V67_PREV_CLOSE_CACHE.clear();
+  V67_PREV_CLOSE_CACHE.set(key,value);
+  return value;
+};
+
+try{
+  V43_PREVCLOSE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V52_LIVE_QUOTE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV67={
+  version:67,basedOn:66,
+  changeBasis:'previous-real-session-close',
+  previousCloseTime:'previous calendar day 23:30 local time',
+  fixedDuringSession:'08:00-23:30',
+  internalGameDayAffectsReturnBasis:false,
+  intradayReturnReset:false,
+  nextReset:'next calendar trading session',
+  marketSpeedChanged:false,priceEngineChanged:false,
+  executionRulesChanged:false,firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V68 — 실제 장 1회 = 내부 게임일 1회 ============
+   목표:
+   - 08:00~23:30 전체를 내부 day의 0~389틱으로 정확히 사용
+   - 장중 내부 날짜 전환 제거, 다음 실제 날짜 장에서만 day 변경
+   - 가격 날짜는 하루 1회만 진행하되 국면/모멘텀/활동성은 기존 체감 속도로 순환
+   - 각 메인 틱 사이는 계속 보간해 화면 정체 방지
+*/
+const V68_SESSION_MS=(MARKET_CLOSE_MIN-MARKET_OPEN_MIN)*60*1000;
+const V68_STATE_SPEED=MARKET_V9_SPEED*DAY_MS/V68_SESSION_MS*V63_STATE_SPEED;
+
+function v68SessionPosition(ms=Date.now()){
+  const d=new Date(ms);
+  let sessionDate=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  let open=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
+  let close=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
+  let effective=ms;
+
+  if(ms<open){
+    sessionDate.setDate(sessionDate.getDate()-1);
+    open=new Date(sessionDate.getFullYear(),sessionDate.getMonth(),sessionDate.getDate(),8,0,0,0).getTime();
+    close=new Date(sessionDate.getFullYear(),sessionDate.getMonth(),sessionDate.getDate(),23,30,0,0).getTime();
+    effective=close;
+  }else if(ms>=close){
+    effective=close;
+  }
+
+  const sessionStart=new Date(sessionDate.getFullYear(),sessionDate.getMonth(),sessionDate.getDate()).getTime();
+  const day=Math.round((sessionStart-MARKET_EPOCH)/DAY_MS);
+  const progress=Math.max(0,Math.min(1,(effective-open)/Math.max(1,close-open)));
+  const raw=progress*DAY_STEPS;
+  const minute=progress>=1?DAY_STEPS-1:Math.max(0,Math.min(DAY_STEPS-1,Math.floor(raw)));
+  const phase=progress>=1?1:raw-minute;
+  return {day,minute,phase,tick:day*DAY_STEPS+minute,open,close,progress};
+}
+
+// 모든 최종 가격 라우터가 실제 장 기준 tick을 사용한다.
+sessionTick=function v68SessionTick(ms=Date.now()){return v68SessionPosition(ms).tick};
+marketTick=function v68MarketTick(ms=Date.now()){return v68SessionPosition(ms).tick};
+
+// 가격 날짜와 상태 순환 속도를 분리한다.
+v63StateMinute=function v68FastStateMinute(day,minute){
+  return Math.floor(Math.max(0,minute)*V68_STATE_SPEED);
+};
+
+v12StockPriceAtMs=function v68SessionStockPrice(s,ms=Date.now()){
+  const pos=v68SessionPosition(ms),a=v10StockDisplayedAt(s,pos.tick);
+  if(pos.minute>=DAY_STEPS-1)return v65RoundPrice(a.price);
+  const b=v10StockDisplayedAt(s,pos.tick+1),x=pos.phase*pos.phase*(3-2*pos.phase);
+  return v65RoundPrice(a.price+(b.price-a.price)*x);
+};
+
+v12EtfPriceAtMs=function v68SessionEtfPrice(s,ms=Date.now()){
+  const pos=v68SessionPosition(ms),a=etfDisplayedAt(s,pos.tick);
+  if(pos.minute>=DAY_STEPS-1)return Math.max(5,Math.round(a.price/5)*5);
+  const b=etfDisplayedAt(s,pos.tick+1),x=pos.phase*pos.phase*(3-2*pos.phase);
+  return Math.max(5,Math.round((a.price+(b.price-a.price)*x)/5)*5);
+};
+
+fastVisualPriceAt=function v68SessionVisualPrice(s,ms=Date.now()){
+  return s?.isETF?v12EtfPriceAtMs(s,ms):v12StockPriceAtMs(s,ms);
+};
+smoothPriceAt=fastVisualPriceAt;
+
+try{
+  v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
+  V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
+  priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV68={
+  version:68,basedOn:67,
+  realSession:'08:00-23:30',ticksPerSession:390,
+  internalDaysPerSession:1,internalDayRolloverDuringSession:false,
+  secondsPerPriceTick:V68_SESSION_MS/DAY_STEPS/1000,
+  stateSpeedMultiplier:V68_STATE_SPEED,
+  stateSpeedDecoupled:true,priceInterpolation:true,
+  previousCloseBasis:'previous real session 23:30',
+  marketSpeedLabelPreserved:true,executionRulesChanged:false,
+  firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V69 — 실제 거래일 사이 가격 연속성 ============
+   V68로 날짜축을 실제 하루로 바꾸면서 과거 엔진의 서로 다른 day 경로가
+   바로 연결되어 시초가가 과도하게 벌어질 수 있는 문제를 보정한다.
+   전일 23:30 종가에 ±1% 이내의 결정론적 갭만 허용한다.
+*/
+const V69_RAW_BASE=v9RawPriceAt;
+const V69_SCALE_CACHE=new Map();
+const V69_RAW_CACHE=new Map();
+const V69_ANCHOR_DAY=v68SessionPosition(Date.parse('2026-08-26T12:00:00+09:00')).day;
+
+function v69AdjustedRaw(s,t){
+  const day=Math.floor(t/DAY_STEPS),minute=((t%DAY_STEPS)+DAY_STEPS)%DAY_STEPS;
+  const key=s.code+'|'+t,hit=V69_RAW_CACHE.get(key);
+  if(hit)return hit;
+  const raw=V69_RAW_BASE(s,t);
+  if(day<=V69_ANCHOR_DAY){V69_RAW_CACHE.set(key,raw);return raw}
+
+  const scaleKey=s.code+'|'+day;
+  let scale=V69_SCALE_CACHE.get(scaleKey);
+  if(!Number.isFinite(scale)){
+    const baseOpen=V69_RAW_BASE(s,day*DAY_STEPS);
+    const prev=v69AdjustedRaw(s,day*DAY_STEPS-1);
+    const gap=Math.max(-.01,Math.min(.01,v9Normal('v69-real-day-gap',s.code,day)*.0045));
+    const targetOpen=Math.max(1,prev.price*Math.exp(gap));
+    scale=targetOpen/Math.max(1,baseOpen.price);
+    V69_SCALE_CACHE.set(scaleKey,scale);
+  }
+  const scaledOpen=v65RoundPrice(raw.open*scale);
+  const scaledPrice=raw.price*scale;
+  const walk=v70SessionCumulativeWalk(s,day,minute,scaledOpen);
+  const out={...raw,price:v65RoundPrice(scaledPrice+walk),open:scaledOpen,day,minute};
+  if(V69_RAW_CACHE.size>STOCKS.length*DAY_STEPS*3)V69_RAW_CACHE.clear();
+  V69_RAW_CACHE.set(key,out);
+  return out;
+}
+
+v9RawPriceAt=function v69ContinuousRawPrice(s,t=marketTick()){return v69AdjustedRaw(s,t)};
+priceAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v9RawPriceAt(s,t)};
+
+try{
+  referenceScaleCache?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV69={
+  version:69,basedOn:68,realDayContinuity:true,
+  maxOvernightGapPct:1,previousCloseResetFixed:true,
+  intradayInternalRollover:false,executionRulesChanged:false,
+  firebaseSchemaChanged:false,rankingChanged:false
+};
+</script>
+
+<script>
+/* ============ V70 — 저가주 메인 누적 틱 정체 방지 ============
+   화면용 랜덤 흔들림이 아니라 v29/V49 메인 가격 누적 ret 자체에
+   최소 이동폭을 적용한다. 기존 방향이 있으면 그 방향을 보존하고,
+   완전 0일 때만 결정론적 방향을 사용한다.
+*/
+function v70EnsureCumulativeMove(s,day,minute,price,ret,reg,mom){
+  const p=Math.max(1,Number(price)||1),r=Number(ret)||0;
+  const minMove=v65TickSize(p)/p*.82;
+  if(Math.abs(r)>=minMove)return r;
+  let dir=Math.sign(r)||Math.sign((reg?.bias||0)+(Number(mom)||0));
+  if(!dir)dir=v9Unit('v70-dir',s.code,day,minute)<.5?-1:1;
+  return dir*minMove;
+}
+
+const V70_WALK_CACHE=new Map();
+function v70SessionCumulativeWalk(s,day,minute,openPrice){
+  const key=s.code+'|'+day;
+  let st=V70_WALK_CACHE.get(key);
+  const tick=v65TickSize(openPrice);
+  if(!st)st={last:0,sum:0,values:[0],tick};
+  for(let i=st.last+1;i<=minute;i++){
+    const u=v9Unit('v70-session-walk',s.code,day,i);
+    const dir=u<.5?-1:1;
+    st.sum+=dir*st.tick*4;
+    st.values[i]=st.sum;
+  }
+  st.last=Math.max(st.last,minute);
+  V70_WALK_CACHE.set(key,st);
+  if(V70_WALK_CACHE.size>STOCKS.length*3)V70_WALK_CACHE.clear();
+  return st.values[minute]??st.sum;
+}
+
+try{
+  V49_PATH_STATE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();
+  V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();
+  V70_WALK_CACHE?.clear?.();
+  referenceScaleCache?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV70={
+  version:70,basedOn:69,cumulativeMinimumMove:true,
+  minimumTickFraction:.82,sessionWalkTicks:4,syntheticVisualWobble:false,
+  directionPreserved:true,intradayInternalRollover:false,
+  firebaseSchemaChanged:false,rankingChanged:false
 };
 </script>
 </body></html>
