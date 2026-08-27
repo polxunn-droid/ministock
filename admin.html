@@ -60,6 +60,16 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
 .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:16px}
 .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#191f28;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;z-index:50}
 .hide{display:none!important}
+
+.stock-search-wrap{position:relative}
+.stock-search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid #dfe3e8;border-radius:14px;box-shadow:0 10px 28px #00000018;max-height:280px;overflow:auto;padding:6px}
+.stock-search-results[hidden]{display:none}
+.stock-search-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:11px 12px;border-radius:10px;background:#fff;color:var(--ink)}
+.stock-search-item:active,.stock-search-item.on{background:#f2f6ff}
+.stock-search-item b{font-size:14px}
+.stock-search-item small{font-size:12px;color:var(--muted);white-space:nowrap}
+.stock-preview.ok{color:var(--blue);font-weight:700}
+.stock-preview.bad{color:var(--red)}
 </style>
 </head>
 <body>
@@ -129,8 +139,10 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
         <p class="desc">종목과 수량을 지정하면 지급 시각의 모의시장가를 기준으로 보유주식에 자동 반영됩니다. 사용자는 별도 수령 버튼을 누르지 않아도 되고 알림만 한 번 표시됩니다.</p>
         <div class="field">
           <label>종목</label>
-          <input id="stock-code" list="stock-list" placeholder="종목코드 또는 종목명 검색">
-          <datalist id="stock-list"></datalist>
+          <div class="stock-search-wrap">
+            <input id="stock-code" autocomplete="off" placeholder="종목코드 또는 종목명 검색">
+            <div class="stock-search-results" id="stock-search-results" hidden></div>
+          </div>
           <div class="stock-preview" id="stock-preview"></div>
         </div>
         <div class="field">
@@ -378,16 +390,59 @@ function resolveAdminStock(raw){
   return ADMIN_STOCKS.find(s=>s.code.includes(q)||s.name.toLowerCase().includes(q.toLowerCase()))||null;
 }
 
-(function initStockPicker(){
-  const list=$('#stock-list');
-  if(list)list.innerHTML=ADMIN_STOCKS.map(s=>`<option value="${esc(s.code)}">${esc(s.name)}</option>`).join('');
-  const input=$('#stock-code'),preview=$('#stock-preview');
-  const update=()=>{
-    const s=resolveAdminStock(input?.value);
-    if(preview)preview.textContent=s?`${s.code} · ${s.name} · 지급 시각 시장가 자동 적용`:'';
+let ADMIN_SELECTED_STOCK_CODE='';
+function adminStockNorm(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,'')}
+function adminStockMatches(raw){
+  const q=adminStockNorm(raw);
+  if(!q)return [];
+  return ADMIN_STOCKS.filter(s=>adminStockNorm(s.code).includes(q)||adminStockNorm(s.name).includes(q)).slice(0,12);
+}
+function selectAdminStock(s){
+  if(!s)return;
+  ADMIN_SELECTED_STOCK_CODE=s.code;
+  const input=$('#stock-code'),box=$('#stock-search-results'),preview=$('#stock-preview');
+  if(input)input.value=s.name;
+  if(box){box.hidden=true;box.innerHTML=''}
+  if(preview){preview.textContent=`${s.code} · ${s.name} · 지급 시각 시장가 자동 적용`;preview.className='stock-preview ok'}
+}
+(function initStockPickerV4(){
+  const input=$('#stock-code'),box=$('#stock-search-results'),preview=$('#stock-preview');
+  if(!input||!box)return;
+  const renderResults=()=>{
+    const raw=input.value;
+    const hits=adminStockMatches(raw);
+    ADMIN_SELECTED_STOCK_CODE='';
+    if(!raw.trim()){
+      box.hidden=true;box.innerHTML='';
+      if(preview){preview.textContent='';preview.className='stock-preview'}
+      return;
+    }
+    const exact=resolveAdminStock(raw);
+    if(exact&&(adminStockNorm(exact.code)===adminStockNorm(raw)||adminStockNorm(exact.name)===adminStockNorm(raw))){
+      ADMIN_SELECTED_STOCK_CODE=exact.code;
+      if(preview){preview.textContent=`${exact.code} · ${exact.name} · 지급 시각 시장가 자동 적용`;preview.className='stock-preview ok'}
+    }else if(preview){
+      preview.textContent=hits.length?'아래 검색 결과에서 종목을 선택해주세요.':'일치하는 종목이 없습니다.';
+      preview.className='stock-preview '+(hits.length?'':'bad');
+    }
+    box.innerHTML=hits.map(s=>`<button type="button" class="stock-search-item" data-admin-stock="${esc(s.code)}"><b>${esc(s.name)}</b><small>${esc(s.code)}</small></button>`).join('');
+    box.hidden=!hits.length;
   };
-  input?.addEventListener('input',update);
-  input?.addEventListener('change',update);
+  input.addEventListener('input',renderResults);
+  input.addEventListener('focus',()=>{if(input.value.trim())renderResults()});
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      const hits=adminStockMatches(input.value);
+      if(hits.length){e.preventDefault();selectAdminStock(hits[0])}
+    }
+  });
+  box.addEventListener('click',e=>{
+    const b=e.target.closest('[data-admin-stock]');if(!b)return;
+    const s=ADMIN_STOCK_BY_CODE.get(b.dataset.adminStock);selectAdminStock(s);
+  });
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.stock-search-wrap'))box.hidden=true;
+  });
   document.querySelectorAll('[data-stock-qty]').forEach(b=>b.onclick=()=>{$('#stock-qty').value=b.dataset.stockQty});
 })();
 
@@ -416,12 +471,12 @@ $('#people').addEventListener('click',async e=>{
 });
 
 async function sendStock(targets){
-  const stock=resolveAdminStock($('#stock-code').value),
+  const rawStock=$('#stock-code').value, hits=adminStockMatches(rawStock), stock=ADMIN_SELECTED_STOCK_CODE?ADMIN_STOCK_BY_CODE.get(ADMIN_SELECTED_STOCK_CODE):(hits.length===1?hits[0]:resolveAdminStock(rawStock)),
         qty=Math.floor(+$('#stock-qty').value||0),
         title=$('#stock-title').value.trim(),
         message=$('#stock-message').value.trim();
   $('#stock-send-err').textContent='';
-  if(!stock)return $('#stock-send-err').textContent='지급할 종목을 선택해주세요.';
+  if(!stock)return $('#stock-send-err').textContent=hits.length>1?'검색 결과에서 지급할 종목을 하나 선택해주세요.':'지급할 종목을 선택해주세요.';
   if(!Number.isFinite(qty)||qty<1||qty>10000)return $('#stock-send-err').textContent='수량은 1~10,000주로 입력해주세요.';
   const all=targets==='all';
   if(!all&&!targets.length)return $('#stock-send-err').textContent='먼저 참여자를 선택해주세요.';
@@ -443,7 +498,8 @@ async function sendStock(targets){
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
     $('#stock-code').value='';$('#stock-qty').value='1';$('#stock-title').value='';$('#stock-message').value='';
-    $('#stock-preview').textContent='';
+    ADMIN_SELECTED_STOCK_CODE='';const sr=$('#stock-search-results');if(sr){sr.hidden=true;sr.innerHTML=''}
+    $('#stock-preview').textContent='';$('#stock-preview').className='stock-preview';
     selected=new Set();renderPeople();
     toast('주식 지급을 보냈어요');
   }catch(error){
@@ -498,7 +554,9 @@ $('#stock-history').addEventListener('click',async e=>{
   }
 });
 
-window.__adminV2={stockGrant:true,userListCleanup:true,stockCount:ADMIN_STOCKS.length};\nwindow.__adminV3={version:3,samsung2xGift:true,codes:['SAMS2L','SAMS2I'],stockCount:ADMIN_STOCKS.length};
+window.__adminV2={stockGrant:true,userListCleanup:true,stockCount:ADMIN_STOCKS.length};
+window.__adminV3={version:3,samsung2xGift:true,codes:['SAMS2L','SAMS2I'],stockCount:ADMIN_STOCKS.length};
+window.__adminV4={version:4,customStockSearch:true,iosDatalistRemoved:true,samsung2xGift:true,grantSchemaChanged:false};
 </script>
 
 </body>
