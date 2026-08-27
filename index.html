@@ -5976,11 +5976,26 @@ function v72MacroLogAtMs(ms=Date.now()){
   const a=v72MacroLogDay(d),b=v72MacroLogDay(d+1);
   return a+(b-a)*(f*f*(3-2*f));
 }
+// V76: 장기 macro 배수가 전 종목에 완전히 동일하게 적용되던 문제를 고친다.
+// 1) 장 마감 중에는 macro도 개별 틱과 동일하게 effectiveMarketRealMs로 고정한다.
+//    장 마감 배지가 떠 있는데 숫자가 계속 실시간으로 움직이던 문제와,
+//    다음 개장 때 밤사이 변화가 "갭"으로 한 번에 반영되는 걸 동시에 해결한다.
+// 2) 종목마다 시장 흐름에 대한 민감도(베타)를 다르게 부여하고 아주 작은 종목 고유
+//    변동을 더해서 "코스피가 오르면 사실상 전종목이 똑같이 오른다"는 현상을 없앤다.
+function v76StockBeta(code){ return 1 + v9Normal('v76-beta', code) * 1.35; }
+function v76StockIdio(code, ms){
+  const dayKey = Math.floor(ms/86400000);
+  return v9Normal('v76-idio', code, dayKey) * .034;
+}
 function v72AssetFactorAtMs(s,ms=Date.now()){
-  const log=v72MacroLogAtMs(ms);
-  if(!s?.isETF)return Math.exp(log);
-  const lev=Number.isFinite(+s.leverage)?+s.leverage:Math.max(0,1-(+s.bondWeight||0));
-  return Math.exp(log*lev);
+  const frozenMs = effectiveMarketRealMs(ms);
+  const log=v72MacroLogAtMs(frozenMs);
+  if(s?.isETF){
+    const lev=Number.isFinite(+s.leverage)?+s.leverage:Math.max(0,1-(+s.bondWeight||0));
+    return Math.exp(log*lev);
+  }
+  const beta=v76StockBeta(s.code), idio=v76StockIdio(s.code, frozenMs);
+  return Math.exp(log*beta + idio);
 }
 
 // V71이 보관한 '장기 macro 적용 전' 가격을 사용해 이중 적용을 막는다.
