@@ -526,7 +526,7 @@ function v9RawPriceAt(s,t=marketTick()){
   const day=Math.floor(t/390),minute=((t%390)+390)%390,open=v9DayOpen(s,day);let p=open,slumpUntil=-1,center=open;
   for(let i=0;i<=minute;i++){
     const reg=v9Regime(s,day,i),mom=v9Momentum(s,day,i),vol=v9Volatility(s,day,i),act=v11Activity(s,day,i),shock=v9Shock(s,day,i);
-    if(shock.ret){const shockLog=Math.log1p(Math.max(-.95,shock.ret));p*=Math.exp(shockLog);center*=Math.exp(shockLog*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));}
+    if(shock.ret){const shockLog=Math.log1p(Math.max(-.95,shock.ret));p*=Math.exp(shockLog);center*=Math.exp(shockLog*.78);if(shock.slump)slumpUntil=Math.max(slumpUntil,i+10+Math.floor(v9Unit(s.code,day,i,'slump')*21));}
     const slumpBias=i<slumpUntil?-.000045:0;
     // 평소 종목은 기존처럼 잔잔하되, 활동성이 높은 종목만 의미 있게 움직인다.
     const sigma=v66MarketSigma(p,.00032*vol*act.mult);
@@ -1766,7 +1766,7 @@ function v29RawWithOpen(s,day,minute,open){
       const shockLog=Math.log1p(Math.max(-.95,shock.ret));
       p*=Math.exp(shockLog);
       center*=Math.exp(shockLog*.78);
-      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
+      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+10+Math.floor(v9Unit(s.code,day,i,'slump')*21));
     }
     const slumpBias=i<slumpUntil?-.000045:0;
     const sigma=v66MarketSigma(p,.00032*vol*act.mult);
@@ -3900,7 +3900,7 @@ v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
       const shockLog=Math.log1p(Math.max(-.95,shock.ret));
       p*=Math.exp(shockLog);
       center*=Math.exp(shockLog*.78);
-      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
+      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+10+Math.floor(v9Unit(s.code,day,i,'slump')*21));
     }
 
     const slumpBias=i<slumpUntil?-.000045:0;
@@ -4024,18 +4024,26 @@ async function rkv2LoadRanking(force=false){
 
 ranking=function(){return Store.rkv2Rows.map(r=>({...r,me:r.uid===Store.uid}))};
 
-function rkv2AgoLabel(ms){
-  if(ms==null)return '';
-  const sec=Math.max(0,Math.round(ms/1000));
-  if(sec<60)return `${sec}초 전`;
-  return `${Math.round(sec/60)}분 전`;
+// V74: 상대시간("N분 전") 표기는 절대시간 표기(rkv2SessionLabel)로 대체되어 더 이상 쓰지 않음.
+// 장 시작(08:00)+10분인 08:10부터 마감(23:30)까지
+// 10분 단위로 정확히 스냅된 "HH:MM 기준" 절대 시각을 보여준다.
+// 08:10 이전(자정~08:10)에는 전날 마지막 스냅인 23:30을 그대로 유지해서 보여준다.
+function rkv2SessionLabel(ms=Date.now()){
+  const d=new Date(ms),minutesNow=d.getHours()*60+d.getMinutes();
+  const firstMark=MARKET_OPEN_MIN+10; // 08:10
+  const lastMark=MARKET_CLOSE_MIN;    // 23:30
+  let snapped;
+  if(minutesNow<firstMark||minutesNow>=lastMark)snapped=lastMark; // 08:10 이전 또는 23:30 이후 → 23:30 유지
+  else snapped=firstMark+Math.floor((minutesNow-firstMark)/10)*10;
+  const hh=String(Math.floor(snapped/60)).padStart(2,'0'),mm=String(snapped%60).padStart(2,'0');
+  return `${hh}:${mm} 기준`;
 }
 
 ranks=function(){
   const rows=ranking();
   const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
   const meInList=rows.find(r=>r.me);
-  const agoMs=Store.rkv2LoadedAt?Date.now()-Store.rkv2LoadedAt:null;
+  const sessionLabel=rkv2SessionLabel();
 
   const row=(r,i)=>`<div class="rankrow ${r.me?'me':''}">
     <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
@@ -4047,24 +4055,20 @@ ranks=function(){
 
   return shell(`${header('랭킹')}
     <div class="between"><h2>총자산 랭킹</h2>${status}</div>
+    <div class="eyebrow">${sessionLabel}</div>
     <div class="ranking-me">
       <span class="eyebrow">나의 평가금액${meInList?` · TOP ${meInList.rank}`:''}</span>
       <h2>${sign(Math.round(total()))}원</h2>
       <b class="${accountRate()<0?'down':'gain'}">${pct(accountRate())}</b>
     </div>
-    <div class="between"><h2>TOP ${RKV2_RANK_TOPN}</h2>
-      <button class="chip" data-rkv2-refresh>새로고침${agoMs!=null?` · ${rkv2AgoLabel(agoMs)}`:''}</button>
-    </div>
+    <div class="between"><h2>TOP ${RKV2_RANK_TOPN}</h2></div>
     ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.rkv2Loading?'랭킹을 불러오는 중이에요.':'아직 등록된 참가자가 없어요.'}</div>`}
-    <div class="rank-refresh-note">${Math.round(RKV2_POLL_MS/60000)}분마다 자동 갱신돼요.</div>
   `,'ranking');
 };
 
 const RKV2_BIND_BASE=bind;
 bind=function(){
   RKV2_BIND_BASE();
-  const btn=document.querySelector('[data-rkv2-refresh]');
-  if(btn)btn.onclick=()=>rkv2LoadRanking(true);
 };
 
 // 1초마다 "체크"만 할 뿐 네트워크 비용은 없음. 실제 조회는
