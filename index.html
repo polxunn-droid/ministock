@@ -157,7 +157,9 @@ function v3VisualPrice(s){const t=marketTick(),a=realisticPriceAt(s,t),b=realist
 window.__marketTest={tick:marketTick,pricesAtTick:t=>STOCKS.map(s=>displayedAt(s,t).price),referencePrices:{...MARKET_REFERENCE_PRICES}};
 const memory={};const LocalStore={async loadMe(id){try{return JSON.parse(localStorage.getItem('mockstock:'+id))}catch{return memory[id]}},async saveMe(id,v){v.marketVersion=5;try{localStorage.setItem('mockstock:'+id,JSON.stringify(v))}catch{memory[id]=v}}};
 const nicknameKey=name=>encodeURIComponent(cleanNickname(name).normalize('NFKC').toLocaleLowerCase('ko-KR'));
-const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,8000-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<8000){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
+// 랭킹 점수(ranking/{uid}) 쓰기 최소 간격 — 랭킹 폴링 간격(RKV2_POLL_MS)과 동일하게 10분으로 통일.
+const SCORE_PUSH_INTERVAL_MS=10*60*1000;
+const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
 let userId=(()=>{try{return localStorage.getItem('mockstock:uid')||''}catch{return''}})(),state=null,view='home',selected=null,accountView=false,sort='value',sectorFilter='전체',assetFilter='stock',chartRange='day',chartMode='line',lastChartTick=-1,chartHoverIndex=-1,trading=false,pendingOrder=null;
 function total(){let v=state?.cash||0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=h.qty*smoothPriceAt(s,Date.now())}return v}
 function unrealizedPnl(){let v=0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=(smoothPriceAt(s,Date.now())-h.avg)*h.qty}return v}
@@ -188,7 +190,7 @@ function bindChartPointer(s){const c=$('#chart'),wrap=$('.chart-wrap');if(!c||!w
 function detail(s){const q=quote(s),watched=state.watch.includes(s.code),chg=rangeChange(s);return shell(`<div class="detail-head between"><button class="back" aria-label="뒤로">‹</button><div class="icons">${watched?'♥':'♡'}　⋯</div></div><div class="sub">${s.code} · ${s.sector}</div><h1>${s.name}</h1><h2 class="detail-price">${fmt(q.price)}원</h2><div data-detail-change class="detail-change ${chg.value<0?'down':'gain'}">${chg.label} ${sign(chg.value)}원 (${pct(chg.rate)})</div><div class="chart-top"><div class="chart-mode"><button data-chart-mode="line" class="${chartMode==='line'?'active':''}">라인</button><button data-chart-mode="candle" class="${chartMode==='candle'?'active':''}">캔들</button></div></div><div class="chart-wrap"><canvas id="chart" aria-label="${s.name} ${chartRange} 가격 차트"></canvas></div><div class="range">${Object.entries(CHART_RANGES).map(([key,x])=>`<button data-range="${key}" class="${chartRange===key?'active':''}">${x.label}</button>`).join('')}</div><div class="info-grid"><div class="card"><small>시가</small><strong>${fmt(q.open)}원</strong></div><div class="card"><small>거래량</small><strong>${fmt(q.volume)}주</strong></div><div class="card"><small>52주 최고</small><strong>${fmt(Math.max(...chartSeries(s,'year')))}원</strong></div><div class="card"><small>52주 최저</small><strong>${fmt(Math.min(...chartSeries(s,'year')))}원</strong></div></div><h2>관련 뉴스</h2><div class="card">${newsText()}<br><small>방금 전 · 모의시장 뉴스</small></div><div class="notice">모의투자 게임입니다. 실제 주가·기업 실적과 무관하며 투자 권유가 아닙니다.</div><div class="tradebar"><button class="ghost" data-order="sell">매도</button><button class="primary" data-order="buy">매수</button></div>`);chart(s)}
 function myStockPanel(s){const h=state.holdings[s.code];if(!h?.qty)return '';const q=quote(s),value=q.price*h.qty,cost=h.avg*h.qty,profit=value-cost,rate=profit/Math.max(1,cost)*100,sellFee=Math.round(value*(FEE+TAX));return `<section class="my-stock" data-my-stock="${s.code}"><h2>내 주식</h2><div class="my-stock-row"><span>1주 평균</span><b data-my-avg>${fmt(h.avg)}원</b></div><div class="my-stock-row"><span>보유 수량</span><b>${fmt(h.qty)}주</b></div><div class="my-stock-row"><span>평가 금액</span><b data-my-value>${fmt(value)}원</b></div><div class="my-stock-row"><span>평가 손익</span><b data-my-pnl class="${profit<0?'down':'gain'}">${sign(profit)}원 (${pct(rate)})</b></div><div class="my-stock-row"><span>팔 때 예상 비용</span><b data-my-fee>${fmt(sellFee)}원</b></div><div class="my-stock-note">평단과 평가손익은 매수 수수료를 포함해 계산해요.</div></section>`}
 const detailBase=detail;detail=function(s){return detailBase(s).replace('　⋯</div>','</div>').replace('<div class="info-grid">',myStockPanel(s)+'<div class="info-grid">')};
-function ranks(){const rows=ranking(),lastRows=(Store.rankingLast||[]).map(r=>({...r,me:r.uid===Store.uid})),me=rows.findIndex(x=>x.me)+1,rate=dailyRankRate(),status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'실시간 연결':'연결 확인 필요'}</span>`;return shell(`${header('랭킹')}<div class="between"><h2>일일 랭킹</h2>${status}</div><div class="ranking-me"><span class="eyebrow">나의 오늘 순위</span><h2>${me>0?me+'위':Store.online?'반영 중':'연결 대기'}</h2><b>${sign(dailyRankPnl())}원</b> <span class="${rate<0?'down':'gain'}">${pct(rate)}</span></div><h2>오늘의 순위 TOP 5</h2>${rows.length?rows.map((r,i)=>`<div class="rankrow ${r.me?'me':''}"><b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b><div><b>${r.nickname}</b>${r.me?' <small>나</small>':''}</div><div class="price">${sign(r.totalValue)}원<small class="${r.pnlRate<0?'down':'gain'}">${pct(r.pnlRate)}</small></div></div>`).join(''):`<div class="ranking-empty">${Store.online?'아직 오늘 등록된 참가자가 없어요.<br>첫 번째 참가자가 되어보세요.':'Firebase 연결을 확인하면<br>실제 참가자 순위가 표시돼요.'}</div>`}${lastRows.length?`<div class="rank-divider">⋯</div>${lastRows.map(r=>`<div class="rankrow last ${r.me?'me':''}"><b>꼴찌</b><div><b>${r.nickname}</b>${r.me?' <small>나</small>':''}</div><div class="price">${sign(r.totalValue)}원<small class="${r.pnlRate<0?'down':'gain'}">${pct(r.pnlRate)}</small></div></div>`).join('')}`:''}<div class="rank-refresh-note">1시간마다 갱신돼요</div>`,'ranking')}
+function ranks(){return shell(`${header('랭킹')}<div class="ranking-empty">랭킹을 불러오는 중이에요.</div>`,'ranking')}
 function searchRows(term=''){const q=term.trim().toLowerCase(),list=q?STOCKS.filter(s=>`${s.name} ${s.code} ${s.sector}`.toLowerCase().includes(q)):STOCKS.slice(0,5);return list.length?list.map(s=>{const x=quote(s);return `<div class="stock" data-search-stock="${s.code}">${logo(s)}<div><div class="name">${s.name}</div><small class="sub">${s.code} · ${s.sector}</small></div><div class="price">${fmt(x.price)}원<small class="${x.change<0?'down':'gain'}">${pct(x.change)}</small></div></div>`}).join(''):`<div class="search-hint">일치하는 종목이 없어요.<br>종목명이나 6자리 코드를 확인해주세요.</div>`}
 function closeSearch(){const o=$('.search-overlay');if(!o||o.classList.contains('closing'))return;o.classList.add('closing');setTimeout(()=>o.remove(),170)}
 function openSearch(){if($('.search-overlay'))return;document.body.insertAdjacentHTML('beforeend',`<div class="overlay search-overlay" role="dialog" aria-modal="true" aria-label="종목 검색"><div class="sheet search-sheet"><div class="search-head"><input id="stock-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="종목명 또는 종목코드 검색" aria-label="종목명 또는 종목코드 검색"><button class="close-search">취소</button></div><div class="search-results"><div class="eyebrow">주요 종목</div>${searchRows()}</div></div></div>`);const input=$('#stock-search');let timer=0;const update=()=>{const box=$('.search-results');if(!box)return;box.innerHTML=(input.value.trim()?'<div class="eyebrow">검색 결과</div>':'<div class="eyebrow">주요 종목</div>')+searchRows(input.value);bindSearchRows()};input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(update,90)});input.addEventListener('keydown',e=>{if(e.key==='Escape')closeSearch()});$('.close-search').onclick=closeSearch;bindSearchRows();requestAnimationFrame(()=>input.focus())}
@@ -372,151 +374,6 @@ const GrantWatch={
   if(state&&Store.online&&Store.db&&Store.uid){GrantWatch.start();return}
   setTimeout(waitGrantReady,700);
 })();
-
-/* ============ 일일 랭킹 전환 (시스템 날짜 기준, v7) ============ */
-// 랭킹을 누적이 아니라 "오늘 하루" 손익 기준으로 바꾸고,
-// 실시간 리스너 대신 화면이 랭킹 탭일 때만 구독해서 읽기 사용량을 크게 줄인다.
-const normalizeStateV6=normalizeState;
-normalizeState=function(v){
-  const out=normalizeStateV6(v);
-  out.dailyBaseKey=typeof v?.dailyBaseKey==='string'?v.dailyBaseKey:'';
-  out.dailyBaseValue=Number.isFinite(+v?.dailyBaseValue)?+v.dailyBaseValue:0;
-  out.rankingLoadedAt=Number.isFinite(+v?.rankingLoadedAt)?+v.rankingLoadedAt:0;
-  return out;
-};
-function todayKey(d=new Date()){return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')}
-function ensureDailyBase(){
-  const key=todayKey();
-  if(!state)return key;
-  if(state.dailyBaseKey!==key){
-    state.dailyBaseKey=key;
-    state.dailyBaseValue=Math.round(total());
-    Store.saveMe(userId,state);
-  }
-  return key;
-}
-function dailyRankPnl(){ensureDailyBase();return Math.round(total())-Math.round(+state.dailyBaseValue||total())}
-function dailyRankRate(){const base=Math.max(1,+state.dailyBaseValue||total());return dailyRankPnl()/base*100}
-
-const SCORE_INTERVAL=25000; // 8초 → 25초: 점수 쓰기 빈도를 줄여 리스너로 퍼지는 읽기량도 함께 감소
-Store.scheduleScore=function(force=false){
-  if(!this.online||!state||!this.uid)return;
-  const wait=Math.max(0,SCORE_INTERVAL-(Date.now()-this.lastPushAt));
-  if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}
-  if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait);
-};
-Store.pushMyScore=async function(force=false){
-  if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;
-  if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;
-  if(!force&&Date.now()-this.lastPushAt<SCORE_INTERVAL){this.scheduleScore();return false}
-  this.lastPushAt=Date.now();
-  const key=ensureDailyBase();
-  this.pushPromise=this.db.collection('ranking_daily').doc(key).collection('scores').doc(this.uid).set({
-    nickname:cleanNickname(state.nickname),
-    totalValue:dailyRankPnl(),
-    pnlRate:+dailyRankRate().toFixed(4),
-    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(()=>true).catch(error=>{console.warn('일일 랭킹 저장 실패',error?.code||error?.message);return false})
-    .finally(()=>{this.pushPromise=null});
-  return this.pushPromise;
-};
-Store.removeMyScore=async function(){
-  if(!this.online||!this.db||!this.uid)return;
-  try{await this.db.collection('ranking_daily').doc(todayKey()).collection('scores').doc(this.uid).delete()}catch{}
-};
-// 기존엔 접속하자마자 전체 참가자 랭킹을 실시간 구독했는데(가장 큰 읽기 비용),
-// 이제는 랭킹 탭을 보고 있을 때만 구독하도록 init()에서 그 부분을 제거한다.
-Store.init=async function(){
-  let legacyId='';
-  try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}
-  try{
-    if(!window.firebase)throw new Error('Firebase SDK unavailable');
-    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
-    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;
-    this.uid=uid;
-    this.db=firebase.firestore();
-    this.online=true;
-    try{
-      const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);
-      if(old&&!current)localStorage.setItem('mockstock:'+uid,old);
-      localStorage.setItem('mockstock:uid',uid);
-    }catch{}
-    userId=uid;
-    return true;
-  }catch(error){
-    console.warn('Firebase 연결 실패',error?.code||error?.message);
-    this.online=false;
-    return false;
-  }
-};
-
-// 랭킹은 실시간 구독 없이, 탭에 들어와도 "1시간에 한 번"만 조회한다.
-// (새로고침/재접속과 무관하게 마지막 조회로부터 1시간이 지나야만 다시 불러옴)
-// TOP 5 + 최하위 1명만 별도 쿼리로 가져와서 한 번에 최대 6건만 읽는다.
-const RANKING_REFRESH_MS=60*60*1000; // 1시간
-let lastOnRanking=false;
-async function loadDailyRanking(force=false){
-  if(!Store.online||!Store.db||!state)return;
-  const key=ensureDailyBase();
-  const now=Date.now();
-  if(!force&&state.rankingLoadedAt&&(now-state.rankingLoadedAt)<RANKING_REFRESH_MS)return;
-  try{
-    const valid=x=>typeof x.nickname==='string'&&x.nickname.trim()&&x.nickname!=='게스트'&&Number.isFinite(x.totalValue)&&Number.isFinite(x.pnlRate);
-    const base=Store.db.collection('ranking_daily').doc(key).collection('scores');
-    const [topSnap,lastSnap]=await Promise.all([
-      base.orderBy('totalValue','desc').limit(5).get(),
-      base.orderBy('totalValue','asc').limit(1).get()
-    ]);
-    Store.rankingRows=topSnap.docs.map(doc=>({uid:doc.id,...doc.data()})).filter(valid);
-    const lastDoc=lastSnap.docs[0];
-    Store.rankingLast=(lastDoc&&!Store.rankingRows.some(x=>x.uid===lastDoc.id))?[{uid:lastDoc.id,...lastDoc.data()}].filter(valid):[];
-    state.rankingLoadedAt=now;
-    Store.saveMe(userId,state);
-    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
-  }catch(error){console.warn('일일 랭킹 조회 실패',error?.code||error?.message)}
-}
-const dailyRankingPoll=setInterval(()=>{
-  if(!state||!Store.online||!Store.db)return;
-  const onRanking=(view==='ranking');
-  if(onRanking&&!lastOnRanking)loadDailyRanking(false); // 탭에 들어와도 1시간 안 지났으면 조회 안 함
-  lastOnRanking=onRanking;
-},700);
-document.head.insertAdjacentHTML('beforeend','<style>.rank-divider{text-align:center;color:var(--muted);font-size:13px;padding:6px 0;letter-spacing:2px}.rankrow.last{background:#fff4f4}.rankrow.last b:first-child{font-size:11px;color:var(--red);width:28px}.rank-refresh-note{text-align:center;color:var(--muted);font-size:11px;padding:14px 0 4px}</style>');
-
-/* ============ 일일 랭킹 임시 점검 모드 (v8) ============ */
-// ranking_daily 읽기·쓰기는 중지하고, 관리자 참여자 목록용 ranking만 최신화한다.
-clearInterval(dailyRankingPoll);
-const DIRECTORY_SCORE_INTERVAL=60000;
-Store.scheduleScore=function(force=false){
-  if(!this.online||!state||!this.uid)return;
-  const wait=Math.max(0,DIRECTORY_SCORE_INTERVAL-(Date.now()-this.lastPushAt));
-  if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}
-  if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait);
-};
-Store.pushMyScore=async function(force=false){
-  if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;
-  if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;
-  if(!force&&Date.now()-this.lastPushAt<DIRECTORY_SCORE_INTERVAL){this.scheduleScore();return false}
-  this.lastPushAt=Date.now();
-  this.pushPromise=this.db.collection('ranking').doc(this.uid).set({
-    nickname:cleanNickname(state.nickname),
-    totalValue:Math.round(total()),
-    pnlRate:+accountRate().toFixed(4),
-    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(()=>true).catch(error=>{console.warn('참여자 정보 저장 실패',error?.code||error?.message);return false})
-    .finally(()=>{this.pushPromise=null});
-  return this.pushPromise;
-};
-Store.removeMyScore=async function(){
-  if(!this.online||!this.db||!this.uid)return;
-  try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}
-};
-loadDailyRanking=async function(){return false};
-ranks=function(){
-  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
-  return shell(`${header('랭킹')}<div class="between"><h2>일일 랭킹</h2>${status}</div><div class="ranking-me" style="text-align:center;padding:46px 20px"><div style="font-size:36px;margin-bottom:14px">🛠️</div><h2 style="font-size:22px;margin:0 0 10px">일일 랭킹 점검 중입니다</h2><p class="sub" style="margin:0;line-height:1.7">더 안정적인 방식으로 개선한 뒤<br>다시 제공할 예정입니다.</p></div>`,'ranking');
-};
 
 
 /* ============ 시장 엔진 V11 — Activity·거래량·급등락 후속경로 (2026-08-26) ============
@@ -1761,112 +1618,9 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]')
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
-
-
-/* ============ V15 — 저비용 1시간 스냅샷 랭킹 ============
-   - TOP 3 + 하위 3명만 표시
-   - 총 평가금액 + 원금 대비 총수익률
-   - 09:00~23:00 매시 정각, 23:30 장마감 최종 스냅샷
-   - 08:00~09:00 및 장마감 중에는 직전 23:30 마감랭킹 유지
-   - 같은 스냅샷은 localStorage 캐시: 탭 재방문으로 Firestore 재읽기 없음
-   - 실시간 onSnapshot 미사용
-*/
-const RANK_V15_CACHE_PREFIX='mockstock:rankSnapshot:';
-Store.rankingBottom=[];Store.rankingSnapshotAt=0;Store.rankingSnapshotKey='';Store.rankingLoading=false;
-function rankDateKey(d){return ''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')}
-function rankSlotInfo(ms=Date.now()){
-  const d=new Date(ms),mins=d.getHours()*60+d.getMinutes()+d.getSeconds()/60;
-  // 장 마감 이후: 오늘 23:30 최종. 08시 이전: 전날 23:30 최종.
-  if(mins>=MARKET_CLOSE_MIN)return {key:rankDateKey(d)+'_2330',label:'23:30 장마감',closed:true};
-  if(mins<MARKET_OPEN_MIN){const y=new Date(d);y.setDate(y.getDate()-1);return {key:rankDateKey(y)+'_2330',label:'23:30 장마감',closed:true};}
-  // 개장 후 첫 1시간은 전날 마감랭킹을 그대로 보여준다.
-  if(mins<9*60){const y=new Date(d);y.setDate(y.getDate()-1);return {key:rankDateKey(y)+'_2330',label:'전일 23:30 장마감',closed:false};}
-  const h=Math.min(23,d.getHours());
-  return {key:rankDateKey(d)+'_'+String(h).padStart(2,'0')+'00',label:String(h).padStart(2,'0')+':00 기준',closed:false};
-}
-function nextRankLabel(ms=Date.now()){
-  const d=new Date(ms),mins=d.getHours()*60+d.getMinutes()+d.getSeconds()/60;
-  if(mins>=MARKET_CLOSE_MIN||mins<MARKET_OPEN_MIN)return '다음 갱신 09:00';
-  if(mins<9*60)return '다음 갱신 09:00';
-  if(mins>=23*60)return '다음 갱신 23:30';
-  return '다음 갱신 '+String(d.getHours()+1).padStart(2,'0')+':00';
-}
-function rankCacheGet(key){try{const x=JSON.parse(localStorage.getItem(RANK_V15_CACHE_PREFIX+key)||'null');return x&&x.key===key?x:null}catch{return null}}
-function rankCacheSet(x){try{localStorage.setItem(RANK_V15_CACHE_PREFIX+x.key,JSON.stringify(x))}catch{}}
-function validRankRow(x){return x&&typeof x.nickname==='string'&&x.nickname.trim()&&x.nickname!=='게스트'&&Number.isFinite(+x.totalValue)&&Number.isFinite(+x.pnlRate)}
-function applyRankSnapshot(x){
-  const uniq=new Set();
-  Store.rankingRows=(x.top||[]).filter(validRankRow).filter(r=>{if(uniq.has(r.uid))return false;uniq.add(r.uid);return true}).slice(0,3);
-  Store.rankingBottom=(x.bottom||[]).filter(validRankRow).filter(r=>{if(uniq.has(r.uid))return false;uniq.add(r.uid);return true}).slice(0,3);
-  Store.rankingSnapshotAt=+x.createdAtMs||0;Store.rankingSnapshotKey=x.key||'';
-}
-async function loadHourlyRanking(force=false){
-  if(!Store.online||!Store.db||Store.rankingLoading)return;
-  const slot=rankSlotInfo(),cached=rankCacheGet(slot.key);
-  if(cached&&!force){applyRankSnapshot(cached);if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();return}
-  Store.rankingLoading=true;
-  try{
-    const snapRef=Store.db.collection('ranking_snapshots').doc(slot.key);
-    let shared=null;
-    try{const ds=await snapRef.get();if(ds.exists)shared={key:slot.key,...ds.data()}}catch(e){console.warn('랭킹 스냅샷 읽기 실패',e?.code||e?.message)}
-    if(shared&&Array.isArray(shared.top)&&Array.isArray(shared.bottom)){
-      rankCacheSet(shared);applyRankSnapshot(shared);
-    }else{
-      // 스냅샷이 아직 없으면 최초 조회자가 상/하위 3명만 읽어 스냅샷을 만든다. 전체 참가자 조회 없음.
-      const base=Store.db.collection('ranking');
-      const [topSnap,bottomSnap]=await Promise.all([
-        base.orderBy('totalValue','desc').limit(3).get(),
-        base.orderBy('totalValue','asc').limit(3).get()
-      ]);
-      const mapDoc=d=>({uid:d.id,nickname:d.data()?.nickname,totalValue:+d.data()?.totalValue,pnlRate:+d.data()?.pnlRate});
-      const data={key:slot.key,label:slot.label,createdAtMs:Date.now(),top:topSnap.docs.map(mapDoc).filter(validRankRow),bottom:bottomSnap.docs.map(mapDoc).filter(validRankRow)};
-      rankCacheSet(data);applyRankSnapshot(data);
-      try{await snapRef.set({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:false})}catch(e){console.warn('랭킹 스냅샷 저장 실패(로컬 결과 사용)',e?.code||e?.message)}
-    }
-  }catch(error){console.warn('시간별 랭킹 조회 실패',error?.code||error?.message)}
-  finally{Store.rankingLoading=false;if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render()}
-}
-// 참여자 자신의 랭킹 점수도 매분 쓰지 않고 현재 랭킹 슬롯마다 최대 1회만 갱신한다.
-function myRankPushKey(){return 'mockstock:rankPush:'+Store.uid+':'+rankSlotInfo().key}
-Store.scheduleScore=function(force=false){
-  if(!this.online||!state||!this.uid||!state.nickname||state.nickname==='게스트')return;
-  const key=myRankPushKey();let done=false;try{done=localStorage.getItem(key)==='1'}catch{}
-  if(done&&!force)return;
-  clearTimeout(this.pushTimer);this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(force)},force?0:1200);
-};
-Store.pushMyScore=async function(force=false){
-  if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;
-  const key=myRankPushKey();if(!force){try{if(localStorage.getItem(key)==='1')return false}catch{}}
-  if(this.pushPromise)return this.pushPromise;
-  this.pushPromise=this.db.collection('ranking').doc(this.uid).set({
-    nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),rankSlot:rankSlotInfo().key,updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-  },{merge:true}).then(()=>{try{localStorage.setItem(key,'1')}catch{}return true}).catch(error=>{console.warn('랭킹 점수 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});
-  return this.pushPromise;
-};
-loadDailyRanking=loadHourlyRanking;
-ranking=function(){return Store.rankingRows.map(r=>({...r,me:r.uid===Store.uid}))};
-ranks=function(){
-  const slot=rankSlotInfo(),status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
-  const top=Store.rankingRows||[],bottom=Store.rankingBottom||[];
-  const row=(r,i,isBottom=false)=>`<div class="rankrow ${r.uid===Store.uid?'me':''} ${isBottom?'last':''}"><b>${isBottom?'▼ '+(i+1):['🥇','🥈','🥉'][i]}</b><div><b>${r.nickname}</b>${r.uid===Store.uid?' <small>나</small>':''}</div><div class="price">${fmt(Math.round(+r.totalValue||0))}원<small class="${+r.pnlRate<0?'down':'gain'}">${pct(+r.pnlRate||0)}</small></div></div>`;
-  return shell(`${header('랭킹')}<div class="between"><h2>투자 랭킹</h2>${status}</div><div class="rank-snapshot-head"><b>${slot.label}</b><span>${nextRankLabel()}</span></div><h2>전체 TOP 3</h2>${top.length?top.map((r,i)=>row(r,i,false)).join(''):`<div class="ranking-empty">${Store.rankingLoading?'랭킹을 불러오는 중이에요.':'아직 표시할 랭킹이 없어요.'}</div>`}<h2 class="rank-bottom-title">전체 하위 3명</h2>${bottom.length?bottom.map((r,i)=>row(r,i,true)).join(''):`<div class="ranking-empty">${Store.rankingLoading?'랭킹을 불러오는 중이에요.':'아직 표시할 랭킹이 없어요.'}</div>`}<div class="rank-refresh-note">순위는 1시간 단위 스냅샷으로 고정됩니다.<br>장 마감 후에는 23:30 최종 순위를 유지해요.</div>`,'ranking');
-};
-document.head.insertAdjacentHTML('beforeend',`<style>
-.rank-snapshot-head{display:flex;justify-content:space-between;align-items:center;background:#f2f4f6;border-radius:14px;padding:13px 14px;margin:2px 0 22px;font-size:12px}.rank-snapshot-head span{color:var(--muted)}.rank-bottom-title{margin-top:30px}.rankrow.last{background:#fff8f8;border-radius:12px;padding-left:10px;padding-right:10px;margin:2px 0}.rankrow.last>b{font-size:11px;color:var(--blue);white-space:nowrap}
-</style>`);
-// 랭킹 탭 진입 시 해당 시간 스냅샷 1회 로드. 같은 시간 재방문은 localStorage만 사용.
-let v15LastView=view,v15LastSlot=rankSlotInfo().key;
-setInterval(()=>{
-  if(!state||!Store.online||!Store.db)return;
-  const slot=rankSlotInfo().key;
-  if(slot!==v15LastSlot){v15LastSlot=slot;Store.scheduleScore(false);if(view==='ranking')loadHourlyRanking(false)}
-  if(view==='ranking'&&v15LastView!=='ranking')loadHourlyRanking(false);
-  v15LastView=view;
-},800);
-// 앱 연결 직후 자기 점수는 현재 시간 슬롯에 한 번만 저장한다.
-(function v15WaitReady(){if(state&&Store.online&&Store.db&&Store.uid){Store.scheduleScore(false);if(view==='ranking')loadHourlyRanking(false);return}setTimeout(v15WaitReady,900)})();
-window.__rankingV15={version:15,slot:rankSlotInfo,load:loadHourlyRanking};
 </script>
+
+
 <script>
 /* ============ V29 — 전환 안전형 1단계 엔진 수정 ============
    - 2026-08-27 08:00 KST 전까지는 V27 시세를 그대로 사용
@@ -4149,236 +3903,6 @@ gameKospiQuote=function v49CachedGameKospiQuote(ms=Date.now()){
   return q;
 };
 
-// ------------------------------------------------------------------
-// 3) equityHistory에 principal도 저장
-// ------------------------------------------------------------------
-const V49_RECORD_EQUITY_BASE=recordEquity;
-recordEquity=async function v49RecordEquity(force=false){
-  if(!state)return;
-  const before=Array.isArray(state.equityHistory)?state.equityHistory.length:0;
-  await V49_RECORD_EQUITY_BASE(force);
-  const arr=state?.equityHistory;
-  if(!Array.isArray(arr)||!arr.length)return;
-  // base가 새 point를 추가했거나 force 갱신된 경우 최신 point에 원금 스냅샷 추가.
-  const p=arr[arr.length-1];
-  if(p&&Number.isFinite(+p.value) && !Number.isFinite(+p.principal)){
-    p.principal=Math.round(accountPrincipal());
-    // 다음 save 시 함께 저장됨. force일 때는 즉시 저장.
-    if(force&&userId)try{await Store.saveMe(userId,state)}catch(e){}
-  }
-};
-
-// normalize 시 principal 필드 보존
-const V49_NORMALIZE_BASE=normalizeState;
-normalizeState=function(v){
-  const out=V49_NORMALIZE_BASE(v);
-  out.equityHistory=(Array.isArray(v?.equityHistory)?v.equityHistory:[])
-    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value))
-    .map(x=>({
-      at:+x.at,
-      tick:Number.isFinite(+x.tick)?+x.tick:undefined,
-      value:+x.value,
-      ...(Number.isFinite(+x.principal)?{principal:+x.principal}:{})
-    }))
-    .slice(-180);
-  return out;
-};
-
-function v49HourlyMetrics(now=Date.now()){
-  const currentValue=Math.round(total());
-  const currentPrincipal=Math.round(accountPrincipal());
-  const arr=(state?.equityHistory||[])
-    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value))
-    .sort((a,b)=>a.at-b.at);
-
-  const target=now-60*60*1000;
-  // target 이전 중 가장 가까운 점. 없으면 가장 오래된 점을 사용하되 period를 표시.
-  let base=null;
-  for(const x of arr){
-    if(x.at<=target)base=x;
-    else break;
-  }
-  if(!base&&arr.length)base=arr[0];
-
-  if(!base){
-    return {pnl:0,rate:0,periodMin:0,eligible:false,currentValue,currentPrincipal};
-  }
-
-  const periodMin=Math.max(0,(now-base.at)/60000);
-  const basePrincipal=Number.isFinite(+base.principal)?+base.principal:null;
-
-  // principal snapshot이 있으면 "총손익 변화"를 사용해 지급/보상 원금 유입 영향을 제외.
-  let pnl;
-  if(basePrincipal!=null){
-    const currentTotalPnl=currentValue-currentPrincipal;
-    const baseTotalPnl=(+base.value)-basePrincipal;
-    pnl=currentTotalPnl-baseTotalPnl;
-  }else{
-    // 이전 버전 history는 principal이 없으므로 한 시간 동안은 자산가치 변화로 호환.
-    pnl=currentValue-(+base.value);
-  }
-
-  const rate=pnl/Math.max(1,+base.value)*100;
-  return {
-    pnl:Math.round(pnl),
-    rate:+rate.toFixed(4),
-    periodMin:Math.round(periodMin),
-    eligible:periodMin>=45,
-    currentValue,currentPrincipal
-  };
-}
-
-// ------------------------------------------------------------------
-// 4) ranking write: 기존 총자산 필드 유지 + 최근 1시간 필드 추가
-// ------------------------------------------------------------------
-Store.scheduleScore=function(force=false){
-  if(!this.online||!state||!this.uid||!state.nickname||state.nickname==='게스트')return;
-  clearTimeout(this.pushTimer);
-  const wait=force?0:Math.max(0,10*60*1000-(Date.now()-(this.lastPushAt||0)));
-  this.pushTimer=setTimeout(()=>{
-    this.pushTimer=0;
-    this.pushMyScore(true);
-  },wait);
-};
-
-Store.pushMyScore=async function(force=false){
-  if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;
-  if(this.pushPromise)return this.pushPromise;
-
-  const m=v49HourlyMetrics();
-  this.lastPushAt=Date.now();
-
-  const payload={
-    nickname:cleanNickname(state.nickname),
-    // 관리자 참가자 목록 등 기존 기능 호환
-    totalValue:Math.round(total()),
-    pnlRate:+accountRate().toFixed(4),
-
-    // 신규 최근 1시간 랭킹
-    hourlyPnl:m.pnl,
-    hourlyRate:m.eligible?m.rate:-9999,
-    hourlyPeriodMin:m.periodMin,
-    hourlyEligible:!!m.eligible,
-    hourlyUpdatedAtMs:Date.now(),
-    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-  };
-
-  this.pushPromise=this.db.collection('ranking').doc(this.uid).set(payload,{merge:true})
-    .then(()=>true)
-    .catch(error=>{
-      console.warn('1시간 랭킹 점수 저장 실패',error?.code||error?.message);
-      return false;
-    })
-    .finally(()=>{this.pushPromise=null});
-  return this.pushPromise;
-};
-
-// ------------------------------------------------------------------
-// 5) ranking read/render: snapshot write 제거, ranking collection TOP 5 직접 조회
-//    단순 orderBy 1개라 composite index 불필요.
-// ------------------------------------------------------------------
-Store.rankingRows=[];
-Store.rankingLoading=false;
-Store.rankingLoadedAt=0;
-const V49_RANK_CACHE_MS=60*1000;
-
-async function v49LoadHourlyRanking(force=false){
-  if(!Store.online||!Store.db||Store.rankingLoading)return;
-  const now=Date.now();
-  if(!force&&Store.rankingLoadedAt&&now-Store.rankingLoadedAt<V49_RANK_CACHE_MS)return;
-
-  Store.rankingLoading=true;
-  try{
-    // 내 값부터 최신화. 실패하더라도 조회는 계속.
-    try{await Store.pushMyScore(true)}catch(e){}
-
-    const snap=await Store.db.collection('ranking')
-      .orderBy('hourlyRate','desc')
-      .limit(15)
-      .get();
-
-    const freshCutoff=Date.now()-20*60*1000;
-    Store.rankingRows=snap.docs.map(d=>{
-      const x=d.data()||{};
-      return {
-        uid:d.id,
-        nickname:String(x.nickname||''),
-        hourlyPnl:+x.hourlyPnl||0,
-        hourlyRate:+x.hourlyRate,
-        hourlyPeriodMin:+x.hourlyPeriodMin||0,
-        hourlyEligible:!!x.hourlyEligible,
-        hourlyUpdatedAtMs:+x.hourlyUpdatedAtMs||0
-      };
-    }).filter(x=>
-      x.nickname&&x.nickname!=='게스트'&&
-      x.hourlyEligible&&
-      Number.isFinite(x.hourlyRate)&&x.hourlyRate>-9000&&
-      x.hourlyUpdatedAtMs>=freshCutoff
-    ).slice(0,5);
-
-    Store.rankingLoadedAt=Date.now();
-  }catch(error){
-    console.warn('최근 1시간 랭킹 조회 실패',error?.code||error?.message);
-  }finally{
-    Store.rankingLoading=false;
-    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
-  }
-}
-
-loadHourlyRanking=v49LoadHourlyRanking;
-loadDailyRanking=v49LoadHourlyRanking;
-ranking=function(){return (Store.rankingRows||[]).map(r=>({...r,me:r.uid===Store.uid}))};
-
-ranks=function(){
-  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
-  const rows=ranking();
-  const me=v49HourlyMetrics();
-  const myText=me.eligible
-    ? `<b class="${me.pnl<0?'down':'gain'}">${sign(me.pnl)}원</b> <span class="${me.rate<0?'down':'gain'}">${pct(me.rate)}</span>`
-    : `<b>집계 중</b> <span class="sub">${me.periodMin} / 60분</span>`;
-
-  const row=(r,i)=>`<div class="rankrow ${r.me?'me':''}">
-    <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
-    <div><b>${r.nickname}</b>${r.me?' <small>나</small>':''}<small class="sub">최근 ${Math.min(60,r.hourlyPeriodMin)}분</small></div>
-    <div class="price ${r.hourlyPnl<0?'down':'gain'}">${sign(r.hourlyPnl)}원
-      <small class="${r.hourlyRate<0?'down':'gain'}">${pct(r.hourlyRate)}</small>
-    </div>
-  </div>`;
-
-  return shell(`${header('랭킹')}
-    <div class="between"><h2>최근 1시간 랭킹</h2>${status}</div>
-    <div class="ranking-me">
-      <span class="eyebrow">나의 최근 1시간</span>
-      <h2>${myText}</h2>
-      <small class="sub">수익률 기준 순위 · 수익금 함께 표시</small>
-    </div>
-    <div class="rank-snapshot-head"><b>직전 1시간</b><span>약 10분마다 점수 갱신</span></div>
-    <h2>TOP 5</h2>
-    ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${
-      Store.rankingLoading?'랭킹을 불러오는 중이에요.':
-      Store.online?'아직 1시간 집계가 완료된 참가자가 없어요.':'서버 연결을 확인해주세요.'
-    }</div>`}
-    <div class="rank-refresh-note">최근 약 1시간 동안의 수익률로 순위를 정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
-  `,'ranking');
-};
-
-// 랭킹 탭 진입 시 직접 로드.
-let V49_LAST_VIEW=view;
-setInterval(()=>{
-  if(document.hidden)return;
-  if(view==='ranking'&&V49_LAST_VIEW!=='ranking')v49LoadHourlyRanking(true);
-  V49_LAST_VIEW=view;
-},1000);
-
-// 앱이 열린 동안 10분마다 자기 최근 1시간 값만 1회 write.
-setInterval(()=>{
-  if(document.hidden||!state||!Store.online)return;
-  Store.scheduleScore(true);
-},10*60*1000);
-
-// 기존 hourly snapshot 로직이 view 진입 시 다시 덮지 않도록 함수 참조는 위에서 교체.
-// 기존 setInterval은 새 loadHourlyRanking 함수를 호출하므로 신규 방식으로 동작한다.
-
 try{
   V48_RAW_TICK_CACHE?.clear?.();
   V49_PATH_STATE_CACHE.clear();
@@ -4390,221 +3914,128 @@ window.__marketV49={
   marketRulesChanged:false,
   incrementalV29Path:true,
   exactSameLoopFormula:true,
-  kospiCacheMs:2000,
-  ranking:'rolling-1h-return-rate',
-  rankingPrimary:'hourlyRate',
-  rankingDisplay:['hourlyPnl','hourlyRate'],
-  rankingWriteEveryMin:10
+  kospiCacheMs:2000
 };
 </script>
 
 
 <script>
-/* ============ V50 — 장중 고정 1시간 구간 랭킹 ============
-   시장 엔진/가격/확률/체결/성능 최적화는 V49 그대로 유지.
+/* ============ RKV2 — 총자산(평가금액) 기준 준실시간 랭킹 (폴링 방식) ============
+   문제의식: 예전 실시간 리스너(onSnapshot) 방식은 "누군가 한 명만 써도
+   구독 중인 유저 전원에게 스냅샷이 재전송"되는 구조라 읽기 사용량이
+   (쓰기 횟수 × 동시 접속자 수)로 곱연산처럼 불어나서 무료 한도를 금방 소모했다.
 
-   랭킹 기준:
-   08:00~09:00 → 09시 결과
-   09:00~10:00 → 10시 결과
-   ...
-   22:00~23:00 → 23시 결과
-   23:00~23:30 → 장마감 결과
+   개선 방향:
+   - 실시간 구독(onSnapshot) 사용 안 함. 대신 "랭킹 탭을 보고 있을 때만,
+     일정 주기로 1회씩" 조회한다 (읽기 = 그때그때 TOP N개, 곱연산 없음).
+   - 기존 ranking/{uid} 문서의 totalValue/pnlRate 필드를 그대로 사용 —
+     새 컬렉션/스키마 변경 없이 바로 적용 가능.
+   - 랭킹 탭 진입 시 즉시 1회 조회 + 이후 RKV2_POLL_MS(10분) 간격으로 자동 갱신,
+     화면이 안 보이거나(document.hidden) 다른 탭이면 폴링 자체를 하지 않음.
+   - 본인 점수 쓰기(SCORE_PUSH_INTERVAL_MS)도 동일하게 10분으로 맞춰뒀다 —
+     어차피 내 점수가 10분에 한 번만 갱신되니 그보다 자주 조회해봐야 의미가 없다.
+   - 수동 새로고침 버튼도 제공해 필요할 때 유저가 직접 최신화 가능.
 
-   진행 중 구간은 랭킹에 올리지 않고, 구간 종료 후 1회 확정 저장.
-   순위는 구간 수익률 기준, 수익금도 함께 표시.
+   비용 감각(참고용 추정치, 무료 한도 하루 읽기 50,000회 기준):
+   - TOP 10, 10분 간격일 때: 유저 1명이 랭킹 탭을 5분간 보고 있으면
+     보통 1회 조회(진입 시 1회, 5분은 다음 폴링 전이라 추가 조회 없음) × 10명
+     = 읽기 10회 안팎. 250명이 그렇게 하루 여러 번 들어와도 여유롭게 무료 한도 안.
+   - TOP N을 늘리면(예: 10→20) 조회 1회당 비용이 그만큼 배로 늘고,
+     간격을 줄이면(예: 10분→1분) 같은 시간 동안 조회 횟수가 늘어난다.
+     즉 TOP N과 간격 둘 다 비용에 선형으로 영향을 준다 — 아래 두 상수로 조절.
 */
-const V50_MARKET_OPEN_HOUR=8;
-const V50_MARKET_CLOSE_HOUR=23;
-const V50_MARKET_CLOSE_MINUTE=30;
-const V50_SLOT_COLLECTION='ranking_hourly';
+const RKV2_RANK_TOPN=10;         // TOP 몇 명까지 보여줄지 — 늘릴수록 조회 1회당 읽기 비용 ↑
+const RKV2_POLL_MS=10*60*1000;   // 자동 갱신 간격(10분) — 줄일수록 시간당 조회 횟수 ↑, 본인 점수 쓰기 주기(SCORE_PUSH_INTERVAL_MS)와 맞춰둠
 
-function v50Pad(n){return String(n).padStart(2,'0')}
-function v50DateKey(d=new Date()){
-  return `${d.getFullYear()}${v50Pad(d.getMonth()+1)}${v50Pad(d.getDate())}`;
-}
-function v50DayStart(d=new Date()){
-  const x=new Date(d); x.setHours(0,0,0,0); return x.getTime();
-}
-function v50SessionBounds(d=new Date()){
-  const base=v50DayStart(d);
-  return {
-    open:base+V50_MARKET_OPEN_HOUR*3600000,
-    close:base+V50_MARKET_CLOSE_HOUR*3600000+V50_MARKET_CLOSE_MINUTE*60000
-  };
-}
-function v50CompletedSlots(now=Date.now()){
-  const d=new Date(now), b=v50SessionBounds(d), out=[];
-  if(now<=b.open)return out;
-  for(let h=8;h<23;h++){
-    const start=v50DayStart(d)+h*3600000;
-    const end=start+3600000;
-    if(now>=end)out.push({start,end,label:`${v50Pad(h)}:00~${v50Pad(h+1)}:00`,key:`${v50DateKey(d)}_${v50Pad(h+1)}00`});
-  }
-  const lastStart=v50DayStart(d)+23*3600000;
-  if(now>=b.close)out.push({start:lastStart,end:b.close,label:'23:00~23:30',key:`${v50DateKey(d)}_2330`});
-  return out;
-}
-function v50PointNear(ms,preferBefore=true){
-  const arr=(state?.equityHistory||[]).filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value));
-  if(!arr.length)return null;
-  let best=null,dist=Infinity;
-  for(const x of arr){
-    const delta=(+x.at)-ms;
-    if(preferBefore && delta>5*60*1000)continue;
-    const ad=Math.abs(delta);
-    if(ad<dist){best=x;dist=ad}
-  }
-  // 15분 이상 떨어진 점은 정확한 시간구간 점수로 쓰지 않음.
-  return dist<=15*60*1000?best:null;
-}
-function v50SlotMetric(slot){
-  const a=v50PointNear(slot.start,false), z=v50PointNear(slot.end,false);
-  if(!a||!z)return null;
-  const ap=Number.isFinite(+a.principal)?+a.principal:null;
-  const zp=Number.isFinite(+z.principal)?+z.principal:null;
-  let pnl;
-  if(ap!=null&&zp!=null){
-    pnl=((+z.value)-zp)-((+a.value)-ap);
-  }else{
-    pnl=(+z.value)-(+a.value);
-  }
-  const rate=pnl/Math.max(1,+a.value)*100;
-  return {pnl:Math.round(pnl),rate:+rate.toFixed(4),startValue:Math.round(+a.value),endValue:Math.round(+z.value)};
-}
+Store.rkv2Rows=Store.rkv2Rows||[];
+Store.rkv2LoadedAt=0;
+Store.rkv2Loading=false;
 
-Store.v50SubmittedSlots=Store.v50SubmittedSlots||new Set();
-Store.v50RankRows=Store.v50RankRows||{};
-Store.v50RankLoading=false;
-Store.v50SelectedSlot=null;
-
-async function v50SubmitCompletedSlots(){
-  if(!Store.online||!Store.db||!Store.uid||!state||!state.nickname||state.nickname==='게스트')return;
-  for(const slot of v50CompletedSlots()){
-    if(Store.v50SubmittedSlots.has(slot.key))continue;
-    const m=v50SlotMetric(slot);
-    if(!m)continue;
-    const ref=Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key).collection('scores').doc(Store.uid);
-    try{
-      await ref.set({
-        nickname:cleanNickname(state.nickname),
-        pnl:m.pnl,
-        rate:m.rate,
-        slotKey:slot.key,
-        slotLabel:slot.label,
-        startAtMs:slot.start,
-        endAtMs:slot.end,
-        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:false});
-      Store.v50SubmittedSlots.add(slot.key);
-    }catch(e){
-      console.warn('시간대 랭킹 저장 실패',slot.key,e?.code||e?.message);
-    }
-  }
-}
-
-async function v50LoadSlot(slot,force=false){
-  if(!slot||!Store.online||!Store.db||Store.v50RankLoading)return;
-  if(!force&&Store.v50RankRows[slot.key])return;
-  Store.v50RankLoading=true;
+async function rkv2LoadRanking(force=false){
+  if(!Store.online||!Store.db||Store.rkv2Loading)return;
+  if(!force&&Store.rkv2LoadedAt&&Date.now()-Store.rkv2LoadedAt<RKV2_POLL_MS)return;
+  Store.rkv2Loading=true;
   try{
-    await v50SubmitCompletedSlots();
-    const snap=await Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key)
-      .collection('scores').orderBy('rate','desc').limit(10).get();
-    Store.v50RankRows[slot.key]=snap.docs.map((d,i)=>{
+    const snap=await Store.db.collection('ranking')
+      .orderBy('totalValue','desc')
+      .limit(RKV2_RANK_TOPN)
+      .get();
+    Store.rkv2Rows=snap.docs.map((d,i)=>{
       const x=d.data()||{};
-      return {uid:d.id,nickname:String(x.nickname||''),pnl:+x.pnl||0,rate:+x.rate||0,label:String(x.slotLabel||slot.label),rank:i+1};
+      return {uid:d.id,nickname:String(x.nickname||''),totalValue:+x.totalValue||0,pnlRate:+x.pnlRate||0,rank:i+1};
     }).filter(x=>x.nickname&&x.nickname!=='게스트');
+    Store.rkv2LoadedAt=Date.now();
   }catch(e){
-    console.warn('시간대 랭킹 조회 실패',e?.code||e?.message);
-    Store.v50RankRows[slot.key]=[];
+    console.warn('총자산 랭킹 조회 실패',e?.code||e?.message);
   }finally{
-    Store.v50RankLoading=false;
+    Store.rkv2Loading=false;
     if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
   }
 }
 
-function v50SelectedSlot(){
-  const slots=v50CompletedSlots();
-  if(!slots.length)return null;
-  let s=slots.find(x=>x.key===Store.v50SelectedSlot);
-  if(!s)s=slots[slots.length-1];
-  Store.v50SelectedSlot=s.key;
-  return s;
+ranking=function(){return Store.rkv2Rows.map(r=>({...r,me:r.uid===Store.uid}))};
+
+function rkv2AgoLabel(ms){
+  if(ms==null)return '';
+  const sec=Math.max(0,Math.round(ms/1000));
+  if(sec<60)return `${sec}초 전`;
+  return `${Math.round(sec/60)}분 전`;
 }
 
 ranks=function(){
-  const slots=v50CompletedSlots(), slot=v50SelectedSlot();
+  const rows=ranking();
   const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
-  if(slot&&!Store.v50RankRows[slot.key]&&!Store.v50RankLoading)setTimeout(()=>v50LoadSlot(slot),0);
-  const rows=slot?(Store.v50RankRows[slot.key]||[]):[];
+  const meInList=rows.find(r=>r.me);
+  const agoMs=Store.rkv2LoadedAt?Date.now()-Store.rkv2LoadedAt:null;
 
-  const tabs=slots.length?`<div class="filter-row" style="overflow-x:auto;white-space:nowrap">
-    ${slots.map(s=>`<button class="chip ${s.key===slot?.key?'active':''}" data-v50-slot="${s.key}">${s.label}</button>`).join('')}
-  </div>`:'';
-
-  const row=(r,i)=>`<div class="rankrow ${r.uid===Store.uid?'me':''}">
+  const row=(r,i)=>`<div class="rankrow ${r.me?'me':''}">
     <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
-    <div><b>${r.nickname}</b>${r.uid===Store.uid?' <small>나</small>':''}</div>
-    <div class="price ${r.pnl<0?'down':'gain'}">${sign(r.pnl)}원
-      <small class="${r.rate<0?'down':'gain'}">${pct(r.rate)}</small>
+    <div><b>${r.nickname}</b>${r.me?' <small>나</small>':''}</div>
+    <div class="price">${sign(r.totalValue)}원
+      <small class="${r.pnlRate<0?'down':'gain'}">${pct(r.pnlRate)}</small>
     </div>
   </div>`;
 
   return shell(`${header('랭킹')}
-    <div class="between"><h2>시간대별 랭킹</h2>${status}</div>
-    <div class="rank-refresh-note">각 시간 구간이 끝난 뒤 수익률로 순위를 확정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
-    ${tabs}
-    ${!slot?`<div class="ranking-empty">첫 랭킹은 09:00에 확정됩니다.</div>`:
-      `<div class="rank-snapshot-head"><b>${slot.label}</b><span>구간 확정 결과</span></div>
-       <h2>TOP 10</h2>
-       ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.v50RankLoading?'랭킹을 불러오는 중이에요.':'아직 등록된 결과가 없어요.'}</div>`}`}
+    <div class="between"><h2>총자산 랭킹</h2>${status}</div>
+    <div class="ranking-me">
+      <span class="eyebrow">나의 평가금액${meInList?` · TOP ${meInList.rank}`:''}</span>
+      <h2>${sign(Math.round(total()))}원</h2>
+      <b class="${accountRate()<0?'down':'gain'}">${pct(accountRate())}</b>
+    </div>
+    <div class="between"><h2>TOP ${RKV2_RANK_TOPN}</h2>
+      <button class="chip" data-rkv2-refresh>새로고침${agoMs!=null?` · ${rkv2AgoLabel(agoMs)}`:''}</button>
+    </div>
+    ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.rkv2Loading?'랭킹을 불러오는 중이에요.':'아직 등록된 참가자가 없어요.'}</div>`}
+    <div class="rank-refresh-note">${Math.round(RKV2_POLL_MS/60000)}분마다 자동 갱신돼요.</div>
   `,'ranking');
 };
 
-// 랭킹 슬롯 버튼
-const V50_BIND_BASE=bind;
+const RKV2_BIND_BASE=bind;
 bind=function(){
-  V50_BIND_BASE();
-  document.querySelectorAll('[data-v50-slot]').forEach(btn=>{
-    btn.onclick=()=>{
-      Store.v50SelectedSlot=btn.dataset.v50Slot;
-      const slot=v50CompletedSlots().find(x=>x.key===Store.v50SelectedSlot);
-      if(slot)v50LoadSlot(slot,true);
-      render();
-    };
-  });
+  RKV2_BIND_BASE();
+  const btn=document.querySelector('[data-rkv2-refresh]');
+  if(btn)btn.onclick=()=>rkv2LoadRanking(true);
 };
 
-// 매분 종료된 슬롯이 있으면 1회 제출. 실시간 점수 write 없음.
-setInterval(()=>{
-  if(document.hidden||!Store.online||!state)return;
-  v50SubmitCompletedSlots();
-},60*1000);
-
-// 랭킹 진입 시 최신 완료 슬롯 로드.
-let V50_LAST_VIEW=view;
+// 1초마다 "체크"만 할 뿐 네트워크 비용은 없음. 실제 조회는
+// rkv2LoadRanking 내부의 RKV2_POLL_MS 스로틀이 지날 때만 발생한다.
+let RKV2_LAST_VIEW=view;
 setInterval(()=>{
   if(document.hidden)return;
-  if(view==='ranking'&&V50_LAST_VIEW!=='ranking'){
-    const s=v50SelectedSlot();
-    if(s)v50LoadSlot(s,true);
+  if(view==='ranking'){
+    if(RKV2_LAST_VIEW!=='ranking')rkv2LoadRanking(true);
+    else rkv2LoadRanking(false);
   }
-  V50_LAST_VIEW=view;
+  RKV2_LAST_VIEW=view;
 },1000);
 
-// V49 rolling ranking writer/reader는 최종 UI에서 사용하지 않음.
-// 기존 ranking/{uid} 호환 문서는 관리자/기존 기능용으로 유지.
-
-window.__marketV50={
-  version:50,
-  marketRulesChanged:false,
-  performanceEngineChanged:false,
-  rankingMode:'fixed-market-hour-slots',
-  firstSlot:'08:00~09:00',
-  lastSlot:'23:00~23:30',
-  liveRanking:false,
-  rankingPrimary:'rate',
-  rankingDisplay:['pnl','rate']
+window.__rankingRKV2={
+  rankingMode:'poll-total-value',
+  realtimeListener:false,
+  pollMs:RKV2_POLL_MS,
+  topN:RKV2_RANK_TOPN,
+  scorePushIntervalMs:SCORE_PUSH_INTERVAL_MS
 };
 </script>
 
@@ -5507,142 +4938,6 @@ window.__marketV57={
   marketRulesChanged:false,
   firebaseReadsAdded:0,
   firebaseWritesAdded:0
-};
-</script>
-
-<script>
-/* ============ V58 — 시간대별 랭킹 정리 (수익금 TOP 5) ============
-   목표
-   - 각 완료된 1시간 구간의 수익금(pnl) 기준 TOP 5만 표시.
-   - 수익금 + 수익률은 함께 표시.
-   - 랭킹 화면 진입/새로고침이 자기 점수 제출 트리거가 되지 않음.
-   - 점수 제출은 구간 종료 후 백그라운드에서 자동 수행.
-   - 같은 완료 구간 점수는 사용자당 1회 확정 저장.
-   - 시장/가격/거래/랭킹 외 기능 변경 없음.
-*/
-
-// V50 조회를 대체: 랭킹 읽기 전에 자기 점수를 제출하지 않는다.
-async function v58LoadSlot(slot,force=false){
-  if(!slot||!Store.online||!Store.db||Store.v50RankLoading)return;
-  if(!force&&Store.v50RankRows[slot.key])return;
-  Store.v50RankLoading=true;
-  try{
-    const snap=await Store.db.collection(V50_SLOT_COLLECTION).doc(slot.key)
-      .collection('scores').orderBy('pnl','desc').limit(5).get();
-    Store.v50RankRows[slot.key]=snap.docs.map((d,i)=>{
-      const x=d.data()||{};
-      return {
-        uid:d.id,
-        nickname:String(x.nickname||''),
-        pnl:+x.pnl||0,
-        rate:+x.rate||0,
-        label:String(x.slotLabel||slot.label),
-        rank:i+1
-      };
-    }).filter(x=>x.nickname&&x.nickname!=='게스트');
-  }catch(e){
-    console.warn('시간대 랭킹 조회 실패',e?.code||e?.message);
-    if(!Store.v50RankRows[slot.key])Store.v50RankRows[slot.key]=[];
-  }finally{
-    Store.v50RankLoading=false;
-    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
-  }
-}
-v50LoadSlot=v58LoadSlot;
-
-// UI: 수익금 순 TOP 5, 수익률은 보조 표시.
-ranks=function(){
-  const slots=v50CompletedSlots(), slot=v50SelectedSlot();
-  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
-
-  // 이 슬롯을 아직 한 번도 읽지 않았다면 1회만 읽는다.
-  // 랭킹 진입 자체가 자기 점수 write를 발생시키지는 않는다.
-  if(slot&&!Store.v50RankRows[slot.key]&&!Store.v50RankLoading)setTimeout(()=>v58LoadSlot(slot,false),0);
-  const rows=slot?(Store.v50RankRows[slot.key]||[]):[];
-
-  const tabs=slots.length?`<div class="filter-row" style="overflow-x:auto;white-space:nowrap">
-    ${slots.map(s=>`<button class="chip ${s.key===slot?.key?'active':''}" data-v50-slot="${s.key}">${s.label}</button>`).join('')}
-  </div>`:'';
-
-  const row=(r,i)=>`<div class="rankrow ${r.uid===Store.uid?'me':''}">
-    <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
-    <div><b>${r.nickname}</b>${r.uid===Store.uid?' <small>나</small>':''}</div>
-    <div class="price ${r.pnl<0?'down':'gain'}">${sign(r.pnl)}원
-      <small class="${r.rate<0?'down':'gain'}">${pct(r.rate)}</small>
-    </div>
-  </div>`;
-
-  return shell(`${header('랭킹')}
-    <div class="between"><h2>시간대별 랭킹</h2>${status}</div>
-    <div class="rank-refresh-note">각 시간 구간이 끝난 뒤 수익금 순으로 확정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
-    ${tabs}
-    ${!slot?`<div class="ranking-empty">첫 랭킹은 09:00에 확정됩니다.</div>`:
-      `<div class="rank-snapshot-head"><b>${slot.label}</b><span>구간 확정 결과</span></div>
-       <h2>TOP 5</h2>
-       ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${Store.v50RankLoading?'랭킹을 불러오는 중이에요.':'아직 등록된 결과가 없어요.'}</div>`}`}
-  `,'ranking');
-};
-
-// 슬롯 버튼: 이미 읽은 구간은 캐시를 즉시 표시, 처음 보는 구간만 1회 read.
-const V58_BIND_BASE=bind;
-bind=function(){
-  V58_BIND_BASE();
-  document.querySelectorAll('[data-v50-slot]').forEach(btn=>{
-    btn.onclick=()=>{
-      Store.v50SelectedSlot=btn.dataset.v50Slot;
-      const slot=v50CompletedSlots().find(x=>x.key===Store.v50SelectedSlot);
-      render();
-      if(slot&&!Store.v50RankRows[slot.key])v58LoadSlot(slot,false);
-    };
-  });
-};
-
-// 자동 제출은 랭킹 화면과 완전히 분리.
-// 앱이 열려 있는 참가자는 구간 종료 후 최대 30초 안에 자동 확정 저장.
-let V58_LAST_SUBMIT_CHECK=0;
-async function v58AutoSubmit(){
-  if(document.hidden||!Store.online||!Store.db||!state)return;
-  const now=Date.now();
-  if(now-V58_LAST_SUBMIT_CHECK<25000)return;
-  V58_LAST_SUBMIT_CHECK=now;
-  await v50SubmitCompletedSlots();
-}
-setInterval(v58AutoSubmit,30000);
-
-// 연결 직후/앱 복귀 시 놓친 완료구간을 자동 제출.
-(function v58Ready(){
-  if(state&&Store.online&&Store.db){v58AutoSubmit();return}
-  setTimeout(v58Ready,1200);
-})();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(v58AutoSubmit,300)});
-window.addEventListener('focus',()=>setTimeout(v58AutoSubmit,300));
-
-// 새로운 구간이 막 완료되면 랭킹 화면에 있을 때만 1회 조회.
-// 화면 진입/새로고침마다 강제 갱신하지 않는다.
-let V58_LAST_COMPLETED_KEY='';
-setInterval(()=>{
-  if(document.hidden)return;
-  const slots=v50CompletedSlots();
-  const latest=slots.at(-1);
-  const key=latest?.key||'';
-  if(key&&key!==V58_LAST_COMPLETED_KEY){
-    V58_LAST_COMPLETED_KEY=key;
-    // 제출들이 도착할 시간을 조금 준 뒤 한 번만 읽는다.
-    if(view==='ranking')setTimeout(()=>v58LoadSlot(latest,true),15000);
-  }
-},5000);
-
-window.__rankingV58={
-  version:58,
-  basedOn:50,
-  sort:'pnl-desc',
-  limit:5,
-  display:['pnl','rate'],
-  submitTrigger:'slot-completion-background',
-  rankingEntryTriggersWrite:false,
-  forcedReloadOnEveryEntry:false,
-  marketRulesChanged:false,
-  firebaseExtraRealtimeListener:false
 };
 </script>
 
