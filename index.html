@@ -4012,4 +4012,378 @@ window.__marketV48={
 };
 </script>
 
+
+<script>
+/* ============ V49 — 증분 가격엔진 + KOSPI 캐시 + 최근 1시간 랭킹 ============
+   [성능]
+   - v29RawWithOpen()을 결과 동일한 증분 상태 캐시로 교체.
+   - 새 틱마다 minute 0부터 재생하지 않고 마지막 계산 minute 다음부터 이어서 계산.
+   - 과거 minute 요청은 저장된 동일 가격을 즉시 반환.
+   - KOSPI는 2초 스냅샷 캐시.
+
+   [랭킹]
+   - 총자산 랭킹 대신 "직전 약 1시간 수익률" 순위.
+   - 화면에는 최근 1시간 수익금 + 수익률을 함께 표시.
+   - equityHistory에 principal을 추가해 보상/관리자 지급 등 원금변동의 영향을 점차 제외.
+   - 기존 ranking 문서의 totalValue/pnlRate는 관리자/호환용으로 그대로 유지.
+   - hourlyPnl/hourlyRate/hourlyPeriodMin만 추가.
+*/
+
+// ------------------------------------------------------------------
+// 1) V29 EXACT incremental state cache
+// ------------------------------------------------------------------
+const V49_PATH_STATE_CACHE=new Map();
+const V49_PATH_STATE_MAX=700;
+
+function v49PathKey(s,day,open){
+  // 종목/게임일마다 open은 결정론적. 혹시 다른 open이 들어오면 별도 상태로 분리.
+  return s.code+'|'+day+'|'+Number(open).toPrecision(12);
+}
+function v49TouchPathState(key,state){
+  // Map insertion order 기반 작은 LRU.
+  V49_PATH_STATE_CACHE.delete(key);
+  V49_PATH_STATE_CACHE.set(key,state);
+  while(V49_PATH_STATE_CACHE.size>V49_PATH_STATE_MAX){
+    const k=V49_PATH_STATE_CACHE.keys().next().value;
+    V49_PATH_STATE_CACHE.delete(k);
+  }
+}
+
+const V49_RAW_WITH_OPEN_BASE=v29RawWithOpen;
+v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
+  minute=Math.max(0,Math.min(389,Math.floor(+minute||0)));
+  const key=v49PathKey(s,day,open);
+  let st=V49_PATH_STATE_CACHE.get(key);
+
+  if(!st){
+    st={
+      open:+open,
+      last:-1,
+      p:+open,
+      center:+open,
+      slumpUntil:-1,
+      prices:new Float64Array(390),
+      filled:new Uint8Array(390)
+    };
+  }
+
+  // 이미 정확히 계산된 과거 tick.
+  if(st.filled[minute]){
+    v49TouchPathState(key,st);
+    return st.prices[minute];
+  }
+
+  // last+1부터 필요한 minute까지만 원래 V29 loop와 완전히 동일하게 진행.
+  let p=st.p,center=st.center,slumpUntil=st.slumpUntil;
+  for(let i=st.last+1;i<=minute;i++){
+    const reg=v9Regime(s,day,i),
+          mom=v9Momentum(s,day,i),
+          vol=v9Volatility(s,day,i),
+          act=v11Activity(s,day,i),
+          shock=v9Shock(s,day,i);
+
+    if(shock.ret){
+      const shockLog=Math.log1p(Math.max(-.95,shock.ret));
+      p*=Math.exp(shockLog);
+      center*=Math.exp(shockLog*.78);
+      if(shock.slump)slumpUntil=Math.max(slumpUntil,i+45+Math.floor(v9Unit(s.code,day,i,'slump')*95));
+    }
+
+    const slumpBias=i<slumpUntil?-.000045:0;
+    const sigma=.00032*vol*act.mult;
+    const noise=v9Normal(s.code,day,i,'idio')*sigma;
+    const currentChange=p/open-1;
+    const extreme=v11ExtremeDrive(s,day,i,currentChange);
+    const post=v11PostMove(s,day,i,currentChange);
+
+    let ret=(reg.bias+mom+slumpBias)*(.72+act.mult*.34)
+      +v9MarketImpulse(day,i)*.28
+      +v9SectorImpulse(s,day,i)*.32
+      +noise+extreme+post;
+
+    center*=Math.exp((reg.bias+slumpBias)*.25);
+    const gap=Math.log(Math.max(1,center)/Math.max(1,p));
+    ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
+    ret=Math.max(-.012,Math.min(.012,ret));
+    p*=Math.exp(ret);
+    p=Math.max(open*.10,Math.min(open*2.20,p));
+
+    st.prices[i]=p;
+    st.filled[i]=1;
+  }
+
+  st.last=Math.max(st.last,minute);
+  st.p=p;st.center=center;st.slumpUntil=slumpUntil;
+  v49TouchPathState(key,st);
+  return st.prices[minute];
+};
+
+// V48의 exact raw-tick cache도 유지되며, miss일 때만 위 증분 엔진까지 들어간다.
+
+// ------------------------------------------------------------------
+// 2) KOSPI 2-second snapshot cache
+// ------------------------------------------------------------------
+const V49_KOSPI_CACHE=new Map();
+const V49_GAME_KOSPI_BASE=gameKospiQuote;
+gameKospiQuote=function v49CachedGameKospiQuote(ms=Date.now()){
+  const slot=Math.floor((+ms||Date.now())/2000);
+  const t=sessionTick(ms);
+  const key=slot+'|'+t+'|'+(marketSessionInfo(ms).open?1:0);
+  const hit=V49_KOSPI_CACHE.get(key);
+  if(hit)return hit;
+  const q=V49_GAME_KOSPI_BASE(ms);
+  V49_KOSPI_CACHE.clear(); // 현재 스냅샷 1개만 유지
+  V49_KOSPI_CACHE.set(key,q);
+  return q;
+};
+
+// ------------------------------------------------------------------
+// 3) equityHistory에 principal도 저장
+// ------------------------------------------------------------------
+const V49_RECORD_EQUITY_BASE=recordEquity;
+recordEquity=async function v49RecordEquity(force=false){
+  if(!state)return;
+  const before=Array.isArray(state.equityHistory)?state.equityHistory.length:0;
+  await V49_RECORD_EQUITY_BASE(force);
+  const arr=state?.equityHistory;
+  if(!Array.isArray(arr)||!arr.length)return;
+  // base가 새 point를 추가했거나 force 갱신된 경우 최신 point에 원금 스냅샷 추가.
+  const p=arr[arr.length-1];
+  if(p&&Number.isFinite(+p.value) && !Number.isFinite(+p.principal)){
+    p.principal=Math.round(accountPrincipal());
+    // 다음 save 시 함께 저장됨. force일 때는 즉시 저장.
+    if(force&&userId)try{await Store.saveMe(userId,state)}catch(e){}
+  }
+};
+
+// normalize 시 principal 필드 보존
+const V49_NORMALIZE_BASE=normalizeState;
+normalizeState=function(v){
+  const out=V49_NORMALIZE_BASE(v);
+  out.equityHistory=(Array.isArray(v?.equityHistory)?v.equityHistory:[])
+    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value))
+    .map(x=>({
+      at:+x.at,
+      tick:Number.isFinite(+x.tick)?+x.tick:undefined,
+      value:+x.value,
+      ...(Number.isFinite(+x.principal)?{principal:+x.principal}:{})
+    }))
+    .slice(-180);
+  return out;
+};
+
+function v49HourlyMetrics(now=Date.now()){
+  const currentValue=Math.round(total());
+  const currentPrincipal=Math.round(accountPrincipal());
+  const arr=(state?.equityHistory||[])
+    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value))
+    .sort((a,b)=>a.at-b.at);
+
+  const target=now-60*60*1000;
+  // target 이전 중 가장 가까운 점. 없으면 가장 오래된 점을 사용하되 period를 표시.
+  let base=null;
+  for(const x of arr){
+    if(x.at<=target)base=x;
+    else break;
+  }
+  if(!base&&arr.length)base=arr[0];
+
+  if(!base){
+    return {pnl:0,rate:0,periodMin:0,eligible:false,currentValue,currentPrincipal};
+  }
+
+  const periodMin=Math.max(0,(now-base.at)/60000);
+  const basePrincipal=Number.isFinite(+base.principal)?+base.principal:null;
+
+  // principal snapshot이 있으면 "총손익 변화"를 사용해 지급/보상 원금 유입 영향을 제외.
+  let pnl;
+  if(basePrincipal!=null){
+    const currentTotalPnl=currentValue-currentPrincipal;
+    const baseTotalPnl=(+base.value)-basePrincipal;
+    pnl=currentTotalPnl-baseTotalPnl;
+  }else{
+    // 이전 버전 history는 principal이 없으므로 한 시간 동안은 자산가치 변화로 호환.
+    pnl=currentValue-(+base.value);
+  }
+
+  const rate=pnl/Math.max(1,+base.value)*100;
+  return {
+    pnl:Math.round(pnl),
+    rate:+rate.toFixed(4),
+    periodMin:Math.round(periodMin),
+    eligible:periodMin>=45,
+    currentValue,currentPrincipal
+  };
+}
+
+// ------------------------------------------------------------------
+// 4) ranking write: 기존 총자산 필드 유지 + 최근 1시간 필드 추가
+// ------------------------------------------------------------------
+Store.scheduleScore=function(force=false){
+  if(!this.online||!state||!this.uid||!state.nickname||state.nickname==='게스트')return;
+  clearTimeout(this.pushTimer);
+  const wait=force?0:Math.max(0,10*60*1000-(Date.now()-(this.lastPushAt||0)));
+  this.pushTimer=setTimeout(()=>{
+    this.pushTimer=0;
+    this.pushMyScore(true);
+  },wait);
+};
+
+Store.pushMyScore=async function(force=false){
+  if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;
+  if(this.pushPromise)return this.pushPromise;
+
+  const m=v49HourlyMetrics();
+  this.lastPushAt=Date.now();
+
+  const payload={
+    nickname:cleanNickname(state.nickname),
+    // 관리자 참가자 목록 등 기존 기능 호환
+    totalValue:Math.round(total()),
+    pnlRate:+accountRate().toFixed(4),
+
+    // 신규 최근 1시간 랭킹
+    hourlyPnl:m.pnl,
+    hourlyRate:m.eligible?m.rate:-9999,
+    hourlyPeriodMin:m.periodMin,
+    hourlyEligible:!!m.eligible,
+    hourlyUpdatedAtMs:Date.now(),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  this.pushPromise=this.db.collection('ranking').doc(this.uid).set(payload,{merge:true})
+    .then(()=>true)
+    .catch(error=>{
+      console.warn('1시간 랭킹 점수 저장 실패',error?.code||error?.message);
+      return false;
+    })
+    .finally(()=>{this.pushPromise=null});
+  return this.pushPromise;
+};
+
+// ------------------------------------------------------------------
+// 5) ranking read/render: snapshot write 제거, ranking collection TOP 5 직접 조회
+//    단순 orderBy 1개라 composite index 불필요.
+// ------------------------------------------------------------------
+Store.rankingRows=[];
+Store.rankingLoading=false;
+Store.rankingLoadedAt=0;
+const V49_RANK_CACHE_MS=60*1000;
+
+async function v49LoadHourlyRanking(force=false){
+  if(!Store.online||!Store.db||Store.rankingLoading)return;
+  const now=Date.now();
+  if(!force&&Store.rankingLoadedAt&&now-Store.rankingLoadedAt<V49_RANK_CACHE_MS)return;
+
+  Store.rankingLoading=true;
+  try{
+    // 내 값부터 최신화. 실패하더라도 조회는 계속.
+    try{await Store.pushMyScore(true)}catch(e){}
+
+    const snap=await Store.db.collection('ranking')
+      .orderBy('hourlyRate','desc')
+      .limit(15)
+      .get();
+
+    const freshCutoff=Date.now()-20*60*1000;
+    Store.rankingRows=snap.docs.map(d=>{
+      const x=d.data()||{};
+      return {
+        uid:d.id,
+        nickname:String(x.nickname||''),
+        hourlyPnl:+x.hourlyPnl||0,
+        hourlyRate:+x.hourlyRate,
+        hourlyPeriodMin:+x.hourlyPeriodMin||0,
+        hourlyEligible:!!x.hourlyEligible,
+        hourlyUpdatedAtMs:+x.hourlyUpdatedAtMs||0
+      };
+    }).filter(x=>
+      x.nickname&&x.nickname!=='게스트'&&
+      x.hourlyEligible&&
+      Number.isFinite(x.hourlyRate)&&x.hourlyRate>-9000&&
+      x.hourlyUpdatedAtMs>=freshCutoff
+    ).slice(0,5);
+
+    Store.rankingLoadedAt=Date.now();
+  }catch(error){
+    console.warn('최근 1시간 랭킹 조회 실패',error?.code||error?.message);
+  }finally{
+    Store.rankingLoading=false;
+    if(view==='ranking'&&!selected&&!document.querySelector('.overlay'))render();
+  }
+}
+
+loadHourlyRanking=v49LoadHourlyRanking;
+loadDailyRanking=v49LoadHourlyRanking;
+ranking=function(){return (Store.rankingRows||[]).map(r=>({...r,me:r.uid===Store.uid}))};
+
+ranks=function(){
+  const status=`<span class="live-status ${Store.online?'online':''}"><i></i>${Store.online?'서버 연결됨':'연결 확인 필요'}</span>`;
+  const rows=ranking();
+  const me=v49HourlyMetrics();
+  const myText=me.eligible
+    ? `<b class="${me.pnl<0?'down':'gain'}">${sign(me.pnl)}원</b> <span class="${me.rate<0?'down':'gain'}">${pct(me.rate)}</span>`
+    : `<b>집계 중</b> <span class="sub">${me.periodMin} / 60분</span>`;
+
+  const row=(r,i)=>`<div class="rankrow ${r.me?'me':''}">
+    <b>${i<3?['🥇','🥈','🥉'][i]:i+1}</b>
+    <div><b>${r.nickname}</b>${r.me?' <small>나</small>':''}<small class="sub">최근 ${Math.min(60,r.hourlyPeriodMin)}분</small></div>
+    <div class="price ${r.hourlyPnl<0?'down':'gain'}">${sign(r.hourlyPnl)}원
+      <small class="${r.hourlyRate<0?'down':'gain'}">${pct(r.hourlyRate)}</small>
+    </div>
+  </div>`;
+
+  return shell(`${header('랭킹')}
+    <div class="between"><h2>최근 1시간 랭킹</h2>${status}</div>
+    <div class="ranking-me">
+      <span class="eyebrow">나의 최근 1시간</span>
+      <h2>${myText}</h2>
+      <small class="sub">수익률 기준 순위 · 수익금 함께 표시</small>
+    </div>
+    <div class="rank-snapshot-head"><b>직전 1시간</b><span>약 10분마다 점수 갱신</span></div>
+    <h2>TOP 5</h2>
+    ${rows.length?rows.map(row).join(''):`<div class="ranking-empty">${
+      Store.rankingLoading?'랭킹을 불러오는 중이에요.':
+      Store.online?'아직 1시간 집계가 완료된 참가자가 없어요.':'서버 연결을 확인해주세요.'
+    }</div>`}
+    <div class="rank-refresh-note">최근 약 1시간 동안의 수익률로 순위를 정해요.<br>수익금과 수익률을 함께 표시합니다.</div>
+  `,'ranking');
+};
+
+// 랭킹 탭 진입 시 직접 로드.
+let V49_LAST_VIEW=view;
+setInterval(()=>{
+  if(document.hidden)return;
+  if(view==='ranking'&&V49_LAST_VIEW!=='ranking')v49LoadHourlyRanking(true);
+  V49_LAST_VIEW=view;
+},1000);
+
+// 앱이 열린 동안 10분마다 자기 최근 1시간 값만 1회 write.
+setInterval(()=>{
+  if(document.hidden||!state||!Store.online)return;
+  Store.scheduleScore(true);
+},10*60*1000);
+
+// 기존 hourly snapshot 로직이 view 진입 시 다시 덮지 않도록 함수 참조는 위에서 교체.
+// 기존 setInterval은 새 loadHourlyRanking 함수를 호출하므로 신규 방식으로 동작한다.
+
+try{
+  V48_RAW_TICK_CACHE?.clear?.();
+  V49_PATH_STATE_CACHE.clear();
+  V49_KOSPI_CACHE.clear();
+}catch(e){}
+
+window.__marketV49={
+  version:49,
+  marketRulesChanged:false,
+  incrementalV29Path:true,
+  exactSameLoopFormula:true,
+  kospiCacheMs:2000,
+  ranking:'rolling-1h-return-rate',
+  rankingPrimary:'hourlyRate',
+  rankingDisplay:['hourlyPnl','hourlyRate'],
+  rankingWriteEveryMin:10
+};
+</script>
+
 </body></html>
