@@ -432,7 +432,7 @@ function v9Unit(...xs){return rnd(hash('v9',...xs))()}
 function v9Normal(...xs){return normal(rnd(hash('v9n',...xs)))}
 function v9Regime(s,day,minute){
   // 장기 국면은 종목마다 55~110틱 유지. 종목 등급보다 현재 국면의 영향이 더 크다.
-  const len=55+Math.floor(v9Unit(s.code,day,'reg-len')*56), block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'reg');
+  const len=38+Math.floor(v9Unit(s.code,day,'reg-len')*15), block=Math.floor(minute/len),u=v9Unit(s.code,day,block,'reg');
   const type=u<.10?'strongDown':u<.30?'down':u<.62?'flat':u<.88?'up':'strongUp';
   return {type,bias:{strongDown:-.00020,down:-.00010,flat:0,up:.00010,strongUp:.00020}[type]};
 }
@@ -2315,7 +2315,7 @@ window.__marketV33Step1={
 
 // Regime: strongDown 11% + down 22% / flat 34% / up 22% + strongUp 11%
 v9Regime = function v34SymmetricRegime(s,day,minute){
-  const len=55+Math.floor(v9Unit(s.code,day,'reg-len')*56);
+  const len=38+Math.floor(v9Unit(s.code,day,'reg-len')*15);
   const block=Math.floor(minute/len);
   const u=v9Unit(s.code,day,block,'reg');
   const type=u<.11?'strongDown':u<.33?'down':u<.67?'flat':u<.89?'up':'strongUp';
@@ -2667,7 +2667,7 @@ v11ExtremeDrive=function v38SymmetricExtreme(s,day,minute){
 
 // Regime도 V34의 대칭 분포를 최종 보장.
 v9Regime=function v38SymmetricRegime(s,day,minute){
-  const len=55+Math.floor(v9Unit(s.code,day,'v38-reg-len')*56);
+  const len=38+Math.floor(v9Unit(s.code,day,'v38-reg-len')*15);
   const block=Math.floor(minute/len);
   const u=v9Unit(s.code,day,block,'v38-reg');
   const type=u<.11?'strongDown':u<.33?'down':u<.67?'flat':u<.89?'up':'strongUp';
