@@ -117,6 +117,24 @@ for(const [code,name,price] of EXTRA_STOCK_DATA){const s=mk(code,name,inferSecto
 // 2026-08-26 11:05 KST KRX 장중 현재가를 게임 시세의 기준점으로 사용합니다.
 const MARKET_REFERENCE_AT=Date.parse('2026-08-26T02:05:00Z'),MARKET_REFERENCE_TICK=marketTickAt(MARKET_REFERENCE_AT);
 const MARKET_REFERENCE_PRICES={'000120':73500,'000270':132600,'000660':1681000,'000720':130250,'000810':675000,'000880':116800,'001450':51100,'003490':27400,'003550':114400,'003670':165100,'004370':458000,'005300':97700,'005380':418500,'005490':326500,'005830':187100,'005930':257500,'005940':26550,'006260':288000,'006400':506000,'006800':35650,'007070':27450,'007310':337000,'008770':42150,'009150':1315000,'009540':358500,'010120':196000,'010130':1393000,'010140':20450,'010950':130300,'011200':21450,'012330':482000,'012450':1071000,'015760':35200,'017670':99600,'018260':227000,'021240':100100,'024110':20300,'028260':378250,'028670':5600,'029780':46500,'030200':52600,'032640':14930,'032830':302000,'033780':175400,'034020':84100,'034730':535000,'035420':219000,'035720':36300,'036570':226500,'039490':274000,'042660':86600,'042700':216000,'047810':130000,'051900':315500,'051910':260000,'055550':107800,'064350':134700,'064400':73700,'066570':196700,'068270':194200,'069960':93700,'071050':188300,'078930':122600,'079550':700000,'086280':207750,'086790':132500,'088350':5490,'090430':145900,'096770':106000,'097950':188900,'105560':166800,'138040':119700,'138930':14980,'139130':17760,'139480':74100,'161890':152300,'175330':27500,'192820':294000,'207940':1598000,'241560':61700,'251270':37450,'259960':226000,'267250':208000,'267260':719000,'271560':129700,'278470':452000,'282330':148700,'298040':2781000,'307950':441500,'316140':32900,'323410':21500,'326030':91100,'329180':463000,'352820':176600,'373220':348000,'377300':46300,'383220':63300,'402340':1039000,'443060':215500,'454910':69900};
+
+// junk 티어 배정 — 가격 변동성/이벤트 확률 함수(v9Volatility/v11Activity/v11ExtremeDrive/v9Shock)에는
+// 이미 junk 티어 계수가 준비돼 있었지만 실제로 이 등급을 쓰는 종목이 하나도 없었다.
+// 특정 종목을 하드코딩해서 골라두면(예: 리스트로 10개 고정) 몇 번 플레이해보고
+// "이 종목들이 잘 흔들리는구나"를 금방 외워서 그 종목으로만 몰리는 문제가 생긴다.
+// 그래서 이름이 아니라 "실제 표시 기준가가 1만원 미만"이라는 객관적 규칙으로 자동 분류한다.
+// - 여전히 결정적(같은 종목은 항상 같은 티어)이라 예측 가능성은 유지되지만
+// - 숨겨서 외워야 하는 리스트가 아니라 "싼 종목일수록 잘 흔들린다"는 직관적인 규칙이라 자연스럽다
+// - 대상이 소수 하드코딩 종목이 아니라 가격 조건을 만족하는 모든 종목으로 넓게 퍼진다
+// junk가 되어도 방향(상승/하락) 확률은 그대로 대칭이라 "무조건 급등락"이 아니라
+// "이벤트가 걸릴 확률/빈도"만 올라간다 — 이 자동분류도 그 성격은 동일하게 유지한다.
+const JUNK_TIER_PRICE_THRESHOLD=10000;
+for(const s of STOCKS){
+  if(s.isETF)continue;
+  const refPrice=Number(s.referencePrice||MARKET_REFERENCE_PRICES[s.code]||s.base)||0;
+  if(refPrice>0 && refPrice<JUNK_TIER_PRICE_THRESHOLD)s.tier='junk';
+}
+
 const $=s=>document.querySelector(s),fmt=n=>Math.round(n).toLocaleString('ko-KR'),sign=n=>(n>=0?'+':'')+fmt(n),pct=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
 function hash(...xs){let h=2166136261;for(const x of xs.join('|'))for(let i=0;i<x.length;i++)h=Math.imul(h^x.charCodeAt(i),16777619);return h>>>0}
 function rnd(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -161,6 +179,19 @@ const nicknameKey=name=>encodeURIComponent(cleanNickname(name).normalize('NFKC')
 const SCORE_PUSH_INTERVAL_MS=10*60*1000;
 const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
 let userId=(()=>{try{return localStorage.getItem('mockstock:uid')||''}catch{return''}})(),state=null,view='home',selected=null,accountView=false,sort='value',sectorFilter='전체',assetFilter='stock',chartRange='day',chartMode='line',lastChartTick=-1,chartHoverIndex=-1,trading=false,pendingOrder=null;
+// liveLoop는 매 프레임 도는 rAF 루프. 원래는 부트스트랩 IIFE(비동기) 안에서
+// const로 선언돼 있어서 (a) 다른 <script> 블록에서는 아예 접근 불가능했고,
+// (b) V45/V46이 그 사이에 자기 버전으로 감싸놔도 IIFE가 나중에(await 이후)
+// 다시 원본으로 덮어써버리는 문제가 있었다. 여기서 최상위 "진짜 함수"로
+// 정의해 두면 V45/V46의 래핑이 정상적으로 걸리고, IIFE는 그냥 시작만 시킨다.
+let liveLoopLastNumbers=0,liveLoopLastChart=0;
+function liveLoop(ts){
+  if(!document.hidden){
+    if(ts-liveLoopLastNumbers>=1000){refreshLive();recordEquity();liveLoopLastNumbers=ts}
+    if(selected&&$('#chart')&&ts-liveLoopLastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);liveLoopLastChart=ts}
+  }
+  requestAnimationFrame(liveLoop);
+}
 function total(){let v=state?.cash||0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=h.qty*smoothPriceAt(s,Date.now())}return v}
 function unrealizedPnl(){let v=0;for(const [c,h] of Object.entries(state?.holdings||{})){const s=STOCKS.find(x=>x.code===c);if(s&&h.qty>0)v+=(smoothPriceAt(s,Date.now())-h.avg)*h.qty}return v}
 function accountPnl(){return(+state?.realizedPnl||0)+unrealizedPnl()}
@@ -448,7 +479,13 @@ function v9SectorImpulse(s,day,minute){
   const block=Math.floor(minute/24);return v9Normal(s.sector,day,block,'sector')*.000045;
 }
 function v9MarketImpulse(day,minute){
-  const block=Math.floor(minute/30);return v9Normal(day,block,'market')*.000035;
+  // 코스피(=전종목 가중평균)에서 유일하게 살아남는 "공통 성분"이 이 함수다.
+  // 종목별 idiosyncratic noise는 100여 종목 평균을 내면서 서로 상쇄되지만,
+  // 이 시장 공통 충격만은 전 종목에 같은 방향으로 실려서 지수에 그대로 드러난다.
+  // 그래서 "코스피가 2900~3000대에서만 머무른다"는 체감을 줄이려면 개별 종목
+  // 변동성보다 이 값을 살짝 키우는 쪽이 종목 체감은 거의 안 건드리면서 지수만 더 움직이게 하는 방법이다.
+  // (기존 .000035 → .00006, 약 1.7배. 종목 하나에 대한 기여도는 여전히 미미함)
+  const block=Math.floor(minute/30);return v9Normal(day,block,'market')*.00006;
 }
 function v9Shock(s,day,minute){
   // 희귀 단발 이벤트. 우량주는 대형 이벤트 확률이 낮지만 0은 아니다.
@@ -1617,7 +1654,7 @@ const bindRewardBase=bind;bind=function(){bindRewardBase();document.querySelecto
 document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]'))e.target.closest('.reward-pop')?.remove();if(e.target.classList.contains('reward-pop'))e.target.remove()});
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
-(async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }let lastNumbers=0,lastChart=0;const liveLoop=ts=>{if(!document.hidden){if(ts-lastNumbers>=1000){refreshLive();recordEquity();lastNumbers=ts}if(selected&&$('#chart')&&ts-lastChart>=750&&!document.querySelector('.overlay')){drawChart(selected,chartHoverIndex);lastChart=ts}}requestAnimationFrame(liveLoop)};requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
+(async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script>
 
 
@@ -4368,10 +4405,14 @@ bind=function(){
 };
 
 // ------------------------------------------------------------------
-// KOSPI: 구성종목 기반 원본 움직임을 1.45배만 확대.
+// KOSPI: 구성종목 기반 원본 움직임을 확대해서 보여준다.
+// 1.45 → 1.85 : v9MarketImpulse 상향과 합쳐서 "2900~3000대에 계속 붙어있는" 느낌을
+// 완화하는 정도. 종목 가격/체결/랭킹 계산에는 전혀 영향 없는 화면 표시 전용 배율이라
+// 과하게 올려도 "도박장 같아진다"는 체감과는 무관하지만, 지수만 튀는 부자연스러움을
+// 피하려고 소폭만 올렸다.
 // ------------------------------------------------------------------
 const V52_KOSPI_BASE=gameKospiQuote;
-const V52_KOSPI_ACTIVITY=1.45;
+const V52_KOSPI_ACTIVITY=1.85;
 gameKospiQuote=function v52MoreActiveKospi(ms=Date.now()){
   const q=V52_KOSPI_BASE(ms);
   const amp=v=>{
