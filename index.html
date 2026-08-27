@@ -5120,4 +5120,85 @@ window.__marketV62={
   firebaseSchemaChanged:false
 };
 </script>
+<script>
+/* ============ V63 — 시장 상태 유지시간 45% 단축 ============
+   목적:
+   - 급등·급락 이후 높은/낮은 등락률에서 오래 굳어 보이는 현상 완화
+   - 추세·모멘텀·활동성·변동성·후속경로를 더 자주 재선택
+   - 가격 충격 크기, 급등락 발생확률, 상하방 공식, 체결·랭킹·Firebase는 변경하지 않음
+
+   연속성:
+   - 2026-08-27 14:00 KST까지의 결정형 가격 경로는 기존 V62와 동일
+   - 이후 상태 함수의 시간축만 1.8배 진행시켜 유지시간을 약 55%로 단축
+*/
+const V63_TRANSITION_MS=Date.parse('2026-08-27T14:00:00+09:00');
+const V63_STATE_SPEED=1.8;
+const V63_TRANSITION_TICK=marketTickAt(acceleratedMs(effectiveMarketRealMs(V63_TRANSITION_MS)));
+const V63_TRANSITION_DAY=Math.floor(V63_TRANSITION_TICK/390);
+const V63_TRANSITION_MINUTE=((V63_TRANSITION_TICK%390)+390)%390;
+
+function v63StateMinute(day,minute){
+  // 전환 이전 기록은 그대로 둬서 배포 시점 가격 점프를 막는다.
+  if(day<V63_TRANSITION_DAY)return minute;
+  if(day===V63_TRANSITION_DAY){
+    if(minute<=V63_TRANSITION_MINUTE)return minute;
+    return V63_TRANSITION_MINUTE+Math.floor((minute-V63_TRANSITION_MINUTE)*V63_STATE_SPEED);
+  }
+  // 다음 게임일부터는 장 시작부터 단축된 상태 주기를 사용한다.
+  return Math.floor(minute*V63_STATE_SPEED);
+}
+
+const V63_REGIME_BASE=v9Regime;
+const V63_MOMENTUM_BASE=v9Momentum;
+const V63_VOLATILITY_BASE=v9Volatility;
+const V63_ACTIVITY_BASE=v11Activity;
+const V63_POSTMOVE_BASE=v11PostMove;
+
+v9Regime=function v63FasterRegime(s,day,minute){
+  return V63_REGIME_BASE(s,day,v63StateMinute(day,minute));
+};
+v9Momentum=function v63FasterMomentum(s,day,minute){
+  return V63_MOMENTUM_BASE(s,day,v63StateMinute(day,minute));
+};
+v9Volatility=function v63FasterVolatility(s,day,minute){
+  return V63_VOLATILITY_BASE(s,day,v63StateMinute(day,minute));
+};
+v11Activity=function v63FasterActivity(s,day,minute){
+  return V63_ACTIVITY_BASE(s,day,v63StateMinute(day,minute));
+};
+v11PostMove=function v63FasterPostMove(s,day,minute,changeRate){
+  return V63_POSTMOVE_BASE(s,day,v63StateMinute(day,minute),changeRate);
+};
+
+try{
+  v9PriceCache?.clear?.();
+  V29_OPEN_CACHE?.clear?.();
+  V29_CLOSE_CACHE?.clear?.();
+  V29_SCALE_CACHE?.clear?.();
+  referenceScaleCache?.clear?.();
+  dayOpenCache?.clear?.();
+  priceCache?.clear?.();
+  V23_QUOTE_CACHE?.clear?.();
+  V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();
+}catch(e){}
+
+window.__marketV63={
+  version:63,
+  basedOn:62,
+  transitionAt:'2026-08-27T14:00:00+09:00',
+  stateTimeMultiplier:1.8,
+  stateDurationRatio:.556,
+  affected:['regime','momentum','volatility','activity','postMove'],
+  shockProbabilityChanged:false,
+  shockMagnitudeChanged:false,
+  extremeProbabilityChanged:false,
+  directionFormulaChanged:false,
+  marketSpeedChanged:false,
+  executionRulesChanged:false,
+  firebaseSchemaChanged:false,
+  continuitySafe:true
+};
+</script>
 </body></html>
