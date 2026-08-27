@@ -1762,6 +1762,46 @@ v11PostMove = function v29PostMove(s,day,minute,changeRate){
   return 0;
 };
 
+
+/* ============ V81 — 깊은 상승/하락 꼬리 대칭 보정 ============
+   목적:
+   - 상승/하락 종목 수를 50:50으로 만들지 않는다.
+   - ±16% 안쪽의 일반 움직임은 건드리지 않는다.
+   - +20~40% 구간에서 상승이 지나치게 멀리 뻗는 기존 편향만 점진적으로 눌러준다.
+   - -20~-40% 구간은 기존 급락 경로를 유지하되 아주 약한 지속성만 허용한다.
+   - 뉴스/시장방향/ETF/장시간/Firebase와 무관한 가격 본체의 깊은 tail만 보정한다.
+*/
+function v81BalanceDeepTail(s,day,minute,price,open,ret){
+  const p=Math.max(1,Number(price)||1),o=Math.max(1,Number(open)||1);
+  let r=Number(ret)||0;
+  const ch=p/o-1;
+
+  // V82: ±15% 안쪽은 기존 시장 그대로.
+  if(Math.abs(ch)<.15)return r;
+
+  if(ch>0){
+    // 상승 꼬리는 V81보다 한 단계만 더 압축.
+    // 강세장 자체는 유지하고, 이미 크게 오른 종목의 '추가 상승 가속'만 줄인다.
+    const heat=Math.max(0,Math.min(1,(ch-.15)/.25));
+    if(r>0){
+      const keep=.82-heat*.27;       // +15%: 82% 유지 → +40%: 55% 유지
+      r*=keep;
+    }else if(r<0){
+      r*=1.03+heat*.10;              // 깊은 급등 뒤 조정은 조금 더 자연스럽게
+    }
+  }else{
+    // 하락 꼬리는 여전히 완만하게만 보강. 폭락장을 억지로 만들지 않는다.
+    const heat=Math.max(0,Math.min(1,((-ch)-.15)/.25));
+    if(r<0){
+      r*=1.025+heat*.065;            // -15%: +2.5% → -40%: +9%
+    }else if(r>0){
+      r*=1.00-heat*.04;              // 깊은 급락 뒤 즉시 튀는 반등만 소폭 완화
+    }
+  }
+
+  return Math.max(-.012,Math.min(.012,r));
+}
+
 function v29RawWithOpen(s,day,minute,open){
   let p=open,slumpUntil=-1,center=open;
   for(let i=0;i<=minute;i++){
@@ -1782,6 +1822,7 @@ function v29RawWithOpen(s,day,minute,open){
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));
     ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
     ret=v70EnsureCumulativeMove(s,day,i,p,ret,reg,mom);
+    ret=v81BalanceDeepTail(s,day,i,p,open,ret);
     ret=Math.max(-.012,Math.min(.012,ret));
     p*=Math.exp(ret);
     p=Math.max(open*.10,Math.min(open*2.20,p));
@@ -3924,6 +3965,7 @@ v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
     const gap=Math.log(Math.max(1,center)/Math.max(1,p));
     ret+=Math.max(-.000035,Math.min(.000035,gap*.008));
     ret=v70EnsureCumulativeMove(s,day,i,p,ret,reg,mom);
+    ret=v81BalanceDeepTail(s,day,i,p,open,ret);
     ret=Math.max(-.012,Math.min(.012,ret));
     p*=Math.exp(ret);
     p=Math.max(open*.10,Math.min(open*2.20,p));
@@ -6964,5 +7006,136 @@ window.__marketV80={
   .v80-market-board .v78-filter-row{margin-left:-16px!important;margin-right:-16px!important;padding-left:16px!important;padding-right:16px!important}
 }
 </style>
+
+
+<script id="v81-tail-balance-meta">
+try{
+  v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
+  V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
+  priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();V70_WALK_CACHE?.clear?.();
+  V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+}catch(e){}
+window.__marketV81={
+  version:82,basedOn:81,
+  deepTailBalance:true,
+  startsAtAbsChange:.15,
+  ordinaryMoveUntouched:true,
+  positiveTailCompression:'progressive-v82',
+  negativeTailContinuation:'mild-v82',
+  marketBreadthForced:false,
+  newsChanged:false,marketHoursChanged:false,
+  etfRulesChanged:false,firebaseChanged:false
+};
+</script>
+
+
+<script id="v83-thermal-optimization">
+/* ============ V83 — 체감 유지형 발열/배터리 최적화 ============
+   원칙:
+   - 장중(08:00~23:30): 기존 V58 체감 그대로. 가격/시장확률/뉴스/체결 변경 없음.
+   - 장마감: 가격이 23:30에 고정되므로 불필요한 UI wake-up과 300종목 재정렬을 크게 줄임.
+   - hidden: 기존처럼 완전 정지.
+   - 화면 복귀/장 시작: 즉시 한 번 갱신 후 장중 주기로 복귀.
+*/
+const V83_OPEN_SCHEDULER_MS=500;      // V58과 동일
+const V83_CLOSED_SCHEDULER_MS=5000;   // 마감 후 5초에 한 번만 가벼운 UI 확인
+const V83_OPEN_MOVER_MS=5000;          // V58과 동일
+
+// 1) live scheduler를 장중/마감 동적으로 전환.
+// 장중은 기존 500ms 그대로라 시세 표시 체감이 변하지 않는다.
+try{
+  if(V46_NEXT_TIMER){clearTimeout(V46_NEXT_TIMER);V46_NEXT_TIMER=0}
+  v46ScheduleLive=function v83AdaptiveLive(delay){
+    if(V46_NEXT_TIMER||document.hidden)return;
+    const open=marketSessionInfo().open;
+    const cadence=open?V83_OPEN_SCHEDULER_MS:V83_CLOSED_SCHEDULER_MS;
+    const wait=Number.isFinite(+delay)?Math.max(80,+delay):cadence;
+    V46_NEXT_TIMER=setTimeout(()=>{
+      V46_NEXT_TIMER=0;
+      if(document.hidden)return;
+      V46_IN_LIVE_LOOP=true;
+      try{v45LiveLoopBase(performance.now())}
+      finally{V46_IN_LIVE_LOOP=false}
+      v46ScheduleLive();
+    },wait);
+  };
+  v46ScheduleLive(80);
+}catch(e){console.warn('V83 adaptive scheduler 적용 실패',e)}
+
+// 2) 급상승/급하락 전체 300종목 재정렬.
+// 장중은 기존 5초, 마감 후에는 가격이 고정이므로 자동 재정렬하지 않는다.
+// 탭 진입/필터 클릭처럼 force=true인 경우는 마감 후에도 즉시 1회 계산되어 화면은 정상 표시.
+const V83_MOVER_BASE=v53RefreshMoverList;
+let V83_LAST_MOVER=0;
+v53RefreshMoverList=function v83ThermalMover(force=false){
+  if(force){
+    V83_LAST_MOVER=Date.now();
+    return V83_MOVER_BASE(true);
+  }
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  if(!marketSessionInfo().open)return;
+  const now=Date.now();
+  if(now-V83_LAST_MOVER<V83_OPEN_MOVER_MS)return;
+  V83_LAST_MOVER=now;
+  return V83_MOVER_BASE(true);
+};
+
+// 3) 발견용 300종목 snapshot.
+// 마감 후에는 동일 가격을 계속 다시 만들 필요가 없으므로 완성 snapshot은 다음 장 시작 전까지 재사용.
+// 장중에는 기존 V58의 12초 정책을 그대로 사용.
+const V83_SNAPSHOT_BASE=v47BuildSnapshot;
+v47BuildSnapshot=function v83ThermalSnapshot(force=false){
+  if(document.hidden||V47_BUILDING)return;
+  const complete=V47_DISCOVER_SNAPSHOT.size===STOCKS.length;
+  if(!marketSessionInfo().open && complete)return;
+  return V83_SNAPSHOT_BASE(force);
+};
+
+// 4) 장 시작/마감 경계에서 캐시 상태를 정리하고 즉시 화면 1회 동기화.
+let V83_LAST_OPEN=marketSessionInfo().open;
+const V83_SESSION_TIMER=setInterval(()=>{
+  if(document.hidden)return;
+  const open=marketSessionInfo().open;
+  if(open===V83_LAST_OPEN)return;
+  V83_LAST_OPEN=open;
+  try{
+    V45_QUOTE_TICK_KEY=null;
+    V45_QUOTE_TICK_CACHE?.clear?.();
+    V47_DISCOVER_SNAPSHOT?.clear?.();
+    V47_SNAPSHOT_AT=0;
+    V83_LAST_MOVER=0;
+    refreshLive();
+    if(open)v47BuildSnapshot(true);
+  }catch(e){}
+},5000);
+
+// 복귀 시 현재 장 상태에 맞는 scheduler를 즉시 재가동.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    if(V46_NEXT_TIMER){clearTimeout(V46_NEXT_TIMER);V46_NEXT_TIMER=0}
+  }else{
+    try{refreshLive()}catch(e){}
+    v46ScheduleLive(80);
+  }
+},{passive:true});
+
+window.__marketV83={
+  version:83,basedOn:82,
+  focus:'thermal-efficiency-without-open-session-feel-change',
+  openSchedulerMs:V83_OPEN_SCHEDULER_MS,
+  closedSchedulerMs:V83_CLOSED_SCHEDULER_MS,
+  moverOpenMs:V83_OPEN_MOVER_MS,
+  moverClosedAutoRefresh:false,
+  closedSnapshotRebuild:false,
+  hiddenWorkPaused:true,
+  priceEngineChanged:false,
+  marketProbabilityChanged:false,
+  newsEngineChanged:false,
+  firebaseReadsAdded:0,
+  firebaseWritesAdded:0
+};
+</script>
 
 </body></html>
