@@ -4956,4 +4956,257 @@ window.__marketV52={
 };
 </script>
 
+
+<script>
+/* ============ V53 — 실시간 급상승/급하락 순위 정렬 오류 수정 ============
+   V52의 최근 5분 기준은 유지.
+   원인:
+   - V52가 기존 renderer에서 '거래량 정렬'을 임시로 빌리고,
+     렌더 후 DOM을 screen 끝으로 이동시키는 방식이라
+     V47 snapshot/기존 refresh와 충돌해 표시값과 순위가 서로 어긋날 수 있었다.
+
+   수정:
+   - 급상승/급하락 화면은 처음부터 최근 5분 수익률로 직접 계산/정렬.
+   - 순위번호도 정렬 결과에서 1,2,3... 새로 생성.
+   - 실시간 갱신 때 전용 mover-list 내부만 다시 생성.
+   - 거래량/관심/종목상세/시장엔진/KOSPI V52 로직은 그대로.
+*/
+
+const V53_DISCOVER_FALLBACK=discover;
+
+function v53MoverUniverse(){
+  return STOCKS.filter(s=>assetFilter==='etf'?s.isETF:!s.isETF)
+    .filter(s=>sectorFilter==='전체' || (assetFilter==='etf'?s.etfCategory===sectorFilter:s.sector===sectorFilter));
+}
+
+function v53MoverRowsHtml(now=Date.now()){
+  let list=v53MoverUniverse().map(s=>{
+    const x=v52LiveMover(s,now);
+    return {s,q:x.q,change:x.liveChange};
+  });
+
+  list=list.filter(x=>sort==='rise'?x.change>0:x.change<0);
+  list.sort((a,b)=>sort==='rise'?b.change-a.change:a.change-b.change);
+
+  return list.length
+    ? list.map((x,i)=>`<div class="stock" data-stock="${x.s.code}">
+        <div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div>
+        <div>
+          <div class="name">${x.s.name}</div>
+          <small class="${x.change<0?'down':'gain'}" data-quote="${x.s.code}">
+            ${fmt(x.q.price)}원 · ${pct(x.change)}
+          </small>
+        </div>
+        <button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">
+          ${state.watch.includes(x.s.code)?'♥':'♡'}
+        </button>
+      </div>`).join('')
+    : `<div class="empty">${sort==='rise'?'최근 5분 상승 종목이 없어요':'최근 5분 하락 종목이 없어요'}</div>`;
+}
+
+function v53MoverDiscover(){
+  const groups=assetFilter==='etf'
+    ? ['전체',...new Set(ETF_STOCKS.map(s=>s.etfCategory))]
+    : ['전체',...new Set(STOCKS.filter(s=>!s.isETF).map(s=>s.sector))];
+  const now=new Date();
+  const assetMenu=`<div class="asset-switch">
+    <button data-asset="stock" class="asset-card ${assetFilter==='stock'?'active':''}">
+      <span class="asset-symbol kr-flag">🇰🇷</span><b>국내주식</b>
+    </button>
+    <button data-asset="etf" class="asset-card ${assetFilter==='etf'?'active':''}">
+      <span class="asset-symbol etf-mark"><i></i></span><b>ETF</b>
+    </button>
+  </div>`;
+  const chips=`<div class="chips">${groups.map(g=>`<button data-sector="${g}" class="chip ${sectorFilter===g?'active':''}">${g}</button>`).join('')}</div>`;
+
+  return shell(`${header('발견')}
+    ${assetMenu}${chips}
+    <div class="strip">
+      <div>오늘 이슈<b>1개</b></div>
+      <div>코스피<b class="gain">상승</b></div>
+      <div>시장 시간<b>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</b></div>
+    </div>
+    <div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div>
+    <h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2>
+    <div class="tabs">
+      ${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}
+    </div>
+    <div id="v53-mover-list">${v53MoverRowsHtml(Date.now())}</div>
+  `,'discover');
+}
+
+// 최종 discover override.
+discover=function(watch=false){
+  if(!watch && (sort==='rise'||sort==='fall'))return v53MoverDiscover();
+  return V53_DISCOVER_FALLBACK(watch);
+};
+
+// V52의 잘못된 screen-level 재배치는 완전히 비활성화.
+v52RefreshMoverRows=function(){};
+
+// 최근 5분 화면만 2.5초마다 전용 list를 정확히 다시 계산.
+// 화면 전체 render를 하지 않아서 헤더/스크롤 위치는 유지.
+let V53_LAST_REFRESH=0;
+function v53RefreshMoverList(force=false){
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  const list=document.getElementById('v53-mover-list');
+  if(!list)return;
+  const now=Date.now();
+  if(!force && now-V53_LAST_REFRESH<V52_LIVE_CACHE_MS)return;
+  V53_LAST_REFRESH=now;
+
+  const next=v53MoverRowsHtml(now);
+  // 내용이 같은 경우 DOM을 건드리지 않는다.
+  if(list.__v53Html===next)return;
+  list.__v53Html=next;
+  list.innerHTML=next;
+
+  // 새로 생성된 row에만 기존 click/watch handler 다시 연결.
+  document.querySelectorAll('#v53-mover-list [data-stock]').forEach(b=>b.onclick=e=>{
+    if(e.target.closest('[data-watch]'))return;
+    selected=STOCKS.find(s=>s.code===b.dataset.stock);
+    chartRange='day';chartMode='line';chartHoverIndex=-1;
+    $('#app').innerHTML=detail(selected);bind();
+  });
+  document.querySelectorAll('#v53-mover-list [data-watch]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const c=b.dataset.watch;
+    state.watch=state.watch.includes(c)?state.watch.filter(x=>x!==c):[...state.watch,c];
+    Store.saveMe(userId,state);
+    b.textContent=state.watch.includes(c)?'♥':'♡';
+  });
+}
+
+const V53_REFRESH_BASE=refreshLive;
+refreshLive=function(){
+  const out=V53_REFRESH_BASE();
+  v53RefreshMoverList(false);
+  return out;
+};
+
+const V53_BIND_BASE=bind;
+bind=function(){
+  V53_BIND_BASE();
+  if(view==='discover'&&(sort==='rise'||sort==='fall')){
+    setTimeout(()=>v53RefreshMoverList(true),0);
+  }
+};
+
+window.__marketV53={
+  version:53,
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  liveMoverWindowMin:5,
+  rankFix:'direct-sort-and-render',
+  screenLevelDomReorderRemoved:true,
+  kospiV52Preserved:true
+};
+</script>
+
+
+<script>
+/* ============ V54 — mover 정렬 패치 최적화/충돌 방지 ============
+   - V53의 최근 5분 기준/정렬 결과/시장 엔진/KOSPI/거래량 로직은 변경하지 않음.
+   - 2.5초마다 mover-list 전체 innerHTML 교체하던 부분만 제거.
+   - 기존 행을 code 기준으로 재사용하고, 값/순위/순서만 갱신.
+   - 따라서 클릭/관심종목 listener를 매번 재바인딩하지 않음.
+   - 전용 #v53-mover-list 안에서만 이동하므로 V52의 screen-level 충돌은 재발하지 않음.
+*/
+
+let V54_LAST_REFRESH=0;
+function v54MoverSnapshot(now=Date.now()){
+  let rows=v53MoverUniverse().map(s=>{
+    const x=v52LiveMover(s,now);
+    return {s,q:x.q,change:x.liveChange};
+  });
+  rows=rows.filter(x=>sort==='rise'?x.change>0:x.change<0);
+  rows.sort((a,b)=>sort==='rise'?b.change-a.change:a.change-b.change);
+  return rows;
+}
+
+v53RefreshMoverList=function v54RefreshMoverList(force=false){
+  if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+  const list=document.getElementById('v53-mover-list');
+  if(!list)return;
+  const now=Date.now();
+  if(!force && now-V54_LAST_REFRESH<V52_LIVE_CACHE_MS)return;
+  V54_LAST_REFRESH=now;
+
+  const data=v54MoverSnapshot(now);
+  if(!data.length){
+    const msg=sort==='rise'?'최근 5분 상승 종목이 없어요':'최근 5분 하락 종목이 없어요';
+    if(list.dataset.v54Empty!==msg){
+      list.innerHTML=`<div class="empty">${msg}</div>`;
+      list.dataset.v54Empty=msg;
+    }
+    return;
+  }
+  delete list.dataset.v54Empty;
+
+  // 기존 DOM을 code별로 재사용한다. 신규 진입 종목만 새 행 생성.
+  const existing=new Map([...list.querySelectorAll('.stock[data-stock]')].map(el=>[el.dataset.stock,el]));
+  const wanted=new Set();
+
+  data.forEach((x,i)=>{
+    wanted.add(x.s.code);
+    let row=existing.get(x.s.code);
+    if(!row){
+      row=document.createElement('div');
+      row.className='stock';
+      row.dataset.stock=x.s.code;
+      row.innerHTML=`<div class="row"><span class="rank-num"></span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small data-quote="${x.s.code}"></small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>`;
+      row.onclick=e=>{
+        if(e.target.closest('[data-watch]'))return;
+        selected=STOCKS.find(s=>s.code===row.dataset.stock);
+        chartRange='day';chartMode='line';chartHoverIndex=-1;
+        $('#app').innerHTML=detail(selected);bind();
+      };
+      const heart=row.querySelector('[data-watch]');
+      if(heart)heart.onclick=e=>{
+        e.stopPropagation();
+        const c=heart.dataset.watch;
+        state.watch=state.watch.includes(c)?state.watch.filter(v=>v!==c):[...state.watch,c];
+        Store.saveMe(userId,state);
+        heart.textContent=state.watch.includes(c)?'♥':'♡';
+      };
+    }
+
+    const rank=row.querySelector('.rank-num');
+    if(rank && rank.textContent!==String(i+1))rank.textContent=String(i+1);
+    const qel=row.querySelector('[data-quote]');
+    if(qel){
+      const text=`${fmt(x.q.price)}원 · ${pct(x.change)}`;
+      if(qel.textContent.trim()!==text)qel.textContent=text;
+      const cls=x.change<0?'down':'gain';
+      if(qel.className!==cls)qel.className=cls;
+    }
+    const heart=row.querySelector('[data-watch]');
+    if(heart){
+      const mark=state.watch.includes(x.s.code)?'♥':'♡';
+      if(heart.textContent!==mark)heart.textContent=mark;
+    }
+
+    // 전용 list 내부에서만 순서를 맞춘다. 같은 노드는 이동만 하므로 listener 유지.
+    const at=list.children[i];
+    if(at!==row)list.insertBefore(row,at||null);
+  });
+
+  // 순위 밖으로 나간 행만 제거.
+  existing.forEach((row,code)=>{if(!wanted.has(code))row.remove()});
+};
+
+window.__marketV54={
+  version:54,
+  basedOn:53,
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  liveMoverWindowMin:5,
+  moverSort:'rise-desc-fall-asc',
+  fullMoverInnerHtmlRefreshRemoved:true,
+  rowListenersPreserved:true,
+  screenLevelDomReorderRemoved:true,
+  kospiV52Preserved:true
+};
+</script>
+
 </body></html>
