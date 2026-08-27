@@ -58,6 +58,10 @@
 }
 </style>
 
+<style id="v76-news-board-style">
+.v76-news-summary{font-size:11px;color:var(--muted);padding:0 2px 10px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}.v76-news-summary::-webkit-scrollbar{display:none}
+.v76-news-list{max-height:50vh;overflow-y:auto;overscroll-behavior:contain}.v76-news-note{margin:12px 2px 2px;color:var(--muted);font-size:10.5px;line-height:1.55}
+</style>
 </head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
@@ -6108,6 +6112,7 @@ const V75_EVENT_TYPES = [
   {id:'overseas_rate', cat:'global', axes:['rate','liquidity'],        needsTarget:'market', cred:[.60,.90], sev:[.25,.55], followup:.15},
   {id:'ai_invest',     cat:'global', axes:['tech','demand'],           needsTarget:'sector',  cred:[.55,.85], sev:[.30,.70], followup:.25},
   {id:'global_logistics',cat:'global', axes:['logistics','supply'],    needsTarget:'sector',  cred:[.50,.80], sev:[.25,.55], followup:.15},
+  {id:'global_demand', cat:'global', axes:['demand','fx','risk'],       needsTarget:'sector',  cred:[.50,.82], sev:[.20,.60], followup:.20},
 
   // 시장
   {id:'fx_move',       cat:'market', axes:['fx'],                     needsTarget:'market', cred:[.70,.95], sev:[.20,.55], followup:.10},
@@ -6117,6 +6122,7 @@ const V75_EVENT_TYPES = [
   {id:'liquidity',     cat:'market', axes:['liquidity'],               needsTarget:'market', cred:[.60,.85], sev:[.20,.45], followup:.10},
   {id:'program_trade', cat:'market', axes:['liquidity'],               needsTarget:'market', cred:[.60,.85], sev:[.15,.40], followup:.05},
   {id:'sector_rotation',cat:'market', axes:['demand'],                 needsTarget:'sector',  cred:[.55,.80], sev:[.15,.40], followup:.10},
+  {id:'profit_taking', cat:'market', axes:['liquidity','risk'],         needsTarget:'sector',  cred:[.60,.88], sev:[.15,.45], followup:.08},
 
   // 산업
   {id:'semiconductor', cat:'industry', axes:['tech','demand','supply'], needsTarget:'sector', cred:[.55,.85], sev:[.30,.70], followup:.25},
@@ -6127,6 +6133,8 @@ const V75_EVENT_TYPES = [
   {id:'bio',           cat:'industry', axes:['tech','policy'],          needsTarget:'sector', cred:[.45,.75], sev:[.25,.60], followup:.20},
   {id:'steel_chem',    cat:'industry', axes:['commodity','supply'],     needsTarget:'sector', cred:[.55,.80], sev:[.20,.50], followup:.15},
   {id:'shipping',      cat:'industry', axes:['logistics','demand'],     needsTarget:'sector', cred:[.55,.80], sev:[.25,.55], followup:.15},
+  {id:'power_grid',    cat:'industry', axes:['policy','demand','commodity'], needsTarget:'sector', cred:[.55,.82], sev:[.20,.60], followup:.20},
+  {id:'robotics',      cat:'industry', axes:['tech','demand'],          needsTarget:'sector', cred:[.45,.78], sev:[.20,.60], followup:.22},
 
   // 기업
   {id:'order_win',     cat:'company', axes:['demand'],                 needsTarget:'stock',  cred:[.60,.90], sev:[.25,.60], followup:.15},
@@ -6135,18 +6143,23 @@ const V75_EVENT_TYPES = [
   {id:'new_product',   cat:'company', axes:['tech','demand'],          needsTarget:'stock',  cred:[.55,.85], sev:[.20,.55], followup:.15},
   {id:'ma_deal',       cat:'company', axes:['liquidity','policy'],     needsTarget:'stock',  cred:[.45,.80], sev:[.30,.70], followup:.30},
   {id:'supply_contract',cat:'company', axes:['demand','supply'],       needsTarget:'stock',  cred:[.50,.80], sev:[.20,.55], followup:.20},
+  {id:'regulatory_action',cat:'company',axes:['policy','risk'],         needsTarget:'stock',  cred:[.60,.90], sev:[.20,.65], followup:.25},
 
   // 찌라시
   {id:'acquisition_rumor', cat:'rumor', axes:['liquidity','policy'],   needsTarget:'stock',  cred:[.20,.55], sev:[.25,.60], followup:.30},
   {id:'supply_rumor',      cat:'rumor', axes:['demand','supply'],      needsTarget:'stock',  cred:[.20,.55], sev:[.20,.55], followup:.30},
   {id:'policy_rumor',      cat:'rumor', axes:['policy'],               needsTarget:'sector',  cred:[.20,.55], sev:[.20,.50], followup:.25},
   {id:'insider_rumor',     cat:'rumor', axes:['liquidity'],            needsTarget:'stock',  cred:[.15,.45], sev:[.20,.50], followup:.25},
+  {id:'new_business_rumor',cat:'rumor', axes:['tech','demand'],         needsTarget:'stock',  cred:[.15,.50], sev:[.20,.55], followup:.30},
+  {id:'major_customer_rumor',cat:'rumor',axes:['demand','supply'],      needsTarget:'stock',  cred:[.18,.52], sev:[.20,.60], followup:.32},
 
   // 속보
   {id:'factory_fire',  cat:'breaking', axes:['supply','risk'],         needsTarget:'stock',  cred:[.70,.95], sev:[.40,.85], followup:.35, sentBias:'neg'},
   {id:'power_outage',  cat:'breaking', axes:['supply','risk'],         needsTarget:'sector',  cred:[.65,.90], sev:[.30,.70], followup:.25, sentBias:'neg'},
   {id:'production_halt',cat:'breaking', axes:['supply'],               needsTarget:'stock',  cred:[.65,.90], sev:[.30,.70], followup:.30, sentBias:'neg'},
   {id:'port_disruption',cat:'breaking', axes:['logistics','supply'],   needsTarget:'sector',  cred:[.60,.85], sev:[.25,.60], followup:.25, sentBias:'neg'},
+  {id:'emergency_policy',cat:'breaking',axes:['policy','liquidity'],    needsTarget:'market',  cred:[.75,.98], sev:[.25,.70], followup:.30},
+  {id:'commodity_spike',cat:'breaking', axes:['commodity','supply'],    needsTarget:'sector',  cred:[.70,.95], sev:[.30,.75], followup:.28},
 ];
 // sentBias: 'neg'=항상 부정적 서술(사고성), 'pos'=항상 긍정적 서술(지원성), 미지정=자유(양쪽 다 가능)
 // 주의: 서술 방향(sentBias)은 "문구"만 고정한다. 실제 가격이 그 방향대로 움직일지는
@@ -6230,6 +6243,29 @@ const V75_RUMOR_TAIL = ['…설이 제기됐다','…이야기가 시장에 돈�
 // 속보 전용 톤
 const V75_BREAKING_LEAD = ['[속보]','[긴급]'];
 
+
+// V76 — 문장조각 확장팩. 축별 호환 문구만 추가하여 비문 생성을 억제한다.
+const V76_PHRASE_EXPANSION = {
+  tech:{subject:['글로벌 AI 인프라 업체','국내 팹리스 업계','해외 데이터센터 사업자','첨단장비 제조사','글로벌 통신장비 업체'],pos:['고성능 제품 개발 진전','AI 인프라 투자 확대','기술 검증 통과 소식','양산 전환 기대 확대','차세대 공정 도입 검토'],neg:['개발 일정 재검토','기술 검증 지연','투자 우선순위 조정','양산 일정 불확실성','경쟁 기술 부상 우려']},
+  demand:{subject:['북미 주요 고객사','유럽 대형 바이어','글로벌 데이터센터 고객','국내 유통 채널','신흥국 주요 고객'],pos:['주문 문의 증가','출하 전망 상향','교체 수요 확대','신규 고객 유입','장기계약 수요 증가'],neg:['발주 시점 연기','판매 전망 하향','교체 수요 둔화','고객사 재고조정','신규 주문 감소']},
+  supply:{subject:['핵심 소재 공급업체','글로벌 장비업체','국내 협력사','해외 생산법인','주요 부품업체'],pos:['공급 정상화 속도','병목 완화 조짐','생산능력 회복','납기 단축 움직임','대체 공급망 확보'],neg:['납기 지연 확대','핵심부품 부족','생산 차질 장기화','공급망 병목 재발','재고 부족 우려']},
+  oil:{subject:['국제 원유시장 참가자','미국 에너지 당국','중동 주요 생산국','글로벌 정유업계','원유 선물시장'],pos:['원유 공급 확대 가능성','유가 안정 기대','생산 정상화 소식','수출 물량 확대','재고 증가 확인'],neg:['유가 급등 압력','생산시설 차질','수출 물량 감소','재고 급감 확인','공급 불안 재점화']},
+  fx:{subject:['서울 외환시장','글로벌 외환 딜러','수출입 기업','역외 원화시장','주요 금융기관'],pos:['원화 변동성 완화','환율 안정 흐름','달러 강세 진정','외환 수급 개선','환헤지 부담 완화'],neg:['원화 약세 압력 확대','환율 급변 가능성','달러 강세 재개','외환 수급 불안','환헤지 비용 증가']},
+  risk:{subject:['국제 외교당국','현지 정부 관계자','글로벌 위험관리 기관','주요국 외교라인','국제 안보 전문가'],pos:['갈등 완화 신호','협상 채널 복원','충돌 위험 감소','제재 완화 논의','외교적 해법 모색'],neg:['충돌 우려 확대','제재 가능성 부각','긴급 경계 강화','협상 결렬 우려','불확실성 장기화']},
+  policy:{subject:['정부 경제부처','산업정책 당국','금융정책 당국','국회 관련 위원회','주요 규제기관'],pos:['산업 지원 확대 검토','투자 인센티브 논의','규제 개선 추진','세액공제 확대 검토','긴급 지원방안 마련'],neg:['규제 기준 강화','지원 축소 가능성','심사 강화 방침','과징금 부담 가능성','정책 일정 지연']},
+  liquidity:{subject:['외국계 자금','국내 액티브펀드','연기금 수급','개인 투자자 수급','프로그램 자금'],pos:['매수세 확산','순유입 전환','대형주 매수 강화','위험자산 선호 회복','저가매수 유입'],neg:['매도세 확산','순유출 확대','대형주 매도 강화','위험자산 선호 약화','차익실현 증가']},
+  rate:{subject:['글로벌 채권시장','미국 국채시장','국내 채권시장','통화정책 전문가','주요 투자은행'],pos:['금리 부담 완화 기대','인하 기대 확대','장기금리 안정','완화 전망 강화','자금조달 부담 완화'],neg:['금리 부담 재부각','인하 기대 후퇴','장기금리 상승','긴축 우려 확대','자금조달 비용 상승']},
+  logistics:{subject:['글로벌 컨테이너 시장','국제 항만 운영사','주요 항공화물사','해상운임 시장','국내 물류업계'],pos:['운송 병목 완화','운항 정상화 확대','운임 안정 흐름','항만 처리량 회복','배송 지연 해소'],neg:['운송 병목 심화','운항 차질 확대','운임 상승 압력','항만 적체 증가','배송 지연 장기화']},
+  commodity:{subject:['비철금속 시장','배터리 원재료 시장','철광석 시장','산업금속 트레이더','주요 광산업체'],pos:['원재료 가격 안정','생산량 확대 전망','재고 증가 확인','공급계약 확대','조달 부담 완화'],neg:['원재료 가격 급등','생산량 감소 전망','재고 감소 확인','수출 제한 우려','조달 부담 확대']}
+};
+for(const [axis,x] of Object.entries(V76_PHRASE_EXPANSION)){
+  V75_SUBJECT[axis]?.push(...x.subject); V75_ACTION_POS[axis]?.push(...x.pos); V75_ACTION_NEG[axis]?.push(...x.neg);
+}
+V75_INTENSITY.push('장 초반부터','장중 한때','예상 범위 안에서','시장 컨센서스와 달리','후속 확인이 필요한 가운데','단기 수급이 몰리며','관련 지표 발표 직후','일부 투자자들이 주목하며');
+V75_FOLLOWUP_POS.push('실적 개선으로 이어질지 관심','수급 개선이 지속될지 주목','추가 계약 가능성도 거론','업종 전반으로 확산될지 관심');
+V75_FOLLOWUP_NEG.push('실적 부담으로 번질지 관심','수급 악화가 이어질지 주목','추가 차질 가능성도 거론','업종 전반으로 번질지 관심');
+V75_FOLLOWUP_NEUTRAL.push('실제 영향은 추가 확인이 필요','단기 가격반응과 펀더멘털은 다를 수 있다는 평가','시장 방향과 엇갈릴 가능성도 제기','후속 수치 확인 전 판단이 어렵다는 시각');
+
 function v75PhraseHash(...xs){return hash('v75',...xs)}
 function v75PickAxis(eventType, r){
   const axes = eventType.axes;
@@ -6243,30 +6279,19 @@ function v75BuildTargetName(target){
 }
 
 function v75GenerateTitle(ev, r){
-  const axis = v75PickAxis(ev.type, r);
-  const subjects = V75_SUBJECT[axis]||['시장 참여자'];
-  const subject = subjects[Math.floor(r()*subjects.length)];
-  const actionsPool = ev.sentiment>0 ? (V75_ACTION_POS[axis]||['긍정적 재료 부각']) : (V75_ACTION_NEG[axis]||['부정적 재료 부각']);
-  const action = actionsPool[Math.floor(r()*actionsPool.length)];
-  const intensity = V75_INTENSITY[Math.floor(r()*V75_INTENSITY.length)];
-  const targetName = v75BuildTargetName(ev.target);
-  let followPool = ev.sentiment>0?V75_FOLLOWUP_POS:V75_FOLLOWUP_NEG;
-  if(ev.cat==='rumor'||r()<.12) followPool = V75_FOLLOWUP_NEUTRAL;
-  const followup = followPool[Math.floor(r()*followPool.length)];
-
-  let title;
-  if(ev.cat==='rumor'){
-    const tail = V75_RUMOR_TAIL[Math.floor(r()*V75_RUMOR_TAIL.length)];
-    title = `${targetName}, ${action} ${tail}`;
-  } else if(ev.cat==='breaking'){
-    const lead = V75_BREAKING_LEAD[Math.floor(r()*V75_BREAKING_LEAD.length)];
-    title = `${lead} ${targetName}, ${action}… ${followup}`;
-  } else if(ev.target.kind!=='market'){
-    title = `${subject}, ${targetName} 관련 ${action}… ${intensity} ${followup}`;
-  } else {
-    title = `${subject}, ${action}… ${intensity} ${followup}`;
-  }
-  return title;
+  const axis=v75PickAxis(ev.type,r),subjects=V75_SUBJECT[axis]||['시장 참여자'];
+  const subject=subjects[Math.floor(r()*subjects.length)];
+  const actionsPool=ev.sentiment>0?(V75_ACTION_POS[axis]||['긍정적 재료 부각']):(V75_ACTION_NEG[axis]||['부정적 재료 부각']);
+  const action=actionsPool[Math.floor(r()*actionsPool.length)],intensity=V75_INTENSITY[Math.floor(r()*V75_INTENSITY.length)];
+  const targetName=v75BuildTargetName(ev.target);
+  let followPool=ev.sentiment>0?V75_FOLLOWUP_POS:V75_FOLLOWUP_NEG;if(ev.cat==='rumor'||r()<.16)followPool=V75_FOLLOWUP_NEUTRAL;
+  const followup=followPool[Math.floor(r()*followPool.length)];
+  if(ev.cat==='rumor'){const tail=V75_RUMOR_TAIL[Math.floor(r()*V75_RUMOR_TAIL.length)];const f=[`${targetName}, ${action} ${tail}`,`${subject}발 ${targetName} 관련 ${action} ${tail}`,`${targetName} 두고 ${action} ${tail}… ${followup}`,`${action} 관련 ${targetName} 거론… ${followup}`];return f[Math.floor(r()*f.length)]}
+  if(ev.cat==='breaking'){const lead=V75_BREAKING_LEAD[Math.floor(r()*V75_BREAKING_LEAD.length)];const f=[`${lead} ${targetName}, ${action}… ${followup}`,`${lead} ${action}… ${targetName} 영향 주목`,`${lead} ${subject}, ${action}… ${targetName} 관련 변동성 주목`];return f[Math.floor(r()*f.length)]}
+  const f=ev.target.kind!=='market'?
+  [`${subject}, ${targetName} 관련 ${action}… ${intensity} ${followup}`,`${targetName}, ${action} 관측… ${followup}`,`${action} 소식에 ${targetName} 주목… ${followup}`,`${subject}, ${intensity} ${targetName} 관련 ${action}`,`${targetName} 관련 ${action}… ${followup}`,`${subject}발 ${action}… ${targetName} 영향은 엇갈릴 가능성`,`${intensity} ${action}… ${targetName} 투자심리 변화 주목`,`${targetName}, ${subject} 움직임에 관심… ${action}`,`${action} 이후 ${targetName} 수급 주목… ${followup}`,`${subject}, ${targetName} 놓고 ${action}… 시장 해석 엇갈려`]:
+  [`${subject}, ${action}… ${intensity} ${followup}`,`${action} 관측… ${followup}`,`${subject}, ${intensity} ${action}`,`${action} 이후 시장 수급 변화 주목… ${followup}`,`${subject}발 ${action}… 국내 증시 영향은 엇갈릴 가능성`,`${intensity} ${action}… 위험선호 변화 여부 주목`,`${subject}, ${action} 언급… 시장 해석 엇갈려`,`${action} 소식… 업종별 차별화 가능성`];
+  return f[Math.floor(r()*f.length)];
 }
 
 // ---- 이벤트 생성 (결정론적, day+슬롯+index 시드) ----
@@ -6327,10 +6352,20 @@ function v75MakeEvent(day, slot, index, sectors, stocks){
   return ev;
 }
 
+function v76FollowUpEvent(parent,day,minute){
+  const type=V75_EVENT_TYPES.find(x=>x.id===parent.type);if(!type||!type.followup)return null;
+  const rr=rnd(v75PhraseHash('followup-roll',parent.id));if(rr()>=type.followup)return null;
+  const startTick=parent.startTick+parent.delayTicks+parent.riseTicks+1+Math.floor(rr()*5),duration=8+Math.floor(rr()*11),age=minute-startTick;
+  if(age<0||age>duration)return null;
+  const sentiment=rr()<.56?parent.sentiment:-parent.sentiment,reactRoll=rr(),reaction=reactRoll<.45?'real':reactRoll<.70?'priced':reactRoll<.90?'noise':'reverse';
+  const ev={...parent,id:parent.id+'-f1',sentiment,credibility:Math.min(.98,Math.max(.15,parent.credibility+(rr()-.45)*.18)),severity:Math.min(.90,Math.max(.12,parent.severity*(.65+rr()*.45))),reaction,delayTicks:1+Math.floor(rr()*2),riseTicks:2+Math.floor(rr()*4),decayTicks:4+Math.floor(rr()*7),duration,startTick,followUpOf:parent.id};
+  ev.title=v75GenerateTitle({...ev,type,sentiment},rnd(v75PhraseHash('followup-title',parent.id)));return ev;
+}
+
 // 활성 뉴스 목록: 최근 몇 개 슬롯에서 만들어진 이벤트 중 아직 duration이 안 끝난 것들.
 // 평균 7~8건 유지되도록 슬롯당 후보 수를 조절한다.
 const V75_CANDIDATES_PER_SLOT = 3; // 슬롯(6틱)마다 후보 3개 생성 시도 → 각각 확률적으로 채택
-const V75_SLOT_ADOPT_CHANCE = .82; // 후보가 실제 "발행"될 확률
+const V75_SLOT_ADOPT_CHANCE = .65; // 후보가 실제 "발행"될 확률
 const V75_LOOKBACK_SLOTS = 22;     // 활성 뉴스 판정을 위해 되돌아볼 슬롯 수(=최대 대략 132틱, duration 최대 27틱을 넉넉히 커버)
 
 const V75_ACTIVE_CALC_CACHE = new Map();
@@ -6346,9 +6381,9 @@ function v75ActiveNews(day, minute, sectors, stocks){
       const adoptR = rnd(v75PhraseHash('adopt', day, s, i))();
       if(adoptR>V75_SLOT_ADOPT_CHANCE) continue;
       const ev = v75MakeEvent(day, s, i, sectors, stocks);
-      const age = nowTick - ev.startTick;
-      if(age<0 || age>ev.duration) continue;
-      list.push(ev);
+      const age=nowTick-ev.startTick;
+      if(age>=0&&age<=ev.duration)list.push(ev);
+      const follow=v76FollowUpEvent(ev,day,nowTick);if(follow)list.push(follow);
     }
   }
   if(V75_ACTIVE_CALC_CACHE.size>200) V75_ACTIVE_CALC_CACHE.clear(); // 하루(390틱)치보다 넉넉한 크기에서 정리
@@ -6445,7 +6480,9 @@ function v75NewsBoardHtml(){
   const t=sessionTick(),minute=((t%390)+390)%390;
   const list=v75GetActiveNewsCached();
   if(!list.length)return `<p class="sub">지금은 특별히 움직이는 재료가 없어요.</p>`;
-  return `<div style="max-height:52vh;overflow-y:auto">${list.map(ev=>v75NewsCard(ev,minute)).join('')}</div>`;
+  const counts={};for(const ev of list)counts[ev.cat]=(counts[ev.cat]||0)+1;
+  const summary=Object.entries(counts).map(([k,n])=>`${V75_CATEGORY[k]?.label||k} ${n}`).join(' · ');
+  return `<div class="v76-news-summary">${summary}</div><div class="v76-news-list">${list.map(ev=>v75NewsCard(ev,minute)).join('')}</div><p class="v76-news-note">뉴스는 시장에 영향을 주지만 상승·하락을 확정하지 않습니다. 여러 재료와 현재 추세를 함께 보세요.</p>`;
 }
 
 // 기존 openMarketSummary(상승/하락 요약)는 유지하고 그 아래에 상황판 목록을 추가한다.
@@ -6472,9 +6509,11 @@ openMarketSummary=function(){
 };
 
 window.__marketV75={
-  version:75,
+  version:76,
   categories:V75_CAT_KEYS,
   eventTypes:V75_EVENT_TYPES.length,
+  phraseSystem:'expanded-axis-compatible',
+  followUps:true,
   avgActiveNewsTarget:'7~8',
   priceHook:'v18RumorDrive(replaced)',
   firebaseUsed:false,
@@ -6482,5 +6521,66 @@ window.__marketV75={
   directionFromKeyword:false,
 };
 </script>
+
+
+<script id="v77-discover-news-status">
+function v77LatestNewsHtml(){
+  const list=typeof v75GetActiveNewsCached==='function'?v75GetActiveNewsCached():[];
+  const ev=list[0],title=ev?.title||'현재 뚜렷한 신규 이슈가 없습니다';
+  const cat=ev?.cat&&V75_CATEGORY?.[ev.cat]?.label?V75_CATEGORY[ev.cat].label:'시장';
+  return `<button class="v77-latest-news" type="button" data-latest-news aria-label="최신 뉴스와 시장 상황판 보기">
+    <span class="v77-latest-head"><b>✦ 최신 뉴스보기</b><small>${cat}</small></span>
+    <span class="v77-latest-title">${title}</span>
+    <span class="v77-latest-more">시장 상황판 열기 ›</span>
+  </button>`;
+}
+function v77MarketTimeHtml(){
+  const open=marketSessionInfo().open;
+  return `<div data-v77-market-time>시장 시간<b>08:00~23:30</b><small class="${open?'v77-open':'v77-closed'}">${open?'운영중':'마감'}</small></div>`;
+}
+const V77_DISCOVER_BASE=discover;
+discover=function(watch=false){
+  let html=V77_DISCOVER_BASE(watch);if(watch)return html;
+  html=html.replace(/<div>시장 시간<b>[^<]*<\/b>(?:<small[^>]*>[^<]*<\/small>)?<\/div>/,v77MarketTimeHtml());
+  html=html.replace(/<div class="rumor-wrap"[\s\S]*?<div class="rumor-dots">[\s\S]*?<\/div><\/div>/,v77LatestNewsHtml());
+  html=html.replace(/<div class="issue"><b>✦ 실시간 이슈<\/b>[\s\S]*?<\/div>/,v77LatestNewsHtml());
+  const n=typeof v75GetActiveNewsCached==='function'?v75GetActiveNewsCached().length:0;
+  html=html.replace(/오늘 찌라시<b>3개<\/b>/,`활성 뉴스<b>${n}개</b>`);
+  html=html.replace(/오늘 이슈<b>1개<\/b>/,`활성 뉴스<b>${n}개</b>`);
+  return html;
+};
+
+let V77_DISCOVER_TIMER=0;
+function v77RefreshDiscoverMeta(){
+  if(view!=='discover'||selected||document.hidden)return;
+  const time=document.querySelector('[data-v77-market-time]');
+  if(time){
+    const open=marketSessionInfo().open;
+    time.innerHTML=`시장 시간<b>08:00~23:30</b><small class="${open?'v77-open':'v77-closed'}">${open?'운영중':'마감'}</small>`;
+  }
+  const btn=document.querySelector('[data-latest-news]');
+  if(btn){
+    const list=v75GetActiveNewsCached(),ev=list[0];
+    const cat=ev?.cat&&V75_CATEGORY?.[ev.cat]?.label?V75_CATEGORY[ev.cat].label:'시장';
+    const title=ev?.title||'현재 뚜렷한 신규 이슈가 없습니다';
+    btn.querySelector('.v77-latest-head small').textContent=cat;
+    btn.querySelector('.v77-latest-title').textContent=title;
+  }
+}
+const V77_BIND_BASE=bind;
+bind=function(){
+  V77_BIND_BASE();
+  document.querySelectorAll('[data-latest-news]').forEach(b=>b.onclick=openMarketSummary);
+  clearInterval(V77_DISCOVER_TIMER);
+  if(view==='discover'&&!selected)V77_DISCOVER_TIMER=setInterval(v77RefreshDiscoverMeta,5000);
+};
+window.__marketV77={version:77,discoverNews:'latest-active',marketHours:'08:00-23:30',statusColors:{open:'green',closed:'red'}};
+</script>
+<style id="v77-discover-news-style">
+.v77-latest-news{width:100%;border:1px solid #e5dcff;background:linear-gradient(135deg,#f7f2ff,#fff);border-radius:18px;padding:15px 16px;margin:14px 0 28px;text-align:left;color:var(--ink);display:block}
+.v77-latest-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.v77-latest-head b{color:#6f52b5;font-size:14px}.v77-latest-head small{color:#8b95a1;font-size:10px;font-weight:750}
+.v77-latest-title{display:block;font-size:13px;line-height:1.5;font-weight:700;word-break:keep-all}.v77-latest-more{display:block;margin-top:8px;color:#8b95a1;font-size:10.5px}
+[data-v77-market-time] small{display:block;margin-top:3px;font-size:10px;font-weight:850}.v77-open{color:#20a36a!important}.v77-closed{color:#f04452!important}
+</style>
 
 </body></html>
