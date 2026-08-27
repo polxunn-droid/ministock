@@ -6793,4 +6793,176 @@ window.__marketV79={
 .v79-closed-badge i{width:8px;height:8px;border-radius:50%;background:#f04452;box-shadow:0 0 0 5px #f0445214}
 </style>
 
+
+<script id="v80-market-board-layout-fix">
+/* V80 — 시장 상황판 레이아웃 근본 수정
+   기존 market summary를 만든 뒤 뉴스판을 덧붙이지 않고,
+   뉴스 전용 sheet를 처음부터 단독 생성한다.
+*/
+openMarketSummary=function(){
+  // 중복 상황판 방지
+  document.querySelectorAll('.overlay.v80-market-overlay').forEach(x=>x.remove());
+
+  const overlay=document.createElement('div');
+  overlay.className='overlay v80-market-overlay';
+  overlay.innerHTML=`<div class="sheet v80-market-sheet">
+    <button class="v80-market-close" type="button" data-close aria-label="시장 상황판 닫기">×</button>
+    <section class="v78-board v80-market-board">
+      ${v78BoardHeaderHtml()}
+      <div class="v80-board-scroll" data-v78-list>${v78BoardListHtml()}</div>
+    </section>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  const sheet=overlay.querySelector('.v80-market-sheet');
+  const board=overlay.querySelector('.v80-market-board');
+  if(!sheet||!board)return;
+
+  v78BindBoardFilters(board);
+
+  // 필터 클릭 후 목록 wrapper 자체가 중첩되지 않도록 갱신
+  board.querySelectorAll('[data-v78-filter]').forEach(b=>{
+    b.onclick=()=>{
+      V78_BOARD_FILTER=b.dataset.v78Filter;
+      board.querySelectorAll('[data-v78-filter]').forEach(x=>x.classList.toggle('on',x.dataset.v78Filter===V78_BOARD_FILTER));
+      const body=board.querySelector('[data-v78-list]');
+      if(body)body.innerHTML=v78BoardListHtml();
+    };
+  });
+
+  // 열려 있는 동안만 최신 활성뉴스 확인
+  let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+  const timer=setInterval(()=>{
+    if(document.hidden||!document.body.contains(overlay)){clearInterval(timer);return}
+    const next=v75GetActiveNewsCached().map(e=>e.id).join(',');
+    if(next===sig)return;
+    sig=next;
+    const body=board.querySelector('[data-v78-list]');
+    if(body)body.innerHTML=v78BoardListHtml();
+  },5000);
+};
+
+window.__marketV80={
+  version:80,
+  marketBoard:'standalone-sheet',
+  legacySummaryRemoved:true,
+  mobileOverflowGuard:true
+};
+</script>
+
+<style id="v80-market-board-layout-style">
+/* overlay 자체가 가로 스크롤을 절대 만들지 않음 */
+.v80-market-overlay{
+  overflow:hidden!important;
+  padding:0!important;
+  align-items:end!important;
+  justify-items:center!important;
+}
+
+/* 시트 크기는 실제 viewport 안쪽에만 존재 */
+.v80-market-sheet{
+  position:relative!important;
+  width:100%!important;
+  max-width:420px!important;
+  height:min(88dvh,760px)!important;
+  max-height:calc(100dvh - env(safe-area-inset-top,0px) - 18px)!important;
+  margin:0 auto!important;
+  padding:24px 20px max(18px,env(safe-area-inset-bottom,0px))!important;
+  border-radius:26px 26px 0 0!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+
+/* 독립 닫기 버튼 */
+.v80-market-close{
+  position:absolute;
+  z-index:5;
+  top:18px;
+  right:18px;
+  width:42px;
+  height:42px;
+  border:0;
+  border-radius:50%;
+  background:#f2f4f6;
+  color:#3182f6;
+  font-size:26px;
+  line-height:1;
+  display:grid;
+  place-items:center;
+}
+
+/* 헤더 우측에 닫기 버튼 공간 확보 */
+.v80-market-board .v78-board-head{
+  padding-right:52px!important;
+  flex:0 0 auto;
+}
+.v80-market-board .v78-board-head h2{
+  font-size:27px!important;
+  line-height:1.15!important;
+}
+.v80-market-board .v78-board-head p{
+  max-width:270px;
+  word-break:keep-all;
+}
+
+/* 전체 보드는 column layout, 실제 스크롤은 뉴스 영역만 */
+.v80-market-board{
+  height:100%;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.v80-market-board .v78-filter-row{
+  flex:0 0 auto;
+  width:auto!important;
+  min-width:0!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  -webkit-overflow-scrolling:touch;
+}
+.v80-board-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  min-width:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* v78/v79가 반환하는 내부 list의 이중 스크롤 제거 */
+.v80-board-scroll .v78-board-list{
+  max-height:none!important;
+  overflow:visible!important;
+  width:100%!important;
+  min-width:0!important;
+}
+.v80-board-scroll .v78-news-card{
+  min-width:0!important;
+  overflow:hidden!important;
+}
+.v80-board-scroll .v78-news-card h3,
+.v80-board-scroll .v78-news-card p{
+  max-width:100%!important;
+  overflow-wrap:anywhere!important;
+  word-break:keep-all!important;
+}
+.v80-board-scroll .v78-news-meta,
+.v80-board-scroll .v78-tags{
+  max-width:100%;
+  min-width:0;
+}
+
+/* 359px 이하에서도 안정적으로 수용 */
+@media(max-width:359px){
+  .v80-market-sheet{padding-left:16px!important;padding-right:16px!important}
+  .v80-market-close{right:14px;top:14px;width:38px;height:38px}
+  .v80-market-board .v78-board-head{padding-right:46px!important}
+  .v80-market-board .v78-board-head h2{font-size:24px!important}
+  .v80-market-board .v78-board-head p{font-size:11px!important;max-width:230px}
+  .v80-market-board .v78-filter-row{margin-left:-16px!important;margin-right:-16px!important;padding-left:16px!important;padding-right:16px!important}
+}
+</style>
+
 </body></html>
