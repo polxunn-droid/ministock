@@ -5717,4 +5717,71 @@ window.__marketV61={
 };
 </script>
 
+
+<script>
+/* ============ V62 — 삼성 2X 상품 합산 보유비중 25% 상한 ============
+   - 대상: SAMS2L + SAMS2I 합산
+   - 기준: 주문 확정 시점 총 평가자산(total)의 25%
+   - 기존 보유분이 이미 25%를 넘는 경우 강제매도하지 않음; 추가 매수만 차단
+   - 매도는 제한하지 않음
+   - 시장/ETF 가격 엔진, 랭킹, Firebase 구조 변경 없음
+*/
+const V62_LEVERAGED_CODES=new Set(['SAMS2L','SAMS2I']);
+const V62_LEVERAGED_CAP=.25;
+const v62TradeBase=trade;
+
+function v62LeveragedValue(){
+  let value=0;
+  for(const code of V62_LEVERAGED_CODES){
+    const h=state?.holdings?.[code];
+    const s=STOCKS.find(x=>x.code===code);
+    if(h?.qty>0&&s)value+=h.qty*quote(s).price;
+  }
+  return value;
+}
+
+trade=async function v62Trade(type,qty){
+  qty=Math.floor(Number(qty));
+  if(type!=='buy'||!selected||!V62_LEVERAGED_CODES.has(selected.code))
+    return v62TradeBase(type,qty);
+
+  // 기존 체결 래퍼의 검증(수량/주문정보/장시간/5초 만료)은 그대로 둔다.
+  if(!Number.isFinite(qty)||qty<1||!pendingOrder||pendingOrder.type!=='buy'||pendingOrder.code!==selected.code)
+    return v62TradeBase(type,qty);
+
+  // V35와 동일하게 확정 순간 시세 및 슬리피지를 반영한 예상 체결가로 상한을 검사한다.
+  const live=quote(selected);
+  const livePrice=Math.max(1,+live?.price||+pendingOrder.price||1);
+  const notional=livePrice*qty;
+  const slip=(typeof v35SlipRate==='function')?v35SlipRate(notional):0;
+  const exec=Math.max(10,Math.round((livePrice*(1+slip))/10)*10);
+
+  const assets=Math.max(0,total());
+  const current=v62LeveragedValue();
+  const after=current+exec*qty;
+  const limit=assets*V62_LEVERAGED_CAP;
+
+  // 이미 상한 초과 상태(관리자 지급/가격상승 등)는 보유 허용하되 추가매수는 금지한다.
+  if(after>limit+1){
+    const room=Math.max(0,limit-current);
+    const maxQty=Math.max(0,Math.floor(room/exec));
+    return toast(maxQty>0
+      ? `레버리지·인버스는 합산 총자산의 25%까지 보유할 수 있어요. 현재 최대 ${fmt(maxQty)}주 더 살 수 있어요.`
+      : '레버리지·인버스는 합산 총자산의 25%까지 보유할 수 있어요.');
+  }
+  return v62TradeBase(type,qty);
+};
+
+window.__marketV62={
+  version:62,
+  leverageExposureCap:.25,
+  codes:['SAMS2L','SAMS2I'],
+  combined:true,
+  buyOnly:true,
+  forcedSell:false,
+  marketEngineChanged:false,
+  rankingChanged:false,
+  firebaseSchemaChanged:false
+};
+</script>
 </body></html>
