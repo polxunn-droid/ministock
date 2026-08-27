@@ -4782,4 +4782,178 @@ window.__marketV51={
 };
 </script>
 
+
+<script>
+/* ============ V52 — 실시간 급상승/급하락 + KOSPI 체감 강화 ============
+   [급상승/급하락]
+   - 전일종가 누적 등락률이 아니라 "실제시간 최근 5분 가격변화율"로 순위/표시.
+   - 거래량 탭과 종목 상세는 기존 기준 그대로.
+   - 모든 종목 DOM을 유지해 새로 급등/급락하는 종목도 자동 진입 가능.
+   - 2.5초 스냅샷 캐시 + 2.5초 정렬로 부하 제한.
+
+   [KOSPI]
+   - 구성종목 가중 시장가 기반 원본 지수는 그대로 사용.
+   - 3000 기준 로그거리만 1.45배 확대해 상승/하락 체감을 조금 강화.
+   - 랜덤 노이즈/평균회귀/강제 방향 없음.
+   - 개별 주가/매매/랭킹 수익률에는 영향 없음.
+*/
+
+const V52_WINDOW_MS = 5 * 60 * 1000;
+const V52_LIVE_CACHE_MS = 2500;
+const V52_LIVE_MOVER_CACHE = new Map();
+let V52_LIVE_CACHE_SLOT = -1;
+
+const V52_BASE_QUOTE = quote;
+function v52LiveMover(s, now=Date.now()){
+  const slot=Math.floor(now/V52_LIVE_CACHE_MS);
+  if(slot!==V52_LIVE_CACHE_SLOT){
+    V52_LIVE_CACHE_SLOT=slot;
+    V52_LIVE_MOVER_CACHE.clear();
+  }
+  const hit=V52_LIVE_MOVER_CACHE.get(s.code);
+  if(hit)return hit;
+
+  const q=V52_BASE_QUOTE(s);
+  const pastMs=now-V52_WINDOW_MS;
+  const past=Math.max(1,fastVisualPriceAt(s,pastMs));
+  const liveChange=(q.price-past)/past*100;
+  const out={q,liveChange,past};
+  V52_LIVE_MOVER_CACHE.set(s.code,out);
+  return out;
+}
+
+// V47 이전까지 누적된 최종 발견 UI를 그대로 사용하되,
+// 급상승/급하락일 때만 정렬 기준을 최근 5분으로 바꾼다.
+// value 정렬 경로를 빌려 전체 종목을 DOM에 남겨 이후 신규 진입도 가능하게 한다.
+const V52_DISCOVER_BASE = discover;
+discover=function v52LiveDiscover(watch=false){
+  if(watch || (sort!=='rise' && sort!=='fall'))return V52_DISCOVER_BASE(watch);
+
+  const wanted=sort;
+  const oldQuote=quote;
+  const oldSort=sort;
+  try{
+    quote=function(s){
+      const x=v52LiveMover(s);
+      // 기존 renderer가 q.change를 화면 표시하고 q.volume으로 value 정렬한다.
+      return {
+        ...x.q,
+        change:x.liveChange,
+        volume:wanted==='rise' ? x.liveChange : -x.liveChange
+      };
+    };
+    rawQuote=quote;
+    sort='value';
+
+    // V47 snapshot wrapper는 과거 전일등락 q를 주입하므로
+    // 그 직전 renderer를 직접 호출해 최근 5분 q가 실제 사용되도록 한다.
+    let html=(typeof v47DiscoverBase==='function')
+      ? v47DiscoverBase(false)
+      : V52_DISCOVER_BASE(false);
+
+    // 탭 선택 표시만 원래 사용자가 선택한 급상승/급하락으로 복구.
+    html=html
+      .replace(/(<button data-sort="value"[^>]*class=")[^"]*(")/,'$1$2')
+      .replace(new RegExp(`(<button data-sort="${wanted}"[^>]*class=")[^"]*(")`),'$1active$2');
+
+    return html;
+  }finally{
+    sort=oldSort;
+    quote=oldQuote;
+    rawQuote=quote;
+  }
+};
+
+// 현재 화면의 mover 행을 2.5초마다 재평가.
+// 전체 종목 row가 존재하므로 새 급등/급락 종목도 즉시 순위에 들어올 수 있다.
+let V52_LAST_REORDER=0;
+function v52RefreshMoverRows(force=false){
+  if(view!=='discover' || (sort!=='rise'&&sort!=='fall') || selected)return;
+  const now=Date.now();
+  if(!force && now-V52_LAST_REORDER<V52_LIVE_CACHE_MS)return;
+  V52_LAST_REORDER=now;
+
+  const screen=document.querySelector('#app .screen');
+  if(!screen)return;
+  const rows=[...screen.querySelectorAll('.stock[data-stock]')];
+  if(!rows.length)return;
+
+  const scored=[];
+  for(const row of rows){
+    const s=V43_STOCK_BY_CODE?.get?.(row.dataset.stock) || STOCKS.find(x=>x.code===row.dataset.stock);
+    if(!s)continue;
+    const x=v52LiveMover(s,now);
+    const el=row.querySelector('[data-quote]');
+    if(el){
+      el.textContent=`${fmt(x.q.price)}원 · ${pct(x.liveChange)}`;
+      el.className=x.liveChange<0?'down':'gain';
+    }
+    const eligible=sort==='rise'?x.liveChange>0:x.liveChange<0;
+    row.classList.toggle('hidden',!eligible);
+    scored.push({row,score:x.liveChange});
+  }
+
+  scored.sort((a,b)=>sort==='rise'?b.score-a.score:a.score-b.score);
+  // 같은 부모 안에서 appendChild는 기존 노드를 이동만 하므로 listener/상태 유지.
+  for(const x of scored)screen.appendChild(x.row);
+
+  let rank=0;
+  for(const x of scored){
+    if(x.row.classList.contains('hidden'))continue;
+    rank++;
+    const n=x.row.querySelector('.rank-num');
+    if(n)n.textContent=rank;
+  }
+}
+
+// 기존 실시간 갱신이 q.change(전일종가)를 다시 덮어쓴 뒤
+// mover 화면만 최근 5분 값으로 재적용한다.
+const V52_REFRESH_BASE=refreshLive;
+refreshLive=function(){
+  const out=V52_REFRESH_BASE();
+  v52RefreshMoverRows(false);
+  return out;
+};
+
+// 탭/필터 클릭 직후에도 바로 정렬.
+const V52_BIND_BASE=bind;
+bind=function(){
+  V52_BIND_BASE();
+  if(view==='discover'&&(sort==='rise'||sort==='fall')){
+    setTimeout(()=>v52RefreshMoverRows(true),0);
+  }
+};
+
+// ------------------------------------------------------------------
+// KOSPI: 구성종목 기반 원본 움직임을 1.45배만 확대.
+// ------------------------------------------------------------------
+const V52_KOSPI_BASE=gameKospiQuote;
+const V52_KOSPI_ACTIVITY=1.45;
+gameKospiQuote=function v52MoreActiveKospi(ms=Date.now()){
+  const q=V52_KOSPI_BASE(ms);
+  const amp=v=>{
+    const r=Math.max(.05,(+v||GAME_KOSPI_BASE)/GAME_KOSPI_BASE);
+    return GAME_KOSPI_BASE*Math.exp(Math.log(r)*V52_KOSPI_ACTIVITY);
+  };
+  const level=amp(q.level),open=amp(q.open);
+  return {level,open,change:(level/open-1)*100};
+};
+
+// 헤더/발견 KOSPI는 다음 refresh부터 자동으로 새 값을 사용.
+// 이전 2초 캐시의 원본 값은 V52가 변환해서 사용하므로 시장 가격에는 영향 없음.
+
+window.__marketV52={
+  version:52,
+  marketRulesChanged:false,
+  stockPriceEngineChanged:false,
+  liveMoverWindowMin:5,
+  liveMoverRefreshMs:2500,
+  moverDisplay:'recent-5m-return',
+  detailDisplay:'previous-close-return',
+  kospiSource:'weighted-constituent-market-prices',
+  kospiActivityMultiplier:1.45,
+  kospiAddsRandomNoise:false
+};
+</script>
+
 </body></html>
