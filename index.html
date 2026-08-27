@@ -3316,4 +3316,197 @@ refreshSearchQuotes=function(){document.querySelectorAll('[data-search-stock]').
 window.__marketV43={version:43,focus:'mobile-performance',marketRulesChanged:false,finalQuoteCacheMs:1000,prevCloseCached:true,stockLookup:'Map',viewportQuotes:'IntersectionObserver',duplicateChartDrawRemoved:true};
 </script>
 
+
+<script>
+/* ============ V44 — 반응속도 집중 최적화 ============
+   시장 가격/확률/체결 규칙은 변경하지 않는다.
+   핵심:
+   1) 1일 차트 과거 119점 반복 재계산 제거 — 현재가 점만 갱신
+   2) IntersectionObserver 등록을 매초 전체 querySelectorAll 하지 않고 bind 시 1회
+   3) 상세화면 52주 최고/최저를 매초 재계산하지 않고 일자별 캐시
+   4) 계좌/내주식 DOM이 실제 존재할 때만 관련 계산 수행
+   5) 화면 갱신 중 같은 종목 quote는 V43 캐시를 그대로 사용
+*/
+
+// ---------- 1. 1일 차트 과거점 캐시 ----------
+const V44_DAY_SERIES_CACHE=new Map();
+const v44DaySeriesBase=v411DaySeries;
+v411DaySeries=function(s,count=CHART_RANGES.day.count){
+  if(!s)return [];
+  const now=Date.now(),bounds=v411SessionBounds(now),open=bounds.open,close=bounds.close;
+  const prev=v411PrevClose(s,now);
+  if(now<open)return [prev,prev];
+
+  const end=Math.min(now,close);
+  const progress=Math.max(0,Math.min(1,(end-open)/(close-open)));
+  const lastSlot=Math.max(1,Math.min(count-1,Math.floor(progress*(count-1))));
+  const used=Math.min(count,lastSlot+1);
+  const dayKey=new Date(open).toDateString();
+  const key=s.code+'|'+dayKey+'|'+count+'|'+lastSlot;
+
+  let history=V44_DAY_SERIES_CACHE.get(key);
+  if(!history){
+    history=[];
+    // 마지막 현재가 점은 캐시하지 않는다.
+    for(let i=0;i<used-1;i++){
+      const ms=open+(i/(count-1))*(close-open);
+      history.push(fastVisualPriceAt(s,ms));
+    }
+    // 이전 슬롯 캐시는 같은 종목 기준으로 정리.
+    if(V44_DAY_SERIES_CACHE.size>STOCKS.length*2){
+      for(const k of V44_DAY_SERIES_CACHE.keys()){
+        if(k.startsWith(s.code+'|') && k!==key)V44_DAY_SERIES_CACHE.delete(k);
+      }
+      if(V44_DAY_SERIES_CACHE.size>STOCKS.length*3)V44_DAY_SERIES_CACHE.clear();
+    }
+    V44_DAY_SERIES_CACHE.set(key,history);
+  }
+  return history.concat(quote(s).price);
+};
+
+// ---------- 2. 52주 최고/최저 캐시 ----------
+const V44_YEAR_STAT_CACHE=new Map();
+function v44YearStats(s){
+  const day=Math.floor(Date.now()/86400000),key=s.code+'|'+day;
+  let hit=V44_YEAR_STAT_CACHE.get(key);
+  if(hit)return hit;
+  const year=chartSeries(s,'year');
+  hit={hi:Math.max(...year),lo:Math.min(...year)};
+  if(V44_YEAR_STAT_CACHE.size>STOCKS.length*2)V44_YEAR_STAT_CACHE.clear();
+  V44_YEAR_STAT_CACHE.set(key,hit);
+  return hit;
+}
+
+// ---------- 3. Observer 등록은 화면 bind 직후 1회 ----------
+const v44TrackQuoteRows=v43TrackQuoteRows;
+let V44_TRACK_SCHEDULED=false;
+function v44ScheduleTrack(){
+  if(V44_TRACK_SCHEDULED)return;
+  V44_TRACK_SCHEDULED=true;
+  requestAnimationFrame(()=>{
+    V44_TRACK_SCHEDULED=false;
+    v44TrackQuoteRows();
+  });
+}
+const v44BindBase=bind;
+bind=function(){
+  v44BindBase();
+  v44ScheduleTrack();
+};
+
+// ---------- 4. refreshLive 경량화 ----------
+refreshLive=function(){
+  const overlay=document.querySelector('.overlay');
+  if(overlay){
+    if(overlay.classList.contains('search-overlay'))refreshSearchQuotes();
+    return;
+  }
+
+  // 매초 document 전체를 다시 검색하지 않는다.
+  const nodes=V43_QUOTE_OBSERVER?[...V43_VISIBLE_QUOTES]:[...document.querySelectorAll('[data-quote]')];
+  for(const el of nodes){
+    if(el.isConnected)v43UpdateQuoteEl(el);
+    else V43_VISIBLE_QUOTES.delete(el);
+  }
+
+  const iq=$('.index b');
+  if(iq){
+    const market=quote(STOCKS[0]),txt=`${(2500+market.change*5).toFixed(2)} ${pct(market.change/10)}`;
+    if(iq.textContent!==txt)iq.textContent=txt;
+  }
+
+  if(!selected&&view==='home'){
+    const hero=$('.hero');
+    if(hero){
+      const tv=total(),pnl=accountPnl(),principal=accountPrincipal();
+      const h2=hero.querySelector('h2'),ht=`${fmt(tv)}원`;
+      if(h2&&h2.textContent!==ht)h2.textContent=ht;
+      const g=hero.querySelector('.gain'),gt=`${sign(pnl)}원 (${pct(pnl/principal*100)})`;
+      if(g&&g.textContent!==gt)g.textContent=gt;
+      if(g)g.className=`gain ${pnl<0?'down':''}`;
+    }
+    const cash=$('.home-balance .card:first-child strong');
+    if(cash){
+      const ct=`${fmt(state.cash)}원`;
+      if(cash.textContent!==ct)cash.textContent=ct;
+    }
+    document.querySelectorAll('.holding[data-stock]').forEach(el=>{
+      const s=V43_STOCK_BY_CODE.get(el.dataset.stock),h=state.holdings[s?.code];
+      if(!s||!h)return;
+      const q=quote(s),val=q.price*h.qty,profit=(q.price-h.avg)*h.qty,rate=(q.price/h.avg-1)*100;
+      const box=el.querySelector('.price'),small=box?.querySelector('small');
+      if(box){
+        const t=`${fmt(val)}원`;
+        if(box.firstChild?.textContent!==t)box.firstChild.textContent=t;
+      }
+      if(small){
+        const t=`${sign(profit)}원 (${pct(rate)})`;
+        if(small.textContent!==t)small.textContent=t;
+        small.className=profit<0?'down':'gain';
+      }
+    });
+  }
+
+  if(selected){
+    const q=quote(selected),p=$('.detail-price');
+    if(p){
+      const t=`${fmt(q.price)}원`;
+      if(p.textContent!==t)p.textContent=t;
+      updateRangeChange(selected);
+    }
+    const info=document.querySelectorAll('.info-grid .card strong');
+    if(info.length===4){
+      const ys=v44YearStats(selected);
+      const vals=[`${fmt(q.open)}원`,`${fmt(q.volume)}주`,`${fmt(ys.hi)}원`,`${fmt(ys.lo)}원`];
+      info.forEach((el,i)=>{if(el.textContent!==vals[i])el.textContent=vals[i]});
+    }
+  }
+
+  // 해당 DOM이 있을 때만 계좌 계산.
+  if($('[data-account-total]'))refreshAccountDetail();
+  if($('[data-my-stock]')&&selected)refreshMyStock();
+
+  const realized=$('[data-live-realized]');
+  const unrealized=$('[data-live-unrealized]');
+  if(realized){
+    const rp=+state.realizedPnl||0,t=`${sign(rp)}원`;
+    if(realized.textContent!==t)realized.textContent=t;
+    realized.className=rp<0?'down':'gain';
+  }
+  if(unrealized){
+    const up=unrealizedPnl(),t=`${sign(up)}원`;
+    if(unrealized.textContent!==t)unrealized.textContent=t;
+    unrealized.className=up<0?'down':'gain';
+  }
+};
+
+// ---------- 5. 검색 결과도 Map + rAF 1회 레이아웃 측정 ----------
+refreshSearchQuotes=function(){
+  const vh=window.innerHeight||document.documentElement.clientHeight;
+  document.querySelectorAll('[data-search-stock]').forEach(el=>{
+    const r=el.getBoundingClientRect();
+    if(r.bottom<0||r.top>vh)return;
+    const s=V43_STOCK_BY_CODE.get(el.dataset.searchStock),box=el.querySelector('.price'),small=box?.querySelector('small');
+    if(!s||!box)return;
+    const q=quote(s),pt=`${fmt(q.price)}원`;
+    if(box.firstChild?.textContent!==pt)box.firstChild.textContent=pt;
+    if(small){
+      const st=pct(q.change);
+      if(small.textContent!==st)small.textContent=st;
+      small.className=q.change<0?'down':'gain';
+    }
+  });
+};
+
+window.__marketV44={
+  version:44,
+  focus:'responsiveness',
+  marketRulesChanged:false,
+  dayChartHistoryCached:true,
+  yearStatsCached:true,
+  observerScanPerSecond:false,
+  accountRefreshGuarded:true
+};
+</script>
+
 </body></html>
