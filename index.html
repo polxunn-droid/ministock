@@ -5453,4 +5453,48 @@ window.__marketV56={
 };
 </script>
 
+
+<script>
+/* ============ V57 — 전일 종가 기준을 '직전 게임일 마지막 틱'으로 수정 ============
+   문제:
+   - 기존 v411PrevClose()는 실제 시계의 '어제 23:30'을 fastVisualPriceAt()에 넣었다.
+   - MARKET_V9_SPEED=12 환경에서는 실제 11시간 차이가 게임상 약 5.6일로 확대되어
+     급상승/급하락 등락률 기준가가 지나치게 오래된 가격을 참조할 수 있었다.
+
+   수정:
+   - 현재 sessionTick이 속한 게임일의 바로 직전 게임일 마지막 틱(day*390-1)을 사용.
+   - 가격 생성/확률/변동성/postMove/extreme/체결 규칙은 변경하지 않음.
+   - 개별주/ETF 모두 각자의 표시가격 라우터를 그대로 사용.
+*/
+function v57PreviousGameCloseTick(ms=Date.now()){
+  const t=sessionTick(ms);
+  const day=Math.floor(t/390);
+  return day*390-1;
+}
+
+v411PrevClose=function v57GamePrevClose(s,ms=Date.now()){
+  if(!s)return 1;
+  const t=v57PreviousGameCloseTick(ms);
+  const q=s?.isETF ? etfDisplayedAt(s,t) : v10StockDisplayedAt(s,t);
+  return Math.max(1,Number(q?.price)||1);
+};
+
+// V43의 기존 전일종가 캐시는 실제 날짜 기준 키였으므로 제거한다.
+// 새 함수 자체가 결정론적이고 최종 quote에는 1초 캐시가 이미 적용되어 있다.
+try{ V43_PREVCLOSE_CACHE?.clear?.(); }catch(e){}
+try{ V43_FINAL_QUOTE_CACHE?.clear?.(); }catch(e){}
+try{ V52_LIVE_QUOTE_CACHE?.clear?.(); }catch(e){}
+
+window.__marketV57={
+  version:57,
+  basedOn:56,
+  previousCloseBasis:'previous-game-day-last-tick',
+  previousCloseTick:s=>v57PreviousGameCloseTick(),
+  marketSpeedChanged:false,
+  stockPriceEngineChanged:false,
+  marketRulesChanged:false,
+  firebaseReadsAdded:0,
+  firebaseWritesAdded:0
+};
+</script>
 </body></html>
