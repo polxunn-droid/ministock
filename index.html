@@ -5947,20 +5947,20 @@ function v72MacroLogDay(day){
   day=Math.floor(day);
   if(day<=V71_ANCHOR_DAY)return 0;
   const hit=V72_LOG_CACHE.get(day);if(hit!==undefined)return hit;
-  if(day<V72_LAST_DAY){
-    let log=0;
-    for(let d=V71_ANCHOR_DAY+1;d<=day;d++){
-      const reg=v72RegimeAt(d);
-      log+=reg.drift+v9Normal('v72-macro-noise',d)*.00220;
-    }
-    V72_LOG_CACHE.set(day,log);return log;
+  // V73: 0일부터 전체 재계산하지 않고, 캐시에 있는 가장 가까운 날부터 이어서 계산한다.
+  let startDay=V71_ANCHOR_DAY,startLog=0;
+  for(let d=Math.min(day-1,V72_LAST_DAY);d>V71_ANCHOR_DAY;d--){
+    const c=V72_LOG_CACHE.get(d);
+    if(c!==undefined){startDay=d;startLog=c;break;}
   }
-  for(let d=V72_LAST_DAY+1;d<=day;d++){
+  let log=startLog;
+  for(let d=startDay+1;d<=day;d++){
     const reg=v72RegimeAt(d);
-    V72_LAST_LOG+=reg.drift+v9Normal('v72-macro-noise',d)*.00220;
-    V72_LOG_CACHE.set(d,V72_LAST_LOG);
+    log+=reg.drift+v9Normal('v72-macro-noise',d)*.00220;
+    V72_LOG_CACHE.set(d,log);
   }
-  V72_LAST_DAY=day;return V72_LAST_LOG;
+  if(day>V72_LAST_DAY){V72_LAST_DAY=day;V72_LAST_LOG=log;}
+  return log;
 }
 function v72GameDayFloat(ms=Date.now()){
   if(ms<=V71_TRANSITION_MS)return V71_ANCHOR_DAY;
@@ -5980,6 +5980,10 @@ function v72AssetFactorAtMs(s,ms=Date.now()){
 }
 
 // V71이 보관한 '장기 macro 적용 전' 가격을 사용해 이중 적용을 막는다.
+// 참고: 개별 종목에는 상한을 두지 않는다. 기준가 자체가 이미 99,999원을 넘는
+// 종목이 다수 존재하므로(예: SK하이닉스 1,681,000원대) 고정 상한을 걸면 게임
+// 시작 시점부터 정상 가격이 잘려나간다. 상한은 KOSPI 지수에만 적용한다.
+const V73_PRICE_CAP=99999;
 fastVisualPriceAt=function v72LongMarketVisual(s,ms=Date.now()){
   const base=Math.max(1,Number(V71_BASE_VISUAL(s,ms))||1);
   const f=ms<V71_TRANSITION_MS?1:v72AssetFactorAtMs(s,ms);
@@ -6000,8 +6004,8 @@ rawQuote=quote;
 // 실제 장의 시가 기준은 그대로. KOSPI 숫자만 현재 구성종목 가치 결과를 따라간다.
 gameKospiQuote=function v72MarketValueKospi(ms=Date.now()){
   if(ms<V71_TRANSITION_MS)return V71_BASE_KOSPI(ms);
-  const level=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(ms);
-  const openMs=v71SessionOpenMs(ms),open=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(openMs);
+  const level=Math.min(V73_PRICE_CAP,V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(ms));
+  const openMs=v71SessionOpenMs(ms),open=Math.min(V73_PRICE_CAP,V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(openMs));
   return {level,open,change:(level/open-1)*100};
 };
 
@@ -6022,6 +6026,27 @@ window.__marketV72={
   approximateMacroSegmentRealHours:[60*72/365,240*72/365],
   permanentAccumulation:true,kospiMeanReversion:false,kospiHardRange:false,
   regimeAt:v72RegimeAt,macroLogAtMs:v72MacroLogAtMs,gameDayFloat:v72GameDayFloat
+};
+</script>
+
+<script>
+/* ============ V73 — KOSPI 지수 상한(99,999) + macro 캐시 재계산 최적화 ============
+   1) KOSPI 지수 표시값에만 99,999 상한을 둔다. 계산 자체는 그대로, 화면에
+      보여줄 마지막 단계에서만 클램프한다(내부 로그/드리프트 흐름은 영향 없음).
+      개별 종목 가격에는 상한을 두지 않는다 — 기준가 자체가 이미 99,999원을
+      넘는 종목이 다수 존재해(예: SK하이닉스 1,681,000원대) 고정 상한을 걸면
+      게임 시작 시점부터 정상 가격이 잘려나가기 때문이다.
+   2) v72MacroLogDay가 과거 날짜 요청 시 0일부터 전부 재계산하던 것을,
+      캐시에 있는 가장 가까운 날부터 이어서 계산하도록 변경(V72 정의를 덮어씀).
+      forward-fill 특성상 사실상 항상 O(1) 조회가 된다.
+*/
+window.__marketV73={
+  version:73,basedOn:72,
+  priceCapWon:V73_PRICE_CAP,
+  priceCapAppliesTo:['kospiIndex'],
+  individualStockPriceCap:false,
+  macroLogRecalcFixed:true,
+  note:'clamp-only-at-display-step, math unchanged below cap'
 };
 </script>
 
