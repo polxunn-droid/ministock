@@ -48,7 +48,17 @@
 .hourly-reward-body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}.hourly-reward-copy b{display:block;font-size:15px;margin-bottom:4px}.hourly-reward-copy small{display:block;color:var(--muted);line-height:1.45;font-size:11px}.hourly-reward-btn{min-width:92px;height:44px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-weight:850;font-size:13px;padding:0 14px}.hourly-reward-btn:disabled{background:#e9edf2;color:#8b95a1}.hourly-reward-done{color:#3182f6!important}
 .reward-pop{position:fixed;inset:0;background:#0006;z-index:55;display:grid;place-items:center;padding:22px}.reward-result{width:min(100%,360px);background:#fff;border-radius:26px;padding:28px 22px 24px;text-align:center;box-shadow:0 18px 50px #0000002e;animation:up .24s ease}.reward-gift{font-size:48px;line-height:1;margin-bottom:12px}.reward-rarity{display:inline-block;padding:6px 11px;border-radius:999px;background:#eef4ff;color:#3182f6;font-size:11px;font-weight:850}.reward-rarity.rare{background:#f5efff;color:#7950c8}.reward-rarity.jackpot{background:#fff5db;color:#a66b00}.reward-result h2{font-size:20px;margin:14px 0 5px}.reward-value{font-size:29px;font-weight:900;letter-spacing:-.8px;color:#191f28;margin:3px 0}.reward-result p{font-size:12px;line-height:1.55;color:var(--muted);margin:10px 0 0}.reward-result .primary{width:100%;margin-top:18px}
 @media(max-width:359px){.hourly-reward{padding:14px}.hourly-reward-body{grid-template-columns:1fr}.hourly-reward-btn{width:100%}}
-</style></head>
+</style>
+<style id="v73-layout-guard">
+/* V73 — mobile bottom-layout guard. Market/price logic untouched. */
+@media (max-width: 768px){
+  .screen{padding-bottom:calc(190px + env(safe-area-inset-bottom, 0px)) !important;}
+  .bottom-nav{z-index:1000 !important;}
+  .bottom-nav-spacer{height:calc(96px + env(safe-area-inset-bottom, 0px)) !important;}
+}
+</style>
+
+</head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
