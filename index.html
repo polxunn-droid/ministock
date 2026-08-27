@@ -5895,4 +5895,124 @@ window.__marketV71={
 };
 </script>
 
+
+<script>
+/* ============ V72 — 장기시장 시간축: 현실 3일 = 게임 1년 ============
+   - 실제 08:00~23:30 장/전일종가/등락률 초기화 주기는 그대로 유지한다.
+   - 장기 macro 역사만 현실 72시간에 365게임일 진행한다.
+   - 장기 국면은 60~240게임일(현실 약 12시간~47시간) 유지한다.
+   - 게임일 사이 macro 값을 보간하여 11~12분마다 가격이 계단식으로 튀지 않게 한다.
+   - KOSPI는 V71과 동일하게 구성종목 시장가치 결과로 계산하며 상하한/3000 회귀가 없다.
+*/
+const V72_REAL_MS_PER_GAME_YEAR=3*24*60*60*1000;
+const V72_GAME_DAYS_PER_YEAR=365;
+const V72_GAME_DAYS_PER_REAL_MS=V72_GAME_DAYS_PER_YEAR/V72_REAL_MS_PER_GAME_YEAR;
+
+const V72_STATES=V71_MACRO_STATES.map(x=>({...x}));
+const V72_SEGMENTS=[];
+function v72EnsureSegments(day){
+  day=Math.floor(day);
+  if(day<=V71_ANCHOR_DAY)return;
+  let start=V72_SEGMENTS.length?V72_SEGMENTS.at(-1).end+1:V71_ANCHOR_DAY+1;
+  let idx=V72_SEGMENTS.length;
+  while(start<=day){
+    const dur=60+Math.floor(v9Unit('v72-macro-duration',idx)*181); // 60~240 게임일 ≈ 현실 12~47시간
+    const u=v9Unit('v72-macro-state',idx);
+    let acc=0,state=V72_STATES.at(-1);
+    for(const x of V72_STATES){acc+=x.p;if(u<acc){state=x;break}}
+    V72_SEGMENTS.push({index:idx,start,end:start+dur-1,name:state.name,drift:state.drift,duration:dur});
+    start+=dur;idx++;
+  }
+}
+function v72RegimeAt(day){
+  day=Math.floor(day);
+  if(day<=V71_ANCHOR_DAY)return {name:'anchor',drift:0,start:V71_ANCHOR_DAY,end:V71_ANCHOR_DAY,duration:1};
+  v72EnsureSegments(day);
+  for(let i=V72_SEGMENTS.length-1;i>=0;i--){const s=V72_SEGMENTS[i];if(day>=s.start&&day<=s.end)return s}
+  return V72_SEGMENTS[0];
+}
+const V72_LOG_CACHE=new Map([[V71_ANCHOR_DAY,0]]);
+let V72_LAST_DAY=V71_ANCHOR_DAY,V72_LAST_LOG=0;
+function v72MacroLogDay(day){
+  day=Math.floor(day);
+  if(day<=V71_ANCHOR_DAY)return 0;
+  const hit=V72_LOG_CACHE.get(day);if(hit!==undefined)return hit;
+  if(day<V72_LAST_DAY){
+    let log=0;
+    for(let d=V71_ANCHOR_DAY+1;d<=day;d++){
+      const reg=v72RegimeAt(d);
+      log+=reg.drift+v9Normal('v72-macro-noise',d)*.00220;
+    }
+    V72_LOG_CACHE.set(day,log);return log;
+  }
+  for(let d=V72_LAST_DAY+1;d<=day;d++){
+    const reg=v72RegimeAt(d);
+    V72_LAST_LOG+=reg.drift+v9Normal('v72-macro-noise',d)*.00220;
+    V72_LOG_CACHE.set(d,V72_LAST_LOG);
+  }
+  V72_LAST_DAY=day;return V72_LAST_LOG;
+}
+function v72GameDayFloat(ms=Date.now()){
+  if(ms<=V71_TRANSITION_MS)return V71_ANCHOR_DAY;
+  return V71_ANCHOR_DAY+(ms-V71_TRANSITION_MS)*V72_GAME_DAYS_PER_REAL_MS;
+}
+function v72MacroLogAtMs(ms=Date.now()){
+  if(ms<=V71_TRANSITION_MS)return 0;
+  const x=v72GameDayFloat(ms),d=Math.floor(x),f=x-d;
+  const a=v72MacroLogDay(d),b=v72MacroLogDay(d+1);
+  return a+(b-a)*(f*f*(3-2*f));
+}
+function v72AssetFactorAtMs(s,ms=Date.now()){
+  const log=v72MacroLogAtMs(ms);
+  if(!s?.isETF)return Math.exp(log);
+  const lev=Number.isFinite(+s.leverage)?+s.leverage:Math.max(0,1-(+s.bondWeight||0));
+  return Math.exp(log*lev);
+}
+
+// V71이 보관한 '장기 macro 적용 전' 가격을 사용해 이중 적용을 막는다.
+fastVisualPriceAt=function v72LongMarketVisual(s,ms=Date.now()){
+  const base=Math.max(1,Number(V71_BASE_VISUAL(s,ms))||1);
+  const f=ms<V71_TRANSITION_MS?1:v72AssetFactorAtMs(s,ms);
+  const px=base*f;
+  return s?.isETF?Math.max(5,Math.round(px/5)*5):v65RoundPrice(px);
+};
+smoothPriceAt=fastVisualPriceAt;
+quote=function v72LongMarketQuote(s){
+  const q=V71_BASE_QUOTE(s)||{};if(!s)return q;
+  const now=Date.now(),f=now<V71_TRANSITION_MS?1:v72AssetFactorAtMs(s,now);
+  const price=s?.isETF?Math.max(5,Math.round((+q.price||1)*f/5)*5):v65RoundPrice((+q.price||1)*f);
+  const open=s?.isETF?Math.max(5,Math.round((+q.open||1)*f/5)*5):v65RoundPrice((+q.open||1)*f);
+  const prevMs=v67SessionPrevCloseMs(now),prevClose=Math.max(1,fastVisualPriceAt(s,prevMs));
+  return {...q,price,open,prevClose,change:(price-prevClose)/prevClose*100};
+};
+rawQuote=quote;
+
+// 실제 장의 시가 기준은 그대로. KOSPI 숫자만 현재 구성종목 가치 결과를 따라간다.
+gameKospiQuote=function v72MarketValueKospi(ms=Date.now()){
+  if(ms<V71_TRANSITION_MS)return V71_BASE_KOSPI(ms);
+  const level=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(ms);
+  const openMs=v71SessionOpenMs(ms),open=V71_KOSPI_ANCHOR_LEVEL*v71KospiMarketRatio(openMs);
+  return {level,open,change:(level/open-1)*100};
+};
+
+try{
+  V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_TICK_CACHE?.clear?.();
+  V52_LIVE_MOVER_CACHE?.clear?.();V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
+  V49_KOSPI_CACHE?.clear?.();chartHistoryCache?.clear?.();
+}catch(e){}
+
+window.__marketV72={
+  version:72,basedOn:71,
+  longMarketClock:'3-real-days = 365-game-days',
+  realHoursPerGameYear:72,
+  gameDaysPerRealDay:V72_GAME_DAYS_PER_YEAR/3,
+  realSessionStillOnePerDay:true,
+  returnResetStillPrevious2330:true,
+  macroSegmentGameDays:[60,240],
+  approximateMacroSegmentRealHours:[60*72/365,240*72/365],
+  permanentAccumulation:true,kospiMeanReversion:false,kospiHardRange:false,
+  regimeAt:v72RegimeAt,macroLogAtMs:v72MacroLogAtMs,gameDayFloat:v72GameDayFloat
+};
+</script>
+
 </body></html>
