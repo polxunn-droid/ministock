@@ -62,7 +62,7 @@
 .v76-news-summary{font-size:11px;color:var(--muted);padding:0 2px 10px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}.v76-news-summary::-webkit-scrollbar{display:none}
 .v76-news-list{max-height:50vh;overflow-y:auto;overscroll-behavior:contain}.v76-news-note{margin:12px 2px 2px;color:var(--muted);font-size:10.5px;line-height:1.55}
 </style>
-<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787921995006&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_00000000b0f881f5b71828e77ec9410f%26fn%3Dministock_v105_extreme_trend_tune.html%26cd%3Dattachment%26ts%3D496646%26p%3Dfs%26cid%3D1%26sig%3D3cbe9082dcc4f95801f5ed5fdb7bc95e263b05a93f2acdd440ea009390defc3e%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787921995006&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000008d188211a341c5b04c77441f%26fn%3Dindex%252820260828-031027%2529.html%26cd%3Dattachment%26ts%3D496644%26p%3Dfs%26cid%3D1%26sig%3Dab4ee946c21cf1d14e4cf2ad84996f9f5b220f3d9ae1e0a52a81dcdc42ae56e5%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
+<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000008d188211a341c5b04c77441f%26fn%3Dindex%252820260828-031027%2529.html%26cd%3Dattachment%26ts%3D496644%26p%3Dfs%26cid%3D1%26sig%3Dab4ee946c21cf1d14e4cf2ad84996f9f5b220f3d9ae1e0a52a81dcdc42ae56e5%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
@@ -219,7 +219,7 @@ function shell(content,tab=view){return `<section class="screen">${content}</sec
 function header(title){const iq=2500+(quote(STOCKS[0]).change*5);return `<header class="header"><h1>${title}</h1><div class="index">코스피<br><b>${iq.toFixed(2)} ${pct(quote(STOCKS[0]).change/10)}</b></div><div class="icons"><button class="icon-btn" data-market aria-label="시장 요약">✦</button><button class="icon-btn" data-search aria-label="종목 검색"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke-width="2.2"/><path d="m16 16 4 4" stroke-width="2.2" stroke-linecap="round"/></svg></button><button class="icon-btn" data-settings aria-label="설정">☰</button></div></header><div class="ticker"><span>속보 · ${newsText()}　　모든 플레이어가 지금 같은 모의 시세를 보고 있어요</span></div>`}
 const MARKET_NEWS=['외국인과 기관의 수급이 엇갈리며 코스피가 보합권에서 움직이고 있어요','원·달러 환율 변동성이 커지며 수출주와 내수주의 흐름이 엇갈리고 있어요','반도체 업종은 업황 기대와 차익 실현 매물이 맞서며 혼조세를 보여요','자동차 업종은 수출 지표와 환율 흐름을 살피며 종목별 장세가 이어져요','2차전지 업종은 원자재 가격과 수요 전망에 따라 변동성이 확대됐어요','바이오 업종은 연구개발 기대감과 실적 경계감이 함께 반영되고 있어요','금융주는 금리 전망 변화에 민감하게 반응하며 순환매가 나타나고 있어요','조선·방산 업종은 수주 기대와 단기 부담이 교차하며 혼조 흐름이에요','소비재 업종은 소비 심리 지표를 확인하며 제한적인 등락을 보이고 있어요','에너지 업종은 국제 유가 움직임을 주시하며 방향성을 탐색하고 있어요','건설·기계 업종은 신규 수주 기대와 비용 부담 속에서 차별화되고 있어요','통신·유틸리티 업종으로 방어적 매수세가 일부 유입되고 있어요'];
 function newsText(){return MARKET_NEWS[hash('broad-news',Math.floor(marketTick()/8))%MARKET_NEWS.length]}
-function home(){const tv=total(),p=accountPnl(),principal=accountPrincipal();let hs=Object.entries(state.holdings).filter(([,h])=>h.qty>0).map(([c,h])=>{const s=STOCKS.find(x=>x.code===c),q=quote(s),val=q.price*h.qty,pnl=(q.price-h.avg)*h.qty,rate=(q.price/h.avg-1)*100;return{s,h,q,val,pnl,rate}});hs.sort((a,b)=>b.val-a.val);return shell(`${header('내 계좌')}<div class="account-row"><div class="avatar">${state.nickname[0]}</div>${state.nickname}<span class="link" id="reset">거래내역</span></div><div class="cards home-balance"><div class="card"><small>원화</small><strong>${fmt(state.cash)}원</strong></div><div class="card"><small>달러</small><strong>$0.00</strong></div></div><div class="hero"><span class="eyebrow">내 투자</span><h2>${fmt(tv)}원 ›</h2><div class="gain ${p<0?'down':''}">${sign(p)}원 (${Math.abs(p/principal*100).toFixed(1)}%)</div></div><div class="between filter"><button class="pill">평가금 높은 순⌄</button><div class="seg"><button class="on">현재가</button><button>평가금</button></div></div>${hs.length?hs.map(x=>`<div class="holding" data-stock="${x.s.code}">${logo(x.s)}<div><div class="name">${x.s.name}</div><small class="sub">${x.h.qty}주 · 평균 ${fmt(x.h.avg)}원</small></div><div class="price">${fmt(x.val)}원<small class="${x.pnl<0?'down':'gain'}">${sign(x.pnl)} (${Math.abs(x.rate).toFixed(1)}%)</small></div></div>`).join(''):`<div class="empty">아직 투자한 종목이 없어요<br><br><button class="primary" data-view="discover">종목 둘러보기</button></div>`}`)}
+function home(){const tv=total(),p=accountPnl(),principal=accountPrincipal();let hs=Object.entries(state.holdings).filter(([,h])=>h.qty>0).map(([c,h])=>{const s=STOCKS.find(x=>x.code===c),q=quote(s),val=q.price*h.qty,pnl=(q.price-h.avg)*h.qty,rate=(q.price/h.avg-1)*100;return{s,h,q,val,pnl,rate}});hs.sort((a,b)=>b.val-a.val);return shell(`${header('내 계좌')}<div class="account-row"><div class="avatar">${state.nickname?.[0]||''}</div>${state.nickname}<span class="link" id="reset">거래내역</span></div><div class="cards home-balance"><div class="card"><small>원화</small><strong>${fmt(state.cash)}원</strong></div><div class="card"><small>달러</small><strong>$0.00</strong></div></div><div class="hero"><span class="eyebrow">내 투자</span><h2>${fmt(tv)}원 ›</h2><div class="gain ${p<0?'down':''}">${sign(p)}원 (${Math.abs(p/principal*100).toFixed(1)}%)</div></div><div class="between filter"><button class="pill">평가금 높은 순⌄</button><div class="seg"><button class="on">현재가</button><button>평가금</button></div></div>${hs.length?hs.map(x=>`<div class="holding" data-stock="${x.s.code}">${logo(x.s)}<div><div class="name">${x.s.name}</div><small class="sub">${x.h.qty}주 · 평균 ${fmt(x.h.avg)}원</small></div><div class="price">${fmt(x.val)}원<small class="${x.pnl<0?'down':'gain'}">${sign(x.pnl)} (${Math.abs(x.rate).toFixed(1)}%)</small></div></div>`).join(''):`<div class="empty">아직 투자한 종목이 없어요<br><br><button class="primary" data-view="discover">종목 둘러보기</button></div>`}`)}
 const homeBase=home;home=function(){const rate=accountRate();let html=homeBase().replace(`(${Math.abs(rate).toFixed(1)}%)`,`(${pct(rate)})`).replace('<button class="pill">평가금 높은 순⌄</button><div class="seg"><button class="on">현재가</button><button>평가금</button></div>','<span class="pill">평가금 높은 순</span>').replace('원 ›</h2>','원</h2><button class="account-open" aria-label="투자 상세 보기">›</button>');for(const [code,h] of Object.entries(state.holdings)){const s=STOCKS.find(x=>x.code===code);if(!s||!h.qty)continue;const q=quote(s),profit=(q.price-h.avg)*h.qty,r=(q.price/h.avg-1)*100;html=html.replace(`${sign(profit)} (${Math.abs(r).toFixed(1)}%)`,`${sign(profit)}원 (${pct(r)})`)}return html};
 function dailyAccountPnl(){const day=priceAt(STOCKS[0]).day,history=Array.isArray(state.equityHistory)?state.equityHistory:[],sameDay=history.filter(x=>Number.isFinite(+x.tick)&&Math.floor(x.tick/390)===day),fallback=state.cash+Object.entries(state.holdings).reduce((sum,[code,h])=>{const s=STOCKS.find(x=>x.code===code);return sum+(s&&h.qty>0?quote(s).open*h.qty:0)},0),base=sameDay[0]?.value??fallback;return total()-base}
 function accountDetail(){const tv=total(),p=accountPnl(),principal=accountPrincipal(),rate=p/principal*100,daily=dailyAccountPnl(),dailyBase=Math.max(1,tv-daily),dailyRate=daily/dailyBase*100,realized=+state.realizedPnl||0,unrealized=unrealizedPnl(),holdings=Object.entries(state.holdings).filter(([,h])=>h.qty>0).map(([code,h])=>{const s=STOCKS.find(x=>x.code===code);if(!s)return null;const q=quote(s),value=q.price*h.qty,profit=(q.price-h.avg)*h.qty;return{s,h,q,value,profit,rate:(q.price/h.avg-1)*100}}).filter(Boolean).sort((a,b)=>b.value-a.value),groups={};for(const x of holdings)groups[x.s.sector]=(groups[x.s.sector]||0)+x.value;groups['예수금']=state.cash;const colors=['#3182f6','#20c997','#ffb020','#8b5cf6','#f04452','#8b95a1'],alloc=Object.entries(groups).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);return `<section class="screen account-detail"><header class="account-detail-head"><button class="account-back" aria-label="뒤로">‹</button><button class="account-settings" data-settings aria-label="설정">⚙</button></header><div class="account-summary"><span class="eyebrow">내 투자</span><h1 data-account-total>${fmt(tv)}원</h1><div class="fee-note">● 예상 수수료·세금 포함</div><div class="summary-line"><span>원금</span><b data-account-principal>${fmt(principal)}원</b></div><div class="summary-line"><span>총 수익</span><b data-account-total-pnl class="${p<0?'down':'gain'}">${sign(p)}원 (${pct(rate)})</b></div></div><div class="allocation-card"><div class="allocation-inner"><div class="between"><b>투자 비중 보기</b><span class="sub">${holdings.length}종목</span></div><div class="allocation-bar">${alloc.map(([name,value],i)=>`<i style="width:${value/tv*100}%;background:${colors[i%colors.length]}" title="${name}"></i>`).join('')}</div><div class="allocation-legend">${alloc.slice(0,6).map(([name],i)=>`<span><i style="background:${colors[i%colors.length]}"></i>${name}</span>`).join('')}</div></div></div><h2 class="portfolio-title">보유 자산</h2><div class="cash-row"><span>예수금</span><b>${fmt(state.cash)}원</b></div><div class="portfolio-list">${holdings.length?holdings.map(x=>`<div class="holding" data-stock="${x.s.code}">${logo(x.s)}<div><div class="name">${x.s.name}</div><small class="sub">${x.h.qty}주 · 평균 ${fmt(x.h.avg)}원</small></div><div class="price">${fmt(x.value)}원<small class="${x.profit<0?'down':'gain'}">${sign(x.profit)}원 (${pct(x.rate)})</small></div></div>`).join(''):'<div class="empty">보유 종목이 없어요.</div>'}</div><div class="notice">모의투자 게임입니다. 실제 주가·기업 실적과 무관하며 투자 권유가 아닙니다.</div></section>`}
@@ -265,7 +265,7 @@ function openSettings(){document.body.insertAdjacentHTML('beforeend',`<div class
 function bind(){document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;render()});document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{sort=b.dataset.sort;render()});document.querySelectorAll('[data-sector]').forEach(b=>b.onclick=()=>{sectorFilter=b.dataset.sector;render()});document.querySelectorAll('[data-search]').forEach(b=>b.onclick=openSearch);document.querySelectorAll('[data-stock]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-watch]'))return;selected=STOCKS.find(s=>s.code===b.dataset.stock);chartRange='day';chartMode='line';chartHoverIndex=-1;$('#app').innerHTML=detail(selected);bind()});document.querySelectorAll('[data-watch]').forEach(b=>b.onclick=e=>{e.stopPropagation();const c=b.dataset.watch;state.watch=state.watch.includes(c)?state.watch.filter(x=>x!==c):[...state.watch,c];Store.saveMe(userId,state);render()});document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{chartRange=b.dataset.range;chartHoverIndex=-1;document.querySelectorAll('[data-range]').forEach(x=>x.classList.toggle('active',x===b));$('#chart')?.setAttribute('aria-label',`${selected.name} ${CHART_RANGES[chartRange]?.label||chartRange} 가격 차트`);updateRangeChange(selected);drawChart(selected)});document.querySelectorAll('[data-chart-mode]').forEach(b=>b.onclick=()=>{chartMode=b.dataset.chartMode;chartHoverIndex=-1;document.querySelectorAll('[data-chart-mode]').forEach(x=>x.classList.toggle('active',x===b));drawChart(selected)});$('.back')?.addEventListener('click',render);document.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>orderSheet(b.dataset.order))}
 const bindBase=bind;bind=function(){bindBase();if(selected&&$('#chart'))bindChartPointer(selected);document.querySelectorAll('[data-market]').forEach(b=>b.onclick=openMarketSummary);document.querySelectorAll('[data-settings]').forEach(b=>b.onclick=openSettings);$('#reset')?.addEventListener('click',openTradeLog);const fav=$('.detail-head .icons');if(selected&&fav){fav.style.cursor='pointer';fav.setAttribute('role','button');fav.setAttribute('tabindex','0');fav.setAttribute('aria-label','관심 종목 설정');fav.onclick=()=>{const c=selected.code;state.watch=state.watch.includes(c)?state.watch.filter(x=>x!==c):[...state.watch,c];Store.saveMe(userId,state);$('#app').innerHTML=detail(selected);bind()}}};
 const bindUi=bind;bind=function(){bindUi();requestAnimationFrame(()=>document.querySelector('.chip.active')?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));const fav=$('.detail-head .icons[role="button"]');if(fav)fav.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fav.click()}}};
-const bindAccount=bind;bind=function(){bindAccount();$('.account-open')?.addEventListener('click',openAccountDetail);$('.account-back')?.addEventListener('click',()=>{accountView=false;render()})};
+const bindAccount=bind;bind=function(){bindAccount();$('.account-open')?.addEventListener('click',openAccountDetail);$('.account-back')?.addEventListener('click',()=>{accountView=false;render()});if(selected&&$('#chart'))requestAnimationFrame(()=>drawChart(selected,chartHoverIndex))};
 document.addEventListener('click',async e=>{if(e.target.classList.contains('overlay')||e.target.closest('[data-close]'))e.target.closest('.overlay')?.remove();if(e.target.id==='confirm')trade(e.target.dataset.type,$('#qty')?.value);if(e.target.id==='start'){const button=e.target,raw=$('#nickname')?.value||'',n=cleanNickname(raw),status=$('#nickname-status');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 닉네임을 확인해주세요');button.disabled=true;if(status)status.textContent='중복 확인 중…';const oldName=onboardingPreserve?state.nickname:'',claim=await Store.claimNickname(n,oldName);button.disabled=false;if(!claim.ok){if(status)status.textContent=claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요.':'연결 오류가 있어 다시 확인해주세요.';return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요')}userId=Store.uid||userId;if(onboardingPreserve)state.nickname=n;else state={nickname:n,cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};try{localStorage.setItem('mockstock:uid',userId)}catch{}await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay.blocking')?.remove();onboardingPreserve=false;render()}if(e.target.id==='save-name'){const button=e.target,n=cleanNickname($('#rename')?.value||'');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 변경해주세요');button.disabled=true;const claim=await Store.claimNickname(n,state.nickname);button.disabled=false;if(!claim.ok)return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요');state.nickname=n;await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay')?.remove();toast('닉네임을 저장했어요');render()}if(e.target.id==='reset-game'){if(!confirm('보유 종목과 거래내역을 모두 지우고 처음부터 시작할까요?'))return;const oldName=state.nickname;await Store.removeMyScore();await Store.releaseNickname(oldName);try{localStorage.removeItem('mockstock:'+userId)}catch{}userId=Store.uid||userId;state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};$('.overlay')?.remove();render();onboarding()}});
 document.addEventListener('click',e=>{if(e.target.matches('.overlay.blocking'))e.stopImmediatePropagation()},true);
 document.addEventListener('click',e=>{if(e.target.matches('.search-overlay')){e.stopImmediatePropagation();closeSearch()}},true);
@@ -7894,6 +7894,171 @@ window.__marketV95={
     V29_OPEN_CACHE?.clear?.();
     V29_CLOSE_CACHE?.clear?.();
   }catch(e){}
+})();
+</script>
+
+<script id="v106-tier-balance-final">
+/* V106 — 등급별 단기 분포 + 장기 누적 추세 균형
+   - 전체시장 300종목 × 5,000시장일 및 5/20/252일 스트레스 테스트 기준
+   - 상승/하락 완전 대칭, 하드캡·강제반전·평균회귀 없음
+   - 장 마감 1일 차트 마지막 점은 동일 가격 경로로 연결 */
+(function(){
+  const TRANSITION_MS=Date.parse('2026-08-29T00:00:00+09:00');
+  const BASE_VISUAL=fastVisualPriceAt;
+  const BASE_TREND=v25TrendEvent;
+  const BASE_POST=v11PostMove;
+
+  const CFG={
+    blue:   {eventFreq:.40,eventScale:.65,dayBands:[.12,.22,.35],dayExtreme:.12,longBands:[.80,1.50]},
+    growth: {eventFreq:.48,eventScale:.72,dayBands:[.20,.35,.58],dayExtreme:.20,longBands:[1.80,3.50]},
+    theme:  {eventFreq:.50,eventScale:.82,dayBands:[.32,.60,1.00],dayExtreme:.34,longBands:[4.00,8.00]},
+    junk:   {eventFreq:.42,eventScale:.85,dayBands:[.48,.90,1.50],dayExtreme:.50,longBands:[7.00,12.00]}
+  };
+  const tierOf=s=>s?.v107Tier||s?.tier||'growth';
+  const cfg=s=>CFG[tierOf(s)]||CFG.growth;
+  const mix=(a,b,t)=>a+(b-a)*Math.max(0,Math.min(1,t));
+
+  function dayContinuation(c,a){
+    const [start,strong,extreme]=c.dayBands;
+    if(a<=start)return 1;
+    if(a<=strong)return mix(1,.72,(a-start)/Math.max(.0001,strong-start));
+    if(a<=extreme)return mix(.72,.38,(a-strong)/Math.max(.0001,extreme-strong));
+    return c.dayExtreme;
+  }
+  function compressLongRatio(c,ratio){
+    if(!(ratio>0))return 1;
+    const sign=ratio>=1?1:-1,mag=Math.abs(Math.log(ratio));
+    const start=Math.log1p(c.longBands[0]),strong=Math.log1p(c.longBands[1]);
+    let adjusted=mag;
+    if(mag>strong)adjusted=start+(strong-start)*.675+(mag-strong)*.12;
+    else if(mag>start){
+      const span=strong-start,x=(mag-start)/Math.max(.0001,span);
+      adjusted=start+span*(x-.325*x*x);
+    }
+    return Math.exp(sign*adjusted);
+  }
+
+  // 등급별 이벤트 빈도와 크기. 기존 이벤트의 방향·seed는 보존한다.
+  v25TrendEvent=function v106TierTrendEvent(s,day,minute){
+    const ev=BASE_TREND(s,day,minute);
+    if(!ev?.active||s?.isETF)return ev;
+    const c=cfg(s),block=Math.floor(minute/7);
+    if(v9Unit('v106-trend-gate',s.code,day,block)>=c.eventFreq)
+      return {active:false,dir:0,quality:'none',drive:0,impulse:0,start:false};
+    return {...ev,drive:ev.drive*c.eventScale,impulse:ev.impulse*c.eventScale};
+  };
+
+  // V85 shock를 같은 seed/크기구간으로 재구성하되 tier별 희소화·크기만 적용한다.
+  v9Shock=function v106TierShock(s,day,minute){
+    if(s?.isETF)return {ret:0,slump:false};
+    const c=cfg(s);let out={ret:0,slump:false};
+    if(minute%7===0){
+      const block=Math.floor(minute/7),r=rnd(hash('v18-shock',s.code,day,block));
+      const t=tierOf(s),chance=({blue:.0352,growth:.0572,theme:.088,junk:.1144}[t]||.055)*c.eventFreq;
+      if(r()<=chance){
+        const down=r()<.50,rare=r(),tail=({blue:.005,growth:.012,theme:.025,junk:.030}[t]??.012);
+        const mag=(rare<.70?.018+r()*.045:rare<1-tail?.060+r()*.095:.15+r()*.17)*c.eventScale;
+        out={ret:(down?-1:1)*mag,slump:down};
+      }
+    }
+    if(!out.ret){
+      const ev=v25TrendEvent(s,day,minute);
+      if(ev.active&&ev.start)out={ret:ev.impulse,slump:ev.dir<0&&ev.quality!=='weak'};
+    }
+    if(out.ret&&minute<=1)return {...out,ret:Math.max(-.018,Math.min(.018,out.ret)),slump:false};
+    return out;
+  };
+
+  // 일간 누적 등락이 큰 경우 같은 방향의 추가 postMove만 감쇠한다.
+  v11PostMove=function v106TierContinuation(s,day,minute,changeRate){
+    const ret=Number(BASE_POST(s,day,minute,changeRate))||0;
+    if(!ret||s?.isETF)return ret;
+    const ch=Number(changeRate)||0,same=(ch>0&&ret>0)||(ch<0&&ret<0);
+    return same?ret*dayContinuation(cfg(s),Math.abs(ch)):ret;
+  };
+
+  // 패치 시점 가격을 연속 기준점으로 삼고 이후 장기 누적분만 부드럽게 압축한다.
+  const ANCHOR=new Map();
+  for(const s of STOCKS)ANCHOR.set(s.code,Math.max(1,Number(BASE_VISUAL(s,TRANSITION_MS))||1));
+  fastVisualPriceAt=function v106LongBalancedVisual(s,ms=Date.now()){
+    const raw=Math.max(1,Number(BASE_VISUAL(s,ms))||1);
+    if(!s||s.isETF||ms<=TRANSITION_MS)return raw;
+    const anchor=ANCHOR.get(s.code)||raw,ratio=raw/Math.max(1,anchor),px=anchor*compressLongRatio(cfg(s),ratio);
+    return v65RoundPrice(px);
+  };
+  smoothPriceAt=fastVisualPriceAt;
+
+  const BASE_QUOTE=quote;
+  quote=function v106BalancedQuote(s){
+    const q=BASE_QUOTE(s)||{};if(!s||s.isETF)return q;
+    const now=Date.now(),price=fastVisualPriceAt(s,now);
+    const pos=v68SessionPosition(now),open=fastVisualPriceAt(s,pos.open),prevMs=v67SessionPrevCloseMs(now),prevClose=fastVisualPriceAt(s,prevMs);
+    return {...q,price,open,prevClose,change:(price-Math.max(1,prevClose))/Math.max(1,prevClose)*100};
+  };
+  rawQuote=quote;
+
+  const BASE_DAY_SERIES=v411DaySeries;
+  v411DaySeries=function v106ClosedDaySeries(s,count=CHART_RANGES.day.count){
+    const out=BASE_DAY_SERIES(s,count);if(!out.length)return out;
+    const now=Date.now(),bounds=v411SessionBounds(now);
+    if(now>=bounds.close)out[out.length-1]=fastVisualPriceAt(s,bounds.close);
+    return out;
+  };
+
+  try{
+    v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
+    V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_TICK_CACHE?.clear?.();
+    V52_LIVE_QUOTE_CACHE?.clear?.();V52_LIVE_MOVER_CACHE?.clear?.();
+    chartHistoryCache?.clear?.();V44_DAY_SERIES_CACHE?.clear?.();
+  }catch(e){}
+
+  window.__marketV106={
+    version:106,basedOn:105,transitionAt:new Date(TRANSITION_MS).toISOString(),
+    tierEventBalance:true,dailyContinuationBalance:true,longCumulativeBalance:true,
+    symmetric:true,hardCap:false,forcedReversal:false,meanReversion:false,
+    closedChartEndpointFixed:true,simulation:'300 stocks × 5000 market days + 5/20/252 day paths'
+  };
+})();
+</script>
+
+<script id="v107-tier-classification-safe">
+/* V107 — 가격이 아닌 종목 성격 기반 밸런스 등급
+   기존 s.tier는 과거 가격 연속성을 위해 보존하고 V106 이벤트 분포에서만 v107Tier를 사용한다. */
+(function(){
+  const CORE_BLUE=new Set([
+    '005930','000660','373220','207940','005380','012330','005490','105560','055550','030200','017670'
+  ]);
+  const THEME=new Set([
+    '352820','326030','251270','036570','377300','454910',
+    '020560','001510','079160','005690','137310','032350'
+  ]);
+  const JUNK=new Set([
+    '001570','006380','009410','019170','003620',
+    '000400','336370','377740','079160','137310'
+  ]);
+
+  for(const s of STOCKS){
+    if(s.isETF)continue;
+    // 기존 1만원 미만 자동 junk는 밸런스 등급에서 성장주 기본값으로 복원한다.
+    let tier=s.tier==='junk'?'growth':s.tier;
+    if(THEME.has(s.code))tier='theme';
+    if(JUNK.has(s.code))tier='junk';
+    if(CORE_BLUE.has(s.code))tier='blue';
+    s.v107Tier=tier;
+  }
+
+  const expectedBlue=['005930','000660','005380','012330','105560','030200','017670'];
+  const errors=expectedBlue.filter(code=>STOCKS.find(s=>s.code===code)?.v107Tier!=='blue');
+  if(errors.length)console.error('V107 핵심 우량주 분류 오류',errors);
+
+  const counts={blue:0,growth:0,theme:0,junk:0};
+  for(const s of STOCKS)if(!s.isETF&&counts[s.v107Tier]!==undefined)counts[s.v107Tier]++;
+  window.__marketV107={
+    version:107,basedOn:106,priceThresholdClassificationRemoved:true,
+    pricePathTierPreserved:true,balanceTierField:'v107Tier',counts,
+    coreBlueProtected:[...CORE_BLUE],explicitTheme:[...THEME],explicitJunk:[...JUNK],
+    validationErrors:errors
+  };
 })();
 </script>
 
