@@ -1832,6 +1832,79 @@ const bindRewardBase=bind;bind=function(){bindRewardBase();document.querySelecto
 document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]'))e.target.closest('.reward-pop')?.remove();if(e.target.classList.contains('reward-pop'))e.target.remove()});
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
+
+/* V104: one-time recovery for SAMS2L deleted by V100.
+   No remembered quantity is required.
+   It scans retained equityHistory snapshots, reconstructs cash/known holdings at each
+   snapshot by reversing later trades, and attributes the unexplained positive gap
+   to the legacy Samsung 2X holding. The recovered quantity is valued at that exact
+   historical snapshot price. */
+function v104RecoverDeletedSams2L(raw){
+  if(!raw||typeof raw!=='object')return raw;
+  if(raw?.recoveryV104Done)return raw;
+  const hs=Array.isArray(raw.equityHistory)?raw.equityHistory.filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value)):[];
+  if(!hs.length){raw.recoveryV104Done=true;return raw;}
+  raw.holdings=raw.holdings&&typeof raw.holdings==='object'?raw.holdings:{};
+  if(raw.holdings?.SAMS2L?.qty>0){raw.recoveryV104Done=true;return raw;}
+  const lev=STOCKS.find(s=>s.code==='SAMS2L');
+  if(!lev){return raw;}
+  const logs=Array.isArray(raw.tradeLog)?raw.tradeLog.filter(x=>x&&Number.isFinite(+x.at)&&['buy','sell'].includes(x.type)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price)):[];
+  let best=null;
+  for(let i=hs.length-1;i>=0;i--){
+    const snap=hs[i], at=+snap.at;
+    // Current cash -> cash at historical snapshot by reversing subsequent known trades.
+    let cash=Number.isFinite(+raw.cash)?+raw.cash:0;
+    const qty={};
+    for(const [code,h] of Object.entries(raw.holdings||{})){
+      if(code==='SAMS2L'||code==='SAMS2I')continue;
+      if(Number.isFinite(+h?.qty)&&+h.qty>0)qty[code]=Math.floor(+h.qty);
+    }
+    for(let j=logs.length-1;j>=0;j--){
+      const x=logs[j]; if(+x.at<=at)continue;
+      const q=Math.floor(+x.qty),px=+x.price;
+      if(x.type==='buy'){
+        cash+=Math.round(px*q*(1+FEE));
+        qty[x.code]=(qty[x.code]||0)-q;
+      }else{
+        cash-=Math.round(px*q*(1-FEE-TAX));
+        qty[x.code]=(qty[x.code]||0)+q;
+      }
+    }
+    let known=cash;
+    for(const [code,q0] of Object.entries(qty)){
+      const q=Math.max(0,Math.floor(q0)); if(!q)continue;
+      const s=STOCKS.find(x=>x.code===code); if(!s)continue;
+      try{known+=q*fastVisualPriceAt(s,at)}catch{}
+    }
+    const gap=(+snap.value)-known;
+    if(!(gap>0))continue;
+    let px=0; try{px=fastVisualPriceAt(lev,at)}catch{}
+    if(!(px>0))continue;
+    const q=Math.round(gap/px);
+    if(q<1)continue;
+    const err=Math.abs(gap-q*px);
+    const rel=err/Math.max(px,gap);
+    // Require the historical account gap to be very close to an integer number of shares.
+    if(rel>.012)continue;
+    const score=rel + Math.max(0,(Date.now()-at)/(1000*60*60*24))*0.00001;
+    if(!best||score<best.score)best={q,px,at,gap,err,score};
+  }
+  if(best){
+    raw.holdings.SAMS2L={qty:best.q,avg:best.px};
+    raw.recoveryV104={
+      code:'SAMS2L',qty:best.q,restoredAvg:best.px,sourceAt:best.at,
+      recoveredValue:Math.round(best.q*best.px),method:'equityHistory-gap'
+    };
+  }
+  raw.recoveryV104Done=true;
+  return raw;
+}
+const V104_LOAD_BASE=Store.loadMe.bind(Store);
+Store.loadMe=async function(id){
+  const raw=await V104_LOAD_BASE(id);
+  return v104RecoverDeletedSams2L(raw);
+};
+
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script>
 
