@@ -755,6 +755,21 @@ function etfRatioAtTick(s,t){
   if(s.bondWeight)ratio+=s.bondWeight*etfBondRatio(s,t);
   return Math.max(.05,ratio||1);
 }
+
+/* V103: ETF ratio tick cache.
+   ETF NAV is deterministic for (code,tick), so repeated UI/ranking/snapshot requests
+   reuse the same result instead of recalculating all underlying paths. */
+const V103_ETF_RATIO_BASE=etfRatioAtTick;
+const V103_ETF_RATIO_CACHE=new Map();
+etfRatioAtTick=function v103CachedEtfRatioAtTick(s,t){
+  if(!s?.isETF)return V103_ETF_RATIO_BASE(s,t);
+  const key=s.code+':'+Math.trunc(t);
+  if(V103_ETF_RATIO_CACHE.has(key))return V103_ETF_RATIO_CACHE.get(key);
+  const value=V103_ETF_RATIO_BASE(s,t);
+  if(V103_ETF_RATIO_CACHE.size>12000)V103_ETF_RATIO_CACHE.clear();
+  V103_ETF_RATIO_CACHE.set(key,value);
+  return value;
+};
 function etfDisplayedAt(s,t=marketTick()){
   const day=Math.floor(t/390),minute=((t%390)+390)%390,dayTick=day*390;
   const price=Math.max(10,Math.round(s.base*etfRatioAtTick(s,t)/5)*5),open=Math.max(10,Math.round(s.base*etfRatioAtTick(s,dayTick)/5)*5);
@@ -7808,8 +7823,9 @@ window.__marketV89Step2={
 <script>
 /* V102 SAFE RESTORE: minimal legacy ETF compatibility patch only */
 window.__marketV102={
-  version:102,
+  version:103,
   legacyEtfsRestored:['SAMS2L','SAMS2I'],
+  etfRatioTickCache:true,
   bootStorageWrapper:false,
   duplicateTradeWrapper:false,
   v100BlueGuardPreserved:true
