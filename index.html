@@ -8062,4 +8062,82 @@ window.__marketV95={
 })();
 </script>
 
+<script id="v108-engine-history-charts">
+/* V108 — 장기 차트를 임의 난수 경로가 아닌 실제 게임 가격 엔진 이력으로 통일
+   - 1일 차트는 기존 장중 경로를 그대로 유지
+   - 1주/3개월/1년/5년/전체는 각 과거 날짜 23:30의 fastVisualPriceAt 결과 사용
+   - 마지막 점만 현재가(장중) 또는 당일 종가(장 마감 후)로 연결
+   - 52주 최고/최저도 같은 1년 이력으로 계산 */
+(function(){
+  const V108_HISTORY_CACHE=new Map();
+  const V108_RANGE_POINTS={week:8,quarter:91,year:132,five:150,all:168};
+
+  function localDayKey(ms=Date.now()){
+    const d=new Date(ms);
+    return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+  }
+  function localCloseMs(ms){
+    const d=new Date(ms);
+    d.setHours(23,30,0,0);
+    return d.getTime();
+  }
+  function historicalTimes(range,now=Date.now()){
+    const cfg=CHART_RANGES[range]||CHART_RANGES.week;
+    const n=V108_RANGE_POINTS[range]||cfg.count;
+    const todayClose=localCloseMs(now),out=[];
+    for(let i=0;i<n-1;i++){
+      const elapsed=cfg.days*(1-i/Math.max(1,n-1));
+      const d=new Date(todayClose);
+      d.setDate(d.getDate()-Math.round(elapsed));
+      out.push(d.getTime());
+    }
+    return out;
+  }
+  function currentChartEndpoint(s,now=Date.now()){
+    const close=localCloseMs(now);
+    return now<close?quote(s).price:fastVisualPriceAt(s,close);
+  }
+
+  longChartSeries=function v108EngineHistorySeries(s,range){
+    const resolved=CHART_RANGES[range]?range:'week',now=Date.now();
+    const key=`${s.code}|${resolved}|${localDayKey(now)}`;
+    let history=V108_HISTORY_CACHE.get(key);
+    if(!history){
+      history=historicalTimes(resolved,now).map(ms=>Math.max(1,Number(fastVisualPriceAt(s,ms))||1));
+      if(V108_HISTORY_CACHE.size>STOCKS.length*6)V108_HISTORY_CACHE.clear();
+      V108_HISTORY_CACHE.set(key,history);
+    }
+    return history.concat(currentChartEndpoint(s,now));
+  };
+
+  // V411 wrapper가 비-1일 구간에서 이전 longChartSeries를 캡처했으므로 최종 진입점도 교체한다.
+  chartSeries=function v108ChartSeries(s,range=chartRange){
+    return range==='day'?v411DaySeries(s,CHART_RANGES.day.count):longChartSeries(s,range);
+  };
+
+  const V108_YEAR_STAT_CACHE=new Map();
+  v44YearStats=function v108YearStats(s){
+    const key=s.code+'|'+localDayKey();
+    let hit=V108_YEAR_STAT_CACHE.get(key);
+    if(hit)return hit;
+    const year=longChartSeries(s,'year');
+    hit={hi:Math.max(...year),lo:Math.min(...year)};
+    if(V108_YEAR_STAT_CACHE.size>STOCKS.length*2)V108_YEAR_STAT_CACHE.clear();
+    V108_YEAR_STAT_CACHE.set(key,hit);
+    return hit;
+  };
+
+  try{
+    chartHistoryCache?.clear?.();V44_YEAR_STAT_CACHE?.clear?.();
+  }catch(e){}
+
+  window.__marketV108={
+    version:108,basedOn:107,dayChartChanged:false,
+    longChartSource:'fastVisualPriceAt historical local closes',
+    ranges:['week','quarter','year','five','all'],yearStatsAligned:true,
+    cachedBy:'stock + range + local calendar day'
+  };
+})();
+</script>
+
 </body></html>
