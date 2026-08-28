@@ -7343,4 +7343,148 @@ window.__marketV84={
 };
 </script>
 
+
+<script>
+/* ============ V85 — 활성 가격경로 tail 균형 + 등급별 극단 이벤트 희소화 ============
+   1) V81이 V29 전환 전 legacy 경로에서 죽어 있던 문제를 최종 v9RawPriceAt 단계에서 보완한다.
+      실제 활성 V69 결과의 '일반 틱'만 V81로 재균형하고, 단발 shock(>1.21%)은 그대로 보존한다.
+   2) 강한/극단 Trend Event와 15~32% Shock의 희소성만 tier별로 낮춘다.
+      방향확률은 완전 대칭이며 상승/하락 어느 쪽도 강제 반전/강제 수익 규칙을 추가하지 않는다.
+   3) weak/medium, 시장/섹터/뉴스, 장기 macro, ETF, 체결/Firebase는 변경하지 않는다.
+*/
+
+// ---- A. Trend Event quality: strong/tail만 희소화, 줄인 확률은 medium으로 이동 ----
+const V85_TREND_QUALITY={
+  blue:   {weak:.34,strong:.08,tail:.005},
+  growth: {weak:.34,strong:.11,tail:.012},
+  theme:  {weak:.34,strong:.15,tail:.025},
+  junk:   {weak:.34,strong:.15,tail:.030}
+};
+
+v25TrendEvent=function v85TierBalancedTrendEvent(s,day,minute){
+  if(s?.isETF)return {active:false,dir:0,quality:'none',drive:0,impulse:0,start:false};
+  const act=v11Activity(s,day,minute);
+  const seedBand=Math.floor(minute/10);
+  const len=7+Math.floor(v9Unit(s.code,day,seedBand,'v25-birth-len')*7);
+  const block=Math.floor(minute/len),r=rnd(hash('v25-birth',s.code,day,block));
+  const tierChance={blue:.030,growth:.046,theme:.066,junk:.082}[s.tier]||.044;
+  const activityMul=act.name==='hot'?1.65:act.name==='active'?1.34:act.name==='normal'?.72:.24;
+  const chance=Math.min(.145,tierChance*activityMul);
+  if(r()>chance)return {active:false,dir:0,quality:'none',drive:0,impulse:0,start:false};
+
+  const reg=v9Regime(s,day,minute),mom=v9Momentum(s,day,minute);
+  const alignedDir=mom?Math.sign(mom):(reg.bias?Math.sign(reg.bias):0);
+  let dir; const d=r();
+  if(alignedDir&&d<.57)dir=alignedDir;
+  else if(reg.bias&&d<.72)dir=Math.sign(reg.bias);
+  else dir=r()<.5?-1:1;
+
+  const cfg=V85_TREND_QUALITY[s.tier]||V85_TREND_QUALITY.growth;
+  const medium=1-cfg.weak-cfg.strong-cfg.tail;
+  const q=r();
+  const tWeak=cfg.weak, tMedium=tWeak+medium, tStrong=tMedium+cfg.strong;
+  const quality=q<tWeak?'weak':q<tMedium?'medium':q<tStrong?'strong':'tail';
+  const ranges={
+    weak:[.00016,.00034,.012,.028],
+    medium:[.00038,.00078,.027,.057],
+    strong:[.00078,.00138,.055,.100],
+    tail:[.00128,.00205,.090,.155]
+  }[quality];
+  const drive=ranges[0]+r()*(ranges[1]-ranges[0]);
+  const impulse=ranges[2]+r()*(ranges[3]-ranges[2]);
+  const start=(minute%len)===0;
+  return {active:true,dir,quality,drive:dir*drive,impulse:dir*impulse,start};
+};
+
+// ---- B. Shock: 발생 빈도는 유지, 15~32% 최상위 크기 비중만 tier별로 낮춤 ----
+// 기존 6% -> blue 0.5 / growth 1.2 / theme 2.5 / junk 3.0%; 나머지는 medium으로 이동.
+const V85_SHOCK_TAIL={blue:.005,growth:.012,theme:.025,junk:.030};
+v9Shock=function v85TierBalancedShock(s,day,minute){
+  if(s?.isETF)return {ret:0,slump:false};
+
+  // V18 base shock를 현재 규칙과 동일 seed로 재현한다.
+  let base={ret:0,slump:false};
+  if(minute%7===0){
+    const block=Math.floor(minute/7),r=rnd(hash('v18-shock',s.code,day,block));
+    const chance={blue:.0352,growth:.0572,theme:.088,junk:.1144}[s.tier]||.055;
+    if(r()<=chance){
+      const down=r()<.50,rare=r(),tail=V85_SHOCK_TAIL[s.tier]??.012;
+      const smallEnd=.70, mediumEnd=1-tail;
+      const mag=rare<smallEnd?.018+r()*.045:rare<mediumEnd?.060+r()*.095:.15+r()*.17;
+      base={ret:(down?-1:1)*mag,slump:down};
+    }
+  }
+
+  // 기존 V25: base shock가 없을 때만 Trend impulse 주입.
+  if(!base.ret){
+    const ev=v25TrendEvent(s,day,minute);
+    if(ev.active&&ev.start)base={ret:ev.impulse,slump:ev.dir<0&&ev.quality!=='weak'};
+  }
+
+  // 기존 V31: 장 시작 경계 2틱 shock guard 유지.
+  if(base.ret&&minute<=1)return {...base,ret:Math.max(-.018,Math.min(.018,base.ret)),slump:false};
+  return base;
+};
+
+// ---- C. V81을 '실제로 사용되는' V69 최종 raw 경로에 연결 ----
+const V85_RAW_BASE=v9RawPriceAt;
+const V85_PATH_CACHE=new Map();
+function v85ActiveBalancedRaw(s,t=marketTick()){
+  if(s?.isETF)return V85_RAW_BASE(s,t);
+  const day=Math.floor(t/DAY_STEPS),minute=((t%DAY_STEPS)+DAY_STEPS)%DAY_STEPS;
+  const key=s.code+'|'+day;
+  let st=V85_PATH_CACHE.get(key);
+  if(!st){
+    const first=V85_RAW_BASE(s,day*DAY_STEPS);
+    const open=Math.max(1,Number(first.open)||1);
+    st={open,filled:-1,prices:new Array(DAY_STEPS),raw:new Array(DAY_STEPS)};
+    V85_PATH_CACHE.set(key,st);
+  }
+  for(let i=st.filled+1;i<=minute;i++){
+    const cur=V85_RAW_BASE(s,day*DAY_STEPS+i);
+    const curRaw=Math.max(1,Number(cur.price)||1);
+    const prevRaw=i===0?st.open:Math.max(1,st.raw[i-1]);
+    let p=i===0?st.open:Math.max(1,st.prices[i-1]);
+    let r=Math.log(curRaw/prevRaw);
+
+    // 기존 엔진에서 일반 ret은 ±1.2%로 제한되고 shock은 그 밖에서 별도 적용된다.
+    // 따라서 큰 단발 jump는 손대지 않고, 일반 틱만 V81에 통과시킨다.
+    if(Math.abs(r)<=.0121)r=v81BalanceDeepTail(s,day,i,p,st.open,r);
+    p*=Math.exp(r);
+    p=Math.max(st.open*.10,Math.min(st.open*2.20,p));
+    st.raw[i]=curRaw;
+    st.prices[i]=p;
+    st.filled=i;
+  }
+  const base=V85_RAW_BASE(s,t);
+  return {...base,price:v65RoundPrice(st.prices[minute]),open:v65RoundPrice(st.open),day,minute};
+}
+
+v9RawPriceAt=function v85LiveBalancedRaw(s,t=marketTick()){return v85ActiveBalancedRaw(s,t)};
+priceAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v9RawPriceAt(s,t)};
+
+// stale 계산 결과 제거. 데이터/Firebase 내용은 건드리지 않는다.
+try{
+  V85_PATH_CACHE.clear();
+  v9PriceCache?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();priceCache?.clear?.();
+  V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();V29_SCALE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();V70_WALK_CACHE?.clear?.();
+  V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V45_QUOTE_TICK_CACHE?.clear?.();V52_LIVE_QUOTE_CACHE?.clear?.();
+  V52_LIVE_MOVER_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();chartHistoryCache?.clear?.();
+}catch(e){}
+
+window.__marketV85={
+  version:85,basedOn:84,
+  liveV81Connected:true,
+  deadV29TransitionDependencyRemovedAtFinalRouter:true,
+  shockTailShare:{blue:.005,growth:.012,theme:.025,junk:.030},
+  trendStrongShare:{blue:.08,growth:.11,theme:.15,junk:.15},
+  trendTailShare:{blue:.005,growth:.012,theme:.025,junk:.030},
+  directionSymmetric:true,forcedReversal:false,forcedProfit:false,
+  weakMediumFrequencyReduced:false,marketMacroChanged:false,newsChanged:false,etfChanged:false
+};
+</script>
+
 </body></html>
