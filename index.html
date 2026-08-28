@@ -62,29 +62,11 @@
 .v76-news-summary{font-size:11px;color:var(--muted);padding:0 2px 10px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}.v76-news-summary::-webkit-scrollbar{display:none}
 .v76-news-list{max-height:50vh;overflow-y:auto;overscroll-behavior:contain}.v76-news-note{margin:12px 2px 2px;color:var(--muted);font-size:10.5px;line-height:1.55}
 </style>
-
-<style id="v119-samsung-leverage-icon">
-.logo.v119-sams2l{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  background:#1769ff!important;
-  border:none!important;
-  border-radius:50%!important;
-  color:#fff!important;
-  font-weight:800!important;
-  font-size:13px!important;
-  letter-spacing:-.3px!important;
-  line-height:1!important;
-  overflow:hidden!important;
-}
-</style>
-
-<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_0000000061e08211bd6bde76fe8798ae%26fn%3Dindex_v119_samsung_leverage_icon_fix.html%26cd%3Dattachment%26ts%3D496643%26p%3Dfs%26cid%3D1%26sig%3Da46aff58f654f18e065c312e80c1ad272f45d908ac18e60192e05a845450fedc%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
+<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000008d188211a341c5b04c77441f%26fn%3Dindex%252820260828-031027%2529.html%26cd%3Dattachment%26ts%3D496644%26p%3Dfs%26cid%3D1%26sig%3Dab4ee946c21cf1d14e4cf2ad84996f9f5b220f3d9ae1e0a52a81dcdc42ae56e5%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
-
-
-
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
 <script>
 const firebaseConfig={apiKey:"AIzaSyD5fQcqEpUY_ChwUdT5KlMLAzI9hzHPvEs",authDomain:"mini-stock-1c189.firebaseapp.com",projectId:"mini-stock-1c189",storageBucket:"mini-stock-1c189.firebasestorage.app",messagingSenderId:"680510173510",appId:"1:680510173510:web:15319b15831f9543c03547"};
 const MARKET_EPOCH=new Date(2026,0,1).setHours(0,0,0,0),TICK_MS=800,DAY_STEPS=390,DAY_MS=86400000,START=1_000_000,FEE=.00015,TAX=.0018;
@@ -141,7 +123,7 @@ mk('298040','효성중공업','전력기기','growth',1650000),mk('241560','두�
 mk('454910','두산로보틱스','로봇','theme',95000),mk('443060','HD현대마린솔루션','조선','growth',245000),
 mk('086280','현대글로비스','물류','blue',180000),mk('028670','팬오션','해운','growth',5200),
 mk('000120','CJ대한통운','물류','blue',115000),mk('000720','현대건설','건설','blue',98000)];
-const EXTRA_STOCK_DATA=[["000150","두산",1170000],["011070","LG이노텍",584000],["272210","한화시스템",72500],["003230","삼양식품",1516000],["028050","삼성E&A",47800],["047050","포스코인터내셔널",52000],["180640","한진칼",127800],["161390","한국타이어앤테크놀로지",68000],["007660","이수페타시스",109200],["016360","삼성증권",88300],["047040","대우건설",19070],["009830","한화솔루션",32550],["000100","유한양행",85900],["128940","한미약품",527000],["267270","HD건설기계",136500],["001440","대한전선",27850],["062040","산일전기",175800],["353200","대덕전자",105400],["010060","OCI홀딩스",274000],["000500","가온전선",167600],["066970","엘앤에프",118800],["034220","LG디스플레이",9470],["088980","맥쿼리인프라",9830],["052690","한전기술",121400],["011790","SKC",86400],["085620","미래에셋생명",30200],["002380","KCC",470000],["082740","한화엔진",47700],["004170","신세계",421000],["000990","DB하이텍",90500],["004020","현대제철",29450],["001040","CJ",129600],["018880","한온시스템",3535],["036460","한국가스공사",36950],["111770","영원무역",75800],["009420","한올바이오파마",63700],["103590","일진전기",68800],["006360","GS건설",37450],["035250","강원랜드",14610],["022100","포스코DX",20500],["011780","금호석유화학",123300],["008930","한미사이언스",44550],["012750","에스원",80100],["336260","두산퓨얼셀",46100],["023530","롯데쇼핑",105700],["302440","SK바이오사이언스",37850],["031210","서울보증보험",42400],["017800","현대엘리베이터",75300],["483650","달바글로벌",231500],["375500","DL이앤씨",72800],["007340","DN오토모티브",47650],["004800","효성",157100],["489790","한화비전",52000],["026960","동서",26300],["450080","에코프로머티",36500],["001720","신영증권",157200],["003690","코리안리",14500],["005850","에스엘",53200],["011170","롯데케미칼",56700],["004990","롯데지주",24050],["204320","HL만도",50000],["000240","한국앤컴퍼니",24400],["103140","풍산",82300],["279570","케이뱅크",5640],["005440","현대지에프홀딩스",12220],["009970","영원무역홀딩스",172200],["081660","미스토홀딩스",41800],["030000","제일기획",19210],["018670","SK가스",235000],["014680","한솔케미칼",200500],["051600","한전KPS",47700],["181710","NHN",64200],["112610","씨에스윈드",49850],["002790","아모레퍼시픽홀딩스",26750],["073240","금호타이어",7070],["462870","시프트업",33050],["457190","이수스페셜티케미컬",62800],["439260","대한조선",49600],["475150","SK이터닉스",54000],["071970","HD현대마린엔진",52500],["089860","롯데렌탈",46850],["006040","동원산업",38250],["020150","롯데에너지머티리얼즈",32200],["023590","다우기술",38650],["011210","현대위아",60800],["361610","SK아이이테크놀로지",19960],["322000","HD현대에너지솔루션",141800],["120110","코오롱인더",52800],["001800","오리온홀딩스",26050],["001430","세아베스틸지주",43350],["020560","아시아나항공",7480],["097230","HJ중공업",17050],["294870","IPARK현대산업개발",23000],["006280","녹십자",129500],["001120","LX인터내셔널",38250],["069620","대웅제약",127600],["007810","코리아써키트",58300],["298020","효성티앤씨",322500],["012630","HDC",22850],["001740","SK네트웍스",6780],["229640","LS에코에너지",43950],["093370","후성",12330],["280360","롯데웰푸드",140800],["005070","코스모신소재",38900],["082640","동양생명",8250],["281820","케이씨텍",64900],["003540","대신증권",26750],["415640","KB발해인프라",10260],["192080","더블유게임즈",58600],["017960","한국카본",23800],["004000","롯데정밀화학",46850],["300720","한일시멘트",16140],["030610","교보증권",10230],["001820","삼화콘덴서",106300],["000080","하이트진로",15410],["006340","대원전선",13650],["032350","롯데관광개발",13420],["003530","한화투자증권",4960],["000210","DL",49400],["003090","대웅",17560],["003570","SNT다이내믹스",30550],["192400","쿠쿠홀딩스",27900],["003240","태광산업",891000],["077970","STX엔진",24300],["286940","롯데이노베이트",18500],["185750","종근당",68400],["009450","경동나비엔",64000],["009240","한샘",39550],["030190","NICE평가정보",15770],["005090","SGC에너지",64300],["034230","파라다이스",9860],["003470","유안타증권",4715],["000370","한화손해보험",7780],["195870","해성디에스",53200],["285130","SK케미칼",52100],["006120","SK디스커버리",51100],["006110","삼아알미늄",58100],["005180","빙그레",94500],["079160","CJ CGV",5260],["071320","지역난방공사",74700],["100090","SK오션플랜트",13450],["004490","세방전지",60000],["499790","GS피앤엘",41550],["003850","보령",9000],["298050","HS효성첨단소재",169400],["137310","에스디바이오센서",6250],["214320","이노션",18840],["036530","SNT홀딩스",46000],["000670","영풍",39250],["456040","OCI",79800],["064960","SNT모티브",26250],["003160","디아이",24500],["317450","명인제약",46150],["094800","맵스리얼티",7150],["268280","미원에스씨",132700],["017940","E1",96700],["100840","SNT에너지",32000],["069260","TKG휴켐스",16140],["005880","대한해운",2040],["002960","한국쉘석유",502000],["005690","파미셀",10820],["033240","자화전자",29950],["000400","롯데손해보험",2065],["002350","넥센타이어",6500],["001060","JW중외제약",27250],["001570","금양",9900],["383800","LX홀딩스",8250],["000640","동아쏘시오홀딩스",93200],["001680","대상",18090],["014820","동원시스템즈",21600],["248070","솔루엠",13030],["006380","카프로",3660],["001510","SK증권",2640],["002840","미원상사",135500],["108320","LX세미콘",37200],["075580","세진중공업",10590],["453340","현대그린푸드",18490],["079900","전진건설로봇",40050],["001270","부국증권",56300],["002990","금호건설",15620],["114090","GKL",9340],["025540","한국단자",56200],["090460","비에이치",16850],["058650","세아홀딩스",133500],["006650","대한유화",87000],["003300","한일홀딩스",18230],["016380","KG스틸",5620],["007700","F&F홀딩스",14290],["005810","풍산홀딩스",38200],["178920","PI첨단소재",18670],["003620","KG모빌리티",2695],["336370","솔루스첨단소재",7490],["039130","하나투어",33300],["284740","쿠쿠홈시스",22950],["001500","현대차증권",8040],["008060","대덕",15770],["009410","태영건설",1650],["001530","DI동일",23650],["019170","신풍제약",9320],["377740","바이오노트",4790]];
+const EXTRA_STOCK_DATA=[["000150","두산",1170000],["011070","LG이노텍",584000],["272210","한화시스템",72500],["003230","삼양식품",1516000],["028050","삼성E&A",47800],["047050","포스코인터내셔널",52000],["180640","한진칼",127800],["161390","한국타이어앤테크놀로지",68000],["007660","이수페타시스",109200],["016360","삼성증권",88300],["047040","대우건설",19070],["009830","한화솔루션",32550],["000100","유한양행",85900],["128940","한미약품",527000],["267270","HD건설기계",136500],["001440","대한전선",27850],["062040","산일전기",175800],["353200","대덕전자",105400],["010060","OCI홀딩스",274000],["000500","가온전선",167600],["066970","엘앤에프",118800],["034220","LG디스플레이",9470],["088980","맥쿼리인프라",9830],["052690","한전기술",121400],["011790","SKC",86400],["085620","미래에셋생명",30200],["002380","KCC",470000],["082740","한화엔진",47700],["004170","신세계",421000],["000990","DB하이텍",90500],["004020","현대제철",29450],["001040","CJ",129600],["018880","한온시스템",3535],["036460","한국가스공사",36950],["111770","영원무역",75800],["009420","한올바이오파마",63700],["103590","일진전기",68800],["006360","GS건설",37450],["035250","강원랜드",14610],["022100","포스코DX",20500],["011780","금호석유화학",123300],["008930","한미사이언스",44550],["012750","에스원",80100],["336260","두산퓨얼셀",46100],["023530","롯데쇼핑",105700],["302440","SK바이오사이언스",37850],["031210","서울보증보험",42400],["017800","현대엘리베이터",75300],["483650","달바글로벌",231500],["375500","DL이앤씨",72800],["007340","DN오토모티브",47650],["004800","효성",157100],["489790","한화비전",52000],["026960","동서",26300],["450080","에코프로머티",36500],["001720","신영증권",157200],["003690","코리안리",14500],["005850","에스엘",53200],["011170","롯데케미칼",56700],["004990","롯데지주",24050],["204320","HL만도",50000],["000240","한국앤컴퍼니",24400],["103140","풍산",82300],["279570","케이뱅크",5640],["005440","현대지에프홀딩스",12220],["009970","영원무역홀딩스",172200],["081660","미스토홀딩스",41800],["030000","제일기획",19210],["018670","SK가스",235000],["014680","한솔케미칼",200500],["051600","한전KPS",47700],["181710","NHN",64200],["112610","씨에스윈드",49850],["002790","아모레퍼시픽홀딩스",26750],["073240","금호타이어",7070],["462870","시프트업",33050],["457190","이수스페셜티케미컬",62800],["439260","대한조선",49600],["475150","SK이터닉스",54000],["071970","HD현대마린엔진",52500],["089860","롯데렌탈",46850],["006040","동원산업",38250],["020150","롯데에너지머티리얼즈",32200],["023590","다우기술",38650],["011210","현대위아",60800],["361610","SK아이이테크놀로지",19960],["322000","HD현대에너지솔루션",141800],["120110","코오롱인더",52800],["001800","오리온홀딩스",26050],["001430","세아베스틸지주",43350],["020560","아시아나항공",7480],["097230","HJ중공업",17050],["294870","IPARK현대산업개발",23000],["006280","녹십자",129500],["001120","LX인터내셔널",38250],["069620","대웅제약",127600],["007810","코리아써키트",58300],["298020","효성티앤씨",322500],["012630","HDC",22850],["001740","SK네트웍스",6780],["229640","LS에코에너지",43950],["093370","후성",12330],["280360","롯데웰푸드",140800],["005070","코스모신소재",38900],["082640","동양생명",8250],["281820","케이씨텍",64900],["003540","대신증권",26750],["415640","KB발해인프라",10260],["192080","더블유게임즈",58600],["017960","한국카본",23800],["004000","롯데정밀화학",46850],["300720","한일시멘트",16140],["030610","교보증권",10230],["001820","삼화콘덴서",106300],["000080","하이트진로",15410],["006340","대원전선",13650],["032350","롯데관광개발",13420],["003530","한화투자증권",4960],["000210","DL",49400],["003090","대웅",17560],["003570","SNT다이내믹스",30550],["192400","쿠쿠홀딩스",27900],["003240","태광산업",891000],["077970","STX엔진",24300],["479080","1Q 머니마켓액티브",53732],["185750","종근당",68400],["009450","경동나비엔",64000],["009240","한샘",39550],["030190","NICE평가정보",15770],["005090","SGC에너지",64300],["034230","파라다이스",9860],["003470","유안타증권",4715],["000370","한화손해보험",7780],["195870","해성디에스",53200],["285130","SK케미칼",52100],["006120","SK디스커버리",51100],["006110","삼아알미늄",58100],["005180","빙그레",94500],["079160","CJ CGV",5260],["071320","지역난방공사",74700],["100090","SK오션플랜트",13450],["004490","세방전지",60000],["499790","GS피앤엘",41550],["003850","보령",9000],["298050","HS효성첨단소재",169400],["137310","에스디바이오센서",6250],["214320","이노션",18840],["036530","SNT홀딩스",46000],["000670","영풍",39250],["456040","OCI",79800],["064960","SNT모티브",26250],["003160","디아이",24500],["317450","명인제약",46150],["094800","맵스리얼티",7150],["268280","미원에스씨",132700],["017940","E1",96700],["100840","SNT에너지",32000],["069260","TKG휴켐스",16140],["005880","대한해운",2040],["002960","한국쉘석유",502000],["005690","파미셀",10820],["033240","자화전자",29950],["000400","롯데손해보험",2065],["002350","넥센타이어",6500],["001060","JW중외제약",27250],["001570","금양",9900],["383800","LX홀딩스",8250],["000640","동아쏘시오홀딩스",93200],["001680","대상",18090],["014820","동원시스템즈",21600],["248070","솔루엠",13030],["006380","카프로",3660],["001510","SK증권",2640],["002840","미원상사",135500],["108320","LX세미콘",37200],["075580","세진중공업",10590],["453340","현대그린푸드",18490],["079900","전진건설로봇",40050],["001270","부국증권",56300],["002990","금호건설",15620],["114090","GKL",9340],["025540","한국단자",56200],["090460","비에이치",16850],["058650","세아홀딩스",133500],["006650","대한유화",87000],["003300","한일홀딩스",18230],["016380","KG스틸",5620],["007700","F&F홀딩스",14290],["005810","풍산홀딩스",38200],["178920","PI첨단소재",18670],["003620","KG모빌리티",2695],["336370","솔루스첨단소재",7490],["039130","하나투어",33300],["284740","쿠쿠홈시스",22950],["001500","현대차증권",8040],["008060","대덕",15770],["009410","태영건설",1650],["001530","DI동일",23650],["019170","신풍제약",9320],["377740","바이오노트",4790]];
 function inferSector(name){if(/금융|은행|증권|보험|화재|생명|카드|캐피탈|투자/.test(name))return '금융';if(/반도체|하이닉스|DB하이텍|디아이$/.test(name))return '반도체';if(/현대차|기아|모비스|타이어|오토|만도|에스엘|명신산업/.test(name))return '자동차';if(/제약|약품|바이오|셀트리온|녹십자|유한양행|한미사이언스|종근당|보령|대웅/.test(name))return '바이오';if(/에너지솔루션|삼성SDI|포스코퓨처엠|코스모신소재|TCC스틸|에코프로머티/.test(name))return '2차전지';if(/에어로|로템|항공우주|LIG|풍산|한화시스템|SNT/.test(name))return '방산';if(/조선|중공업|한화오션|마린솔루션/.test(name))return '조선';if(/건설|E&A|엔지니어링|산업개발/.test(name))return '건설';if(/식품|농심|오뚜기|오리온|빙그레|제당|하이트진로|삼양/.test(name))return '식품';if(/화학|케미칼|정밀화학|석유|S-Oil|OCI/.test(name))return '화학';if(/화장품|아모레|생활건강|콜마|코스맥스|에이피알/.test(name))return '화장품';if(/텔레콤|KT$|유플러스/.test(name))return '통신';if(/게임|크래프톤|넷마블|엔씨/.test(name))return '게임';if(/엔터|하이브/.test(name))return '엔터';if(/백화점|마트|리테일|쇼핑|호텔신라/.test(name))return '유통';if(/전력|전기|전선|일렉트릭/.test(name))return '전력기기';if(/철강|제철|스틸|고려아연/.test(name))return '철강';if(/해운|HMM|팬오션/.test(name))return '해운';if(/항공|물류|글로비스|대한통운/.test(name))return '운송';if(/전자|이노텍|디스플레이|SDS|씨엔에스|오토에버/.test(name))return 'IT';return '산업재'}
 const EXTRA_REFERENCE_AT=Date.parse('2026-08-26T05:20:00Z'),EXTRA_REFERENCE_TICK=marketTickAt(EXTRA_REFERENCE_AT);
 for(const [code,name,price] of EXTRA_STOCK_DATA){const s=mk(code,name,inferSector(name),STOCKS.length<180?'blue':'growth',price);s.referencePrice=price;s.referenceTick=EXTRA_REFERENCE_TICK;STOCKS.push(s)}
@@ -166,101 +148,6 @@ for(const s of STOCKS){
   const refPrice=Number(s.referencePrice||MARKET_REFERENCE_PRICES[s.code]||s.base)||0;
   if(refPrice>0 && refPrice<JUNK_TIER_PRICE_THRESHOLD)s.tier='junk';
 }
-
-/* ============ V89 STEP 2 — 400종목 확장용 메타데이터 골격 ============
-   - 기존 300개 개별주는 현재 KOSPI 기준본으로 명시해 기존 지수 결과를 보존.
-   - 현재 400개 개별주는 모두 market:'KOSPI', indexEligible:true로 GAME KOSPI에 반영.
-   - sectorExplicit/newsWeight는 향후 업종·뉴스 가중 확장을 위한 메타데이터이며 현재 가격/뉴스 선정에는 미사용.
-*/
-for(const s of STOCKS){
-  if(s.isETF)continue;
-  if(!s.market)s.market='KOSPI';
-  if(s.indexEligible==null)s.indexEligible=(s.market==='KOSPI');
-  if(!s.sectorExplicit)s.sectorExplicit=s.sector;
-  if(!Number.isFinite(+s.newsWeight))s.newsWeight=1;
-}
-
-
-/* ============ V93 STEP 6 TEST — 시장/자산형태/업종 메타데이터 정리 ============
-   - 기존 EXTRA_STOCK_DATA에 일반주식처럼 섞였던 1Q 머니마켓액티브(479080, ETF)를 제거하고
-     KOSPI 일반주식 롯데이노베이트(286940, 2026-08-27 종가 18,500원)로 교체해 개별주 300개를 유지.
-   - 기존 가격엔진의 s.sector는 이번 단계에서 건드리지 않는다. sectorExplicit만 정리해 회귀변화를 최소화.
-   - assetType을 명시해 이후 ETF/주식 혼입을 자동 검출할 수 있게 한다.
-*/
-const V93_SECTOR_EXPLICIT={'000150':'지주','047050':'무역','180640':'지주','007660':'전자부품','009830':'에너지','066970':'2차전지','088980':'인프라','011790':'화학','002380':'화학','082740':'조선','004170':'유통','001040':'지주','018880':'자동차','036460':'유틸리티','111770':'의류','035250':'레저','022100':'IT서비스','012750':'서비스','336260':'에너지','017800':'기계','483650':'화장품','375500':'건설','004800':'지주','489790':'방산','026960':'소비재','003690':'금융','004990':'지주','000240':'지주','279570':'금융','005440':'지주','009970':'지주','081660':'지주','030000':'광고','018670':'에너지','051600':'유틸리티','181710':'IT서비스','112610':'에너지','462870':'게임','457190':'화학','475150':'에너지','071970':'조선','089860':'렌탈','006040':'식품','020150':'2차전지','023590':'IT서비스','011210':'자동차','361610':'2차전지','120110':'화학','001120':'무역','007810':'전자부품','298020':'화학','012630':'지주','001740':'유통','229640':'전력기기','093370':'화학','280360':'식품','281820':'반도체','415640':'인프라','017960':'소재','300720':'건자재','001820':'전자부품','032350':'레저','000210':'지주','192400':'지주','003240':'화학','077970':'조선','286940':'IT서비스','009450':'가전','009240':'가구','030190':'IT서비스','005090':'에너지','034230':'레저','195870':'반도체','006120':'지주','006110':'2차전지','079160':'엔터','071320':'유틸리티','100090':'조선','004490':'2차전지','499790':'지주','298050':'화학','214320':'광고','000670':'비철금속','094800':'리츠','268280':'화학','017940':'에너지','069260':'화학','005690':'바이오','001570':'2차전지','383800':'지주','000640':'지주','001680':'식품','014820':'소재','248070':'전자부품','006380':'화학','002840':'화학','108320':'반도체','453340':'식품','114090':'레저','025540':'전자부품','090460':'전자부품','058650':'지주','006650':'화학','003300':'지주','007700':'지주','178920':'소재','003620':'자동차','336370':'2차전지','039130':'레저','284740':'소비재','008060':'전자부품','001530':'소재'};
-for(const s of STOCKS){
-  s.assetType=s.isETF?'ETF':'STOCK';
-  if(!s.isETF && V93_SECTOR_EXPLICIT[s.code])s.sectorExplicit=V93_SECTOR_EXPLICIT[s.code];
-}
-const V93_MARKET_AUDIT={
-  auditedAt:'2026-08-28',
-  legacyIndividualCount:300,
-  replacement:{removedCode:'479080',removedName:'1Q 머니마켓액티브',reason:'ETF_IN_STOCK_DATA',addedCode:'286940',addedName:'롯데이노베이트'},
-  activeSectorMigration:false
-};
-
-/* ============ V91 STEP 4 TEST — 400종목 밸런스 조정/장기검증 ============
-   - 2단계 메타데이터 구조를 실제 100종목으로 검증하기 위한 테스트 패치.
-   - 모두 market:'KOSDAQ', indexEligible:false -> 기존 GAME KOSPI 산식 불변.
-   - referencePrice는 구조/성능 시뮬레이션용 결정론적 테스트 기준가이며 최종본에서 실제 기준가로 교체한다.
-   - newsWeight는 아직 선택확률에 연결하지 않아 뉴스 희석량을 그대로 측정한다.
-*/
-const V90_STEP3_STOCK_DATA=[["004560","현대비앤지스틸","철강","growth",11790,1.0],["001230","동국홀딩스","지주","growth",2030,1.0],["000430","대원강업","자동차","growth",4260,1.0],["001250","GS글로벌","무역","growth",2690,1.0],["002030","아세아","지주","blue",207000,1.15],["002240","고려제강","철강","growth",17070,1.0],["002710","TCC스틸","철강","growth",11520,1.0],["003000","부광약품","바이오","growth",4170,1.0],["003030","세아제강지주","철강","blue",99700,1.15],["003060","에이프로젠바이오로직스","바이오","theme",1881,0.85],["003120","일성아이에스","바이오","growth",21000,1.0],["003220","대원제약","바이오","blue",7760,1.15],["003520","영진약품","바이오","theme",1131,0.85],["004090","한국석유","에너지","theme",11110,0.85],["004140","동방","물류","growth",1836,1.0],["004360","세방","물류","growth",13500,1.0],["004430","송원산업","화학","growth",11440,1.0],["004690","삼천리","유틸리티","blue",130900,1.15],["004700","조광피혁","소비재","growth",64000,1.0],["004710","한솔테크닉스","전자부품","growth",6910,1.0],["004770","써니전자","전자부품","theme",1763,0.85],["004830","덕성","화학","theme",3325,0.85],["005250","녹십자홀딩스","지주","growth",10010,1.0],["005420","코스모화학","화학","theme",11260,0.85],["005610","SPC삼립","식품","blue",39700,1.15],["005720","넥센","자동차","growth",6100,1.0],["005950","이수화학","화학","growth",11880,1.0],["006060","화승인더","의류","growth",2535,1.0],["006220","제주은행","금융","theme",9870,0.85],["006490","인스코비","통신","theme",898,0.85],["006660","삼성공조","자동차","growth",13050,1.0],["006740","영풍제지","제지","theme",1052,0.85],["006890","태경케미컬","화학","growth",5200,1.0],["007110","일신석재","건설","theme",592,0.85],["007160","사조산업","식품","growth",51300,1.0],["007210","벽산","건설","growth",1452,1.0],["007280","한국특강","철강","growth",2380,1.0],["007460","에이프로젠","바이오","theme",2365,0.85],["007570","일양약품","바이오","growth",8410,1.0],["008260","NI스틸","철강","growth",3410,1.0],["008350","남선알미늄","소재","theme",1048,0.85],["008420","문배철강","철강","growth",2145,1.0],["008490","서흥","바이오","growth",21900,1.0],["008700","아남전자","전자부품","theme",1223,0.85],["009070","KCTC","물류","growth",4030,1.0],["009160","SIMPAC","산업재","growth",5100,1.0],["009180","한솔로지스틱스","물류","growth",2760,1.0],["009190","대양금속","철강","theme",1521,0.85],["009200","무림페이퍼","제지","growth",1542,1.0],["009270","신원","의류","growth",1128,1.0],["009290","광동제약","바이오","blue",6330,1.15],["009320","대우부품","자동차","growth",963,1.0],["009580","무림P&P","제지","growth",1673,1.0],["009680","모토닉","자동차","growth",10110,1.0],["009810","플레이그램","서비스","junk",1985,0.65],["010040","한국내화","소재","growth",1605,1.0],["010100","한국무브넥스","자동차","growth",3545,1.0],["010420","한솔PNS","IT서비스","growth",1888,1.0],["010580","에스엠벡셀","자동차","growth",1539,1.0],["010690","화신","자동차","growth",8020,1.0],["011000","진원생명과학","바이오","theme",2670,0.85],["011090","에넥스","소비재","growth",2295,1.0],["011150","CJ씨푸드","식품","growth",2030,1.0],["011280","태림포장","제지","growth",1649,1.0],["011300","성안머티리얼스","소재","growth",2990,1.0],["011330","유니켐","화학","growth",4305,1.0],["011390","부산산업","산업재","theme",48800,0.85],["011420","갤럭시아에스엠","서비스","theme",1509,0.85],["011500","한농화성","화학","theme",14100,0.85],["011690","와이투솔루션","전자부품","junk",3255,0.65],["012030","DB","지주","growth",1473,1.0],["012160","영흥","철강","junk",2650,0.65],["012170","아센디오","서비스","junk",748,0.65],["012200","계양전기","기계","growth",3805,1.0],["012280","영화금속","자동차","growth",803,1.0],["012320","경동인베스트","지주","growth",47050,1.0],["012600","청호ICT","IT서비스","junk",128,0.65],["012690","모나리자","소비재","growth",1454,1.0],["013000","세우글로벌","무역","growth",1264,1.0],["013360","일성건설","건설","growth",1503,1.0],["013520","화승코퍼레이션","자동차","growth",2615,1.0],["014160","대영포장","제지","growth",692,1.0],["014280","금강공업","건설","growth",4345,1.0],["014440","영보화학","화학","growth",4635,1.0],["014530","극동유화","에너지","growth",3215,1.0],["014580","태경비케이","소재","growth",3815,1.0],["014790","HL D&I","건설","growth",2650,1.0],["015230","대창단조","기계","growth",6300,1.0],["015260","에이엔피","전자부품","junk",271,0.65],["015590","KIB플러그에너지","산업재","growth",1445,1.0],["015860","일진홀딩스","지주","growth",6980,1.0],["016090","대현","의류","growth",1457,1.0],["016450","한세예스24홀딩스","지주","growth",4560,1.0],["016580","환인제약","바이오","blue",10090,1.15],["016590","신대양제지","제지","growth",10050,1.0],["016710","대성홀딩스","유틸리티","growth",6990,1.0],["016800","퍼시스","소비재","blue",27750,1.15],["016880","웅진","지주","growth",2100,1.0],["017040","광명전기","전력","theme",932,0.85],["017180","명문제약","바이오","theme",1194,0.85]];
-const V90_STEP3_ADDED=[];
-for(const [code,name,sector,tier,price,newsWeight] of V90_STEP3_STOCK_DATA){
-  if(STOCKS.some(s=>s.code===code))continue;
-  const s=mk(code,name,sector,tier,price);
-  s.referencePrice=price;
-  s.referenceTick=MARKET_REFERENCE_TICK;
-  s.market='KOSPI'; s.indexEligible=true;
-  s.sectorExplicit=sector;
-  s.newsWeight=newsWeight;
-  s.referenceDate=(code==='010420'||code==='012600')?'LAST_VERIFIED':'2026-08-27';
-  s.v116ActualReference=true;
-  STOCKS.push(s);V90_STEP3_ADDED.push(s);
-}
-window.__marketV90Step3={version:91,step:4,testOnly:true,added:V90_STEP3_ADDED.length,totalNonEtf:STOCKS.filter(s=>!s.isETF).length,kospiAdded:V90_STEP3_ADDED.filter(s=>s.market==='KOSPI').length,indexEligibleAdded:V90_STEP3_ADDED.filter(s=>s.indexEligible).length,newsWeightActive:true};
-window.__marketV91Step4={version:91,step:4,testOnly:true,themeTarget:18,notes:'신규 100종목 theme 25→18 조정. 가격/뉴스 엔진은 미변경, 신규 100종목도 GAME KOSPI 편입.'};
-
-/* ============ V92 STEP 5 TEST — 400종목 뉴스 가중 타겟 ==========
-   목적: 300→400 확장으로 기존 종목별 뉴스 빈도가 일괄 25% 희석되는 현상을 완화한다.
-   - blue 1.50 / growth 1.05 / theme 0.85 / junk 0.60
-   - KOSPI 400종목은 시장계수 1.00으로 동일 적용
-   - 뉴스의 총 생성 빈도/감성/신뢰도/가격영향 로직은 변경하지 않고 '어느 종목이 선택되는가'만 가중한다.
-   - ETF는 뉴스 직접 타겟에서 계속 제외한다.
-*/
-const V92_NEWS_TIER_WEIGHT=Object.freeze({blue:1.50,growth:1.05,theme:.85,junk:.60});
-function v92EffectiveNewsWeight(s){
-  if(!s||s.isETF)return 0;
-  const tierW=V92_NEWS_TIER_WEIGHT[s.tier]||1;
-  const marketW=1;
-  return Math.max(.20,tierW*marketW);
-}
-for(const s of STOCKS){
-  if(s.isETF)continue;
-  s.newsWeight=v92EffectiveNewsWeight(s);
-}
-const V92_NEWS_TARGET_POOL=[];
-let V92_NEWS_TARGET_TOTAL=0;
-for(const s of STOCKS){
-  if(s.isETF)continue;
-  const w=v92EffectiveNewsWeight(s);
-  V92_NEWS_TARGET_TOTAL+=w;
-  V92_NEWS_TARGET_POOL.push({stock:s,cum:V92_NEWS_TARGET_TOTAL,weight:w});
-}
-if(V92_NEWS_TARGET_TOTAL<=0)V92_NEWS_TARGET_TOTAL=1;
-function v92WeightedNewsStock(r){
-  const x=r()*V92_NEWS_TARGET_TOTAL;
-  let lo=0,hi=V92_NEWS_TARGET_POOL.length-1;
-  while(lo<hi){
-    const mid=(lo+hi)>>1;
-    if(x<=V92_NEWS_TARGET_POOL[mid].cum)hi=mid;else lo=mid+1;
-  }
-  return V92_NEWS_TARGET_POOL[lo]?.stock||null;
-}
-const V92_KOSDAQ_NEWS_WEIGHT=0;
-window.__marketV92Step5={version:92,step:5,testOnly:true,newsWeightActive:true,totalWeight:V92_NEWS_TARGET_TOTAL,kosdaqWeightShare:V92_KOSDAQ_NEWS_WEIGHT/V92_NEWS_TARGET_TOTAL,picker:'cdf-binary'};
-
 
 const $=s=>document.querySelector(s),fmt=n=>Math.round(n).toLocaleString('ko-KR'),sign=n=>(n>=0?'+':'')+fmt(n),pct=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
 function hash(...xs){let h=2166136261;for(const x of xs.join('|'))for(let i=0;i<x.length;i++)h=Math.imul(h^x.charCodeAt(i),16777619);return h>>>0}
@@ -300,11 +187,11 @@ function quote(s){const t=marketTick(),a=displayedAt(s,t),price=fastVisualPriceA
 function legacyVisualPrice(s){const old={...s,sigma:{blue:.014,growth:.026,theme:.043,junk:.065}[s.tier],drift:s.tier==='blue'?.00018:s.tier==='growth'?.00028:0,beta:s.tier==='blue'?.9:s.tier==='growth'?1.15:1.35},t=marketTick(),a=legacyPriceAt(old,t),b=legacyPriceAt(old,t+1);return Math.max(1,Math.round((a.price+(b.price-a.price)*smoothPhase())/10)*10)}
 function v3VisualPrice(s){const t=marketTick(),a=realisticPriceAt(s,t),b=realisticPriceAt(s,t+1);return Math.max(1,Math.round((a.price+(b.price-a.price)*smoothPhase())/10)*10)}
 window.__marketTest={tick:marketTick,pricesAtTick:t=>STOCKS.map(s=>displayedAt(s,t).price),referencePrices:{...MARKET_REFERENCE_PRICES}};
-const memory={};const LocalStore={async loadMe(id){try{return JSON.parse(localStorage.getItem('mockstock:'+id))}catch{return memory[id]}},async saveMe(id,v){try{localStorage.setItem('mockstock:'+id,JSON.stringify(v));memory[id]=v;return true}catch(error){memory[id]=v;console.warn('로컬 계좌 저장 실패',error?.message||error);return false}}};
+const memory={};const LocalStore={async loadMe(id){try{return JSON.parse(localStorage.getItem('mockstock:'+id))}catch{return memory[id]}},async saveMe(id,v){v.marketVersion=5;try{localStorage.setItem('mockstock:'+id,JSON.stringify(v))}catch{memory[id]=v}}};
 const nicknameKey=name=>encodeURIComponent(cleanNickname(name).normalize('NFKC').toLocaleLowerCase('ko-KR'));
 // 랭킹 점수(ranking/{uid}) 쓰기 최소 간격 — 랭킹 폴링 간격(RKV2_POLL_MS)과 동일하게 10분으로 통일.
 const SCORE_PUSH_INTERVAL_MS=10*60*1000;
-const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){const saved=await LocalStore.saveMe(id,v);if(saved)this.scheduleScore();return saved},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
+const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
 let userId=(()=>{try{return localStorage.getItem('mockstock:uid')||''}catch{return''}})(),state=null,view='home',selected=null,accountView=false,sort='value',sectorFilter='전체',assetFilter='stock',chartRange='day',chartMode='line',lastChartTick=-1,chartHoverIndex=-1,trading=false,pendingOrder=null;
 // liveLoop는 매 프레임 도는 rAF 루프. 원래는 부트스트랩 IIFE(비동기) 안에서
 // const로 선언돼 있어서 (a) 다른 <script> 블록에서는 아예 접근 불가능했고,
@@ -359,41 +246,7 @@ function refreshAccountDetail(){const amount=$('[data-account-total]');if(!amoun
 function refreshMyStock(){const box=$('[data-my-stock]');if(!box||!selected)return;const h=state.holdings[selected.code];if(!h?.qty)return;const q=quote(selected),value=q.price*h.qty,cost=h.avg*h.qty,profit=value-cost,rate=profit/Math.max(1,cost)*100,fee=Math.round(value*(FEE+TAX)),p=box.querySelector('[data-my-pnl]');box.querySelector('[data-my-value]').textContent=`${fmt(value)}원`;box.querySelector('[data-my-fee]').textContent=`${fmt(fee)}원`;p.textContent=`${sign(profit)}원 (${pct(rate)})`;p.className=profit<0?'down':'gain'}
 const refreshLiveBase=refreshLive;refreshLive=function(){const overlay=document.querySelector('.overlay');if(overlay){if(overlay.classList.contains('search-overlay'))refreshSearchQuotes();return}const parked=[];document.querySelectorAll('[data-quote]').forEach(el=>{const r=el.getBoundingClientRect();if(r.bottom<-80||r.top>(window.innerHeight||document.documentElement.clientHeight)+80){parked.push([el,el.dataset.quote]);el.removeAttribute('data-quote')}});refreshLiveBase();for(const [el,code] of parked)el.dataset.quote=code;const hero=$('.hero h2');if(hero)hero.textContent=hero.textContent.replace(' ›','');const realized=$('[data-live-realized]'),unrealized=$('[data-live-unrealized]'),rp=+state.realizedPnl||0,up=unrealizedPnl();if(realized){realized.textContent=`${sign(rp)}원`;realized.className=rp<0?'down':'gain'}if(unrealized){unrealized.textContent=`${sign(up)}원`;unrealized.className=up<0?'down':'gain'}refreshAccountDetail();refreshMyStock()};
 function orderSheet(type){const s=selected,q=quote(s),h=state.holdings[s.code]||{qty:0,avg:0};pendingOrder={type,code:s.code,price:q.price};$('#app').insertAdjacentHTML('beforeend',`<div class="overlay"><div class="sheet"><h2>${s.name} ${type==='buy'?'매수':'매도'}</h2><div class="between"><span>체결가</span><b>${fmt(q.price)}원</b></div><p class="sub">현재 주문창에 표시된 가격으로 즉시 체결돼요.</p><div class="quick">${['10%','25%','50%','최대'].map((x,i)=>`<button data-quick="${[.1,.25,.5,1][i]}">${x}</button>`).join('')}</div><input id="qty" inputmode="numeric" min="1" placeholder="수량을 입력하세요"><div class="card" style="margin-top:12px"><small>예상 금액 · 수수료/세금 포함</small><strong id="estimate">0원</strong></div><button class="primary" id="confirm" data-type="${type}">${type==='buy'?'매수하기':'매도하기'}</button></div></div>`);const input=$('#qty');input.oninput=()=>{$('#estimate').textContent=fmt((+input.value||0)*q.price*(type==='buy'?1+FEE:1-FEE-TAX))+'원'};document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{input.value=type==='buy'?Math.floor(state.cash/(q.price*(1+FEE))*+b.dataset.quick):Math.floor(h.qty*+b.dataset.quick);input.oninput()})}
-async function trade(type,qty){
- qty=Math.floor(Number(qty));if(trading)return;
- if(!Number.isFinite(qty)||qty<1)return toast('1주 이상 입력해주세요');
- if(!selected||!['buy','sell'].includes(type)||pendingOrder?.type!==type||pendingOrder?.code!==selected.code)return toast('주문 정보를 다시 확인해주세요');
- const s=selected,fillPrice=pendingOrder.price,h=state.holdings[s.code]||{qty:0,avg:0};
- if(type==='buy'){
-  const cost=Math.round(fillPrice*qty*(1+FEE));
-  if(cost>state.cash)return toast('예수금이 부족해요');
- }else if(qty>h.qty)return toast('보유 수량이 부족해요');
- const beforeCash=state.cash,beforeHolding=state.holdings[s.code]?{...state.holdings[s.code]}:null,beforeLogLength=state.tradeLog.length;
- trading=true;
- try{
-  if(type==='buy'){
-   const cost=Math.round(fillPrice*qty*(1+FEE));
-   h.avg=(h.avg*h.qty+cost)/(h.qty+qty);h.qty+=qty;state.cash-=cost;
-  }else{
-   state.cash+=Math.round(fillPrice*qty*(1-FEE-TAX));h.qty-=qty;if(!h.qty)h.avg=0;
-  }
-  pendingOrder=null;state.holdings[s.code]=h;
-  state.tradeLog.push({at:Date.now(),type,code:s.code,qty,price:fillPrice});
-  const saved=await Store.saveMe(userId,state);
-  if(saved===false)throw new Error('ACCOUNT_SAVE_FAILED');
- }catch(error){
-  state.cash=beforeCash;
-  if(beforeHolding)state.holdings[s.code]=beforeHolding;else delete state.holdings[s.code];
-  state.tradeLog.length=beforeLogLength;
-  trading=false;
-  console.warn('거래 저장 실패 — 직전 계좌 상태 복원',error?.message||error);
-  toast('저장에 실패했어요. 주문은 반영되지 않았습니다.');
-  return;
- }
- trading=false;$('.overlay')?.remove();
- toast(`${fmt(fillPrice)}원에 ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);
- $('#app').innerHTML=detail(s);bind()
-}
+async function trade(type,qty){qty=Math.floor(Number(qty));if(trading)return;if(!Number.isFinite(qty)||qty<1)return toast('1주 이상 입력해주세요');if(!selected||!['buy','sell'].includes(type)||pendingOrder?.type!==type||pendingOrder?.code!==selected.code)return toast('주문 정보를 다시 확인해주세요');const s=selected,fillPrice=pendingOrder.price,h=state.holdings[s.code]||{qty:0,avg:0};if(type==='buy'){const cost=Math.round(fillPrice*qty*(1+FEE));if(cost>state.cash)return toast('예수금이 부족해요');h.avg=(h.avg*h.qty+cost)/(h.qty+qty);h.qty+=qty;state.cash-=cost}else{if(qty>h.qty)return toast('보유 수량이 부족해요');state.cash+=Math.round(fillPrice*qty*(1-FEE-TAX));h.qty-=qty;if(!h.qty)h.avg=0}trading=true;pendingOrder=null;state.holdings[s.code]=h;state.tradeLog.push({at:Date.now(),type,code:s.code,qty,price:fillPrice});await Store.saveMe(userId,state);trading=false;$('.overlay')?.remove();toast(`${fmt(fillPrice)}원에 ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);$('#app').innerHTML=detail(s);bind()}
 const tradeBase=trade;trade=async function(type,qty){const n=Math.floor(Number(qty)),s=selected,before=state?.tradeLog?.length||0,avg=s?(state.holdings[s.code]?.avg||0):0;await tradeBase(type,qty);const log=state?.tradeLog||[];if(log.length===before)return;const fill=log.at(-1);if(type==='sell'&&fill?.type==='sell')state.realizedPnl=(+state.realizedPnl||0)+Math.round(fill.price*n*(1-FEE-TAX))-avg*n;await recordEquity(true);await Store.pushMyScore(true)};
 function toast(t){const el=document.createElement('div');el.className='toast';el.textContent=t;document.body.append(el);setTimeout(()=>el.remove(),2100)}
 let onboardingPreserve=false;
@@ -735,41 +588,15 @@ const ETF_STOCKS=[
     ['005930',.25],['000660',.25]
   ],.50),
   // V59 테스트 ETF: 별도 랜덤/뉴스/업종 효과 없이 게임 속 삼성전자 가격만 ±2배 추종
-  {...etfDef('SAMS2L','삼성전자 레버리지 2X',20000,'레버리지',[['005930',1]]),linkedCode:'005930',leverage:2},
-  {...etfDef('SAMS2I','삼성전자 인버스 2X',20000,'레버리지',[['005930',1]]),linkedCode:'005930',leverage:-2}
+  {...etfDef('SAMS2L','삼성전자 레버리지 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:2},
+  {...etfDef('SAMS2I','삼성전자 인버스 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:-2}
 ];
-
-/* V97 STEP10: diversified major domestic ETF test set */
-if(!ETF_STOCKS.some(e=>e.code==='226490')) ETF_STOCKS.push(etfDef('226490','KODEX 코스피',86570,'대표지수',[['005930',0.22],['000660',0.18],['009150',0.07],['402340',0.055],['005380',0.05],['373220',0.045],['032830',0.04],['028260',0.035],['207940',0.035],['012450',0.035],['034020',0.03],['329180',0.03],['105560',0.028],['000270',0.025],['012330',0.022],['055550',0.02],['068270',0.018],['006400',0.015],['267260',0.012],['066570',0.01]]));
-if(!ETF_STOCKS.some(e=>e.code==='091160')) ETF_STOCKS.push(etfDef('091160','KODEX 반도체',118955,'반도체',[['005930',0.25],['000660',0.23],['042700',0.08],['000660',0.07],['042700',0.06],['007660',0.055],['353200',0.05],['000990',0.045],['009150',0.04],['011070',0.035],['000990',0.03],['009150',0.025],['007660',0.02]]));
-if(!ETF_STOCKS.some(e=>e.code==='305720')) ETF_STOCKS.push(etfDef('305720','KODEX 2차전지산업',14395,'2차전지',[['373220',0.18],['373220',0.14],['006400',0.12],['051910',0.1],['006400',0.1],['003670',0.08],['066970',0.07],['361610',0.06],['011790',0.05],['020150',0.04]]));
-if(!ETF_STOCKS.some(e=>e.code==='091180')) ETF_STOCKS.push(etfDef('091180','KODEX 자동차',29665,'자동차',[['005380',0.28],['000270',0.24],['012330',0.14],['161390',0.08],['018880',0.06],['204320',0.05],['011210',0.04],['005850',0.035],['064960',0.025]]));
-if(!ETF_STOCKS.some(e=>e.code==='091170')) ETF_STOCKS.push(etfDef('091170','KODEX 은행',15760,'금융',[['105560',0.2],['055550',0.18],['086790',0.16],['138930',0.14],['316140',0.12],['024110',0.08],['139130',0.07],['323410',0.05]]));
-if(!ETF_STOCKS.some(e=>e.code==='266420')) ETF_STOCKS.push(etfDef('266420','KODEX 헬스케어',15990,'바이오',[['207940',0.18],['068270',0.15],['207940',0.12],['068270',0.08],['128940',0.06],['000100',0.06],['069620',0.055],['006280',0.05],['009420',0.045],['302440',0.04],['069620',0.035],['326030',0.03],['185750',0.03],['137310',0.025],['006280',0.025]]));
-
-/* V98 STEP11: high-liquidity domestic theme ETF expansion test */
-if(!ETF_STOCKS.some(e=>e.code==='0080G0')) ETF_STOCKS.push(etfDef('0080G0','KODEX 방산TOP10',10900,'방산',[['012450',0.237],['047810',0.206],['079550',0.193],['064350',0.18],['272210',0.115],['103140',0.04],['064350',0.01],['047810',0.008]]));
-if(!ETF_STOCKS.some(e=>e.code==='0115D0')) ETF_STOCKS.push(etfDef('0115D0','KODEX 조선TOP10',7890,'조선',[['009540',0.2227],['329180',0.2225],['042660',0.2083],['010140',0.1914],['082740',0.0547],['071970',0.0373],['097230',0.0291],['439260',0.0159],['443060',0.0057],['017960',0.005]]));
-if(!ETF_STOCKS.some(e=>e.code==='0098F0')) ETF_STOCKS.push(etfDef('0098F0','KODEX 원자력SMR',16745,'원전',[['034020',0.1968],['000720',0.1928],['015760',0.0933],['375500',0.0889],['047040',0.0793],['028260',0.0725],['052690',0.0695],['051600',0.0557]]));
-
-/* V96 STEP9: real broad-market leveraged/inverse ETF test */
-function v96IndexEtf(code,name,base,leverage){
-  return {code,name,base,referencePrice:base,sector:'ETF',tier:'blue',sigma:.007,drift:0,beta:1,
-    isETF:true,etfCategory:'index',indexLinked:'KOSPI200_PROXY',leverage};
-}
-if(!ETF_STOCKS.some(e=>e.code==='122630')) ETF_STOCKS.push(v96IndexEtf('122630','KODEX 레버리지',118200,2));
-if(!ETF_STOCKS.some(e=>e.code==='114800')) ETF_STOCKS.push(v96IndexEtf('114800','KODEX 인버스',1540,-1));
-
 for(const e of ETF_STOCKS)if(!STOCKS.some(s=>s.code===e.code))STOCKS.push(e);
 
-const V97_ETF_COMPONENT_CACHE=new Map();
 function etfNormalizedComponents(s){
-  if(V97_ETF_COMPONENT_CACHE.has(s.code))return V97_ETF_COMPONENT_CACHE.get(s.code);
   const available=(s.components||[]).map(([code,w])=>[STOCKS.find(x=>x.code===code&&!x.isETF),w]).filter(([x,w])=>x&&w>0);
   const target=Math.max(0,1-(s.bondWeight||0)),sum=available.reduce((a,[,w])=>a+w,0)||1;
-  const out=available.map(([x,w])=>[x,w/sum*target]);
-  V97_ETF_COMPONENT_CACHE.set(s.code,out);
-  return out;
+  return available.map(([x,w])=>[x,w/sum*target]);
 }
 function etfBondRatio(s,t){
   const dd=(t-ETF_REFERENCE_TICK)/390;
@@ -780,14 +607,6 @@ function etfBondRatio(s,t){
 }
 const v10StockDisplayedAt=v9DisplayedAt,v10StockCanonicalPriceAtMs=v9CanonicalPriceAtMs;
 function etfRatioAtTick(s,t){
-  if(s?.indexLinked==='KOSPI200_PROXY'){
-    const day=Math.floor(t/DAY_STEPS), openT=day*DAY_STEPS;
-    const now=gameKospiAt(t)?.level||GAME_KOSPI_BASE;
-    const op=gameKospiAt(openT)?.level||GAME_KOSPI_BASE;
-    const r=op>0?(now/op-1):0;
-    return Math.max(.05,1+r*(Number(s.leverage)||1));
-  }
-
   // V59 삼성전자 2X 테스트 ETF는 오직 삼성전자 시장가 변화만 사용한다.
   // 기준시점 대비 삼성전자 수익률 × (+2 / -2)를 ETF 기준가 20,000원에 그대로 반영한다.
   if(s?.linkedCode&&Number.isFinite(+s.leverage)){
@@ -805,21 +624,6 @@ function etfRatioAtTick(s,t){
   if(s.bondWeight)ratio+=s.bondWeight*etfBondRatio(s,t);
   return Math.max(.05,ratio||1);
 }
-
-/* V103: ETF ratio tick cache.
-   ETF NAV is deterministic for (code,tick), so repeated UI/ranking/snapshot requests
-   reuse the same result instead of recalculating all underlying paths. */
-const V103_ETF_RATIO_BASE=etfRatioAtTick;
-const V103_ETF_RATIO_CACHE=new Map();
-etfRatioAtTick=function v103CachedEtfRatioAtTick(s,t){
-  if(!s?.isETF)return V103_ETF_RATIO_BASE(s,t);
-  const key=s.code+':'+Math.trunc(t);
-  if(V103_ETF_RATIO_CACHE.has(key))return V103_ETF_RATIO_CACHE.get(key);
-  const value=V103_ETF_RATIO_BASE(s,t);
-  if(V103_ETF_RATIO_CACHE.size>12000)V103_ETF_RATIO_CACHE.clear();
-  V103_ETF_RATIO_CACHE.set(key,value);
-  return value;
-};
 function etfDisplayedAt(s,t=marketTick()){
   const day=Math.floor(t/390),minute=((t%390)+390)%390,dayTick=day*390;
   const price=Math.max(10,Math.round(s.base*etfRatioAtTick(s,t)/5)*5),open=Math.max(10,Math.round(s.base*etfRatioAtTick(s,dayTick)/5)*5);
@@ -868,12 +672,6 @@ longChartSeries=function(s,range){
 // ETF 전용 아이콘: 사용자가 제시한 청록색 원형 ETF 이미지를 단순화한 UI 아이콘.
 const v10StockLogo=logo;
 logo=function(s){if(!s?.isETF)return v10StockLogo(s);return `<div class="logo etf-logo" aria-label="ETF"><i></i></div>`};
-// V117 legacy icon restore: Samsung 2X products use their original stock-style icon.
-const v117CommonEtfLogo=logo;
-logo=function v117Logo(s){
-  if(s?.code==='SAMS2L'||s?.code==='SAMS2I')return v10StockLogo(s);
-  return v117CommonEtfLogo(s);
-};
 
 const v10DiscoverBase=discover;
 discover=function(watch=false){
@@ -1056,8 +854,8 @@ window.__marketV13={version:13,focus:'tension-jackpot',volumeSafe:true};
 */
 const GAME_KOSPI_BASE=3000;
 function kospiWeight(s){
-  if(s?.isETF||s?.indexEligible===false||s?.market==='KOSDAQ')return 0;
-  // V89 Step 2: 기존 KOSPI 종목의 산식은 그대로 유지하고, 향후 KOSDAQ만 지수에서 제외한다.
+  if(s?.isETF)return 0;
+  // 실제 시총 데이터가 없는 게임이므로 대형/우량주가 지수에 더 크게 반영되도록 완만한 가중치만 둔다.
   const tier={blue:5.0,growth:2.2,theme:.75,junk:.35}[s.tier]||1;
   const beta=Number.isFinite(+s.beta)?Math.max(.75,Math.min(1.25,+s.beta)):1;
   return tier/beta;
@@ -1133,7 +931,7 @@ v11Activity=function(s,day,minute){
   // V12 섹터 순환 효과는 유지하되 정답이 되지 않도록 약하게만 추가한다.
   const sectors=[...new Set(STOCKS.filter(z=>!z.isETF).map(z=>z.sector))];
   const rotBlock=Math.floor(minute/36),hotSector=sectors[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,sectors.length)];
-  if(v94SectorOf(s)===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
   return a;
 };
 
@@ -1194,7 +992,7 @@ function v18RumorEvent(day,minute,index=0){
   const sectors=[...new Set(STOCKS.filter(x=>!x.isETF).map(x=>x.sector))];
   const stockTargets=STOCKS.filter(x=>!x.isETF);
   const targetStock=r()<.34?stockTargets[Math.floor(r()*stockTargets.length)]:null;
-  const sector=targetStock?v94SectorOf(targetStock):v95PickHotSector(r);
+  const sector=targetStock?targetStock.sector:sectors[Math.floor(r()*sectors.length)];
   const sentiment=r()<.51?1:-1;
   const behaviorRoll=r();
   const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
@@ -1476,27 +1274,9 @@ window.__marketV22={version:22,focus:'anti-v-rebound',deepDropThreshold:'-18%',s
    4) quote 결과를 짧게 캐시하여 같은 화면 프레임의 중복 가격 계산 제거
    5) 숫자 UI 300ms -> 1000ms, 차트 120ms -> 750ms
 */
-/* V94 STEP7: audited sector routing */
-function v94SectorOf(s){
-  return String(s?.sectorExplicit || s?.sector || '산업재');
-}
 const V23_STOCK_BY_CODE=new Map(STOCKS.map(s=>[s.code,s]));
 const V23_NON_ETF_STOCKS=STOCKS.filter(s=>!s.isETF);
-const V23_SECTORS=[...new Set(V23_NON_ETF_STOCKS.map(s=>v94SectorOf(s)))];
-const V95_SECTOR_COUNTS=new Map();
-for(const s of V23_NON_ETF_STOCKS){
-  const sec=v94SectorOf(s);
-  V95_SECTOR_COUNTS.set(sec,(V95_SECTOR_COUNTS.get(sec)||0)+1);
-}
-// sqrt(count): 1~2종목짜리 업종의 과도한 당첨을 줄이되 대형 업종 독점도 방지.
-const V95_SECTOR_POOL=V23_SECTORS.map(sec=>[sec,Math.sqrt(V95_SECTOR_COUNTS.get(sec)||1)]);
-const V95_SECTOR_TOTAL=V95_SECTOR_POOL.reduce((a,x)=>a+x[1],0)||1;
-function v95PickHotSector(r){
-  let x=(typeof r==='function'?r():Number(r)||0)*V95_SECTOR_TOTAL;
-  for(const [sec,w] of V95_SECTOR_POOL){x-=w;if(x<=0)return sec;}
-  return V95_SECTOR_POOL[V95_SECTOR_POOL.length-1]?.[0]||'산업재';
-}
-
+const V23_SECTORS=[...new Set(V23_NON_ETF_STOCKS.map(s=>s.sector))];
 
 // V16과 결과가 동일하되 sectors를 매 호출마다 다시 만들지 않는다.
 v11Activity=function(s,day,minute){
@@ -1510,8 +1290,8 @@ v11Activity=function(s,day,minute){
   else if(x<.63)a={name:'normal',mult:1.18,flow:1.16};
   else if(x<.90)a={name:'active',mult:2.55,flow:2.65};
   else a={name:'hot',mult:4.35,flow:4.70};
-  const rotBlock=Math.floor(minute/36),hotSector=v95PickHotSector(rnd(hash('v16-sector-rotation',day,rotBlock)));
-  if(v94SectorOf(s)===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  const rotBlock=Math.floor(minute/36),hotSector=V23_SECTORS[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,V23_SECTORS.length)];
+  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
   return a;
 };
 
@@ -1519,7 +1299,7 @@ v11Activity=function(s,day,minute){
 v18RumorEvent=function(day,minute,index=0){
   const block=Math.floor(minute/12),r=rnd(hash('v18-rumor',day,block,index));
   const targetStock=r()<.34?V23_NON_ETF_STOCKS[Math.floor(r()*V23_NON_ETF_STOCKS.length)]:null;
-  const sector=targetStock?v94SectorOf(targetStock):v95PickHotSector(r);
+  const sector=targetStock?targetStock.sector:V23_SECTORS[Math.floor(r()*V23_SECTORS.length)];
   const sentiment=r()<.51?1:-1,behaviorRoll=r();
   const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
   const posActions=['대형 수주 기대','실적 개선 기대','외국인 매수 유입설','신규 공급계약 가능성','정책 수혜 기대','증설 검토설','목표가 상향 움직임','업황 회복 기대'];
@@ -1888,342 +1668,7 @@ const bindRewardBase=bind;bind=function(){bindRewardBase();document.querySelecto
 document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]'))e.target.closest('.reward-pop')?.remove();if(e.target.classList.contains('reward-pop'))e.target.remove()});
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
-
-
-/* V107 STEP2 — intentional KOSDAQ100 -> KOSPI100 migration.
-   KOSDAQ holdings are intentionally discarded by user request; KOSPI/ETF holdings are untouched. */
-const V107_REMOVED_KOSDAQ=new Set(["196170","247540","086520","028300","277810","141080","145020","214150","087010","310210","000250","058470","039030","357780","403870","036930","240810","067310","095340","084370","131970","089030","140860","036810","039440","222800","166090","101490","319660","031980","068760","298380","237690","950160","214450","195940","067630","290650","086450","085660","328130","253450","293490","263750","112040","225570","095660","067160","035900","041510","122870","035760","078340","194480","060250","053800","041020","108490","056080","090360","348370","121600","078600","222080","005290","095610","036830","131290","025900","393890","272290","204270","161580","257720","018290","214430","099320","274090","189300","211270","065350","058610","090710","108860","042000","060370","086900","243070","206640","096530","214370","206650","048410","226950","290670","278280","137400","336570","030520","417200"]);
-const V107_NORMALIZE_BASE=normalizeState;
-normalizeState=function v107KospiMigration(v){
-  if(v&&!v.kospi400MigrationV107){
-    const holdings={...(v.holdings||{})},orphanHoldings={...(v.orphanHoldings||{})};
-    for(const c of V107_REMOVED_KOSDAQ){delete holdings[c];delete orphanHoldings[c];}
-    v={...v,holdings,orphanHoldings,
-       watch:(Array.isArray(v.watch)?v.watch:[]).filter(c=>!V107_REMOVED_KOSDAQ.has(c)),
-       tradeLog:(Array.isArray(v.tradeLog)?v.tradeLog:[]).filter(x=>!V107_REMOVED_KOSDAQ.has(x?.code)),
-       kospi400MigrationV107:true};
-  }
-  const out=V107_NORMALIZE_BASE(v);out.kospi400MigrationV107=true;return out;
-};
-window.__marketV107={version:107,stage:'KOSPI400_STEP2',ordinaryKOSPI:400,removedKOSDAQ:100,replacementETF:'226490'};
-
-
-/* V108 STEP3 — KOSPI400 tier balance audit.
-   No quote/continuity/market-clock formula is changed here. */
-window.__marketV108={
-  version:108,stage:'KOSPI400_TIER_BALANCE',
-  new100Tier:{blue:8,growth:66,theme:20,junk:6},
-  quoteFormulaChanged:false,marketClockChanged:false
-};
-
-
-/* V109 STEP4 — KOSPI400 news/sector integration.
-   New 100 are explicitly KOSPI/indexEligible and use the same market news multiplier as existing KOSPI.
-   News generation frequency, sentiment, credibility and price-impact formulas are unchanged. */
-window.__marketV109={
- version:109,stage:'KOSPI400_NEWS_SECTOR',
- new100Market:'KOSPI',new100IndexEligible:true,
- kosdaqNewsDiscountRemoved:true,
- newsFrequencyChanged:false,newsImpactFormulaChanged:false,
- sectorExplicitConnected:true
-};
-
-
-/* V110 STEP5 — KOSPI400 index validation.
-   Result: all 400 ordinary stocks remain indexEligible. Existing KOSPI formula is intentionally unchanged:
-   the added 100 contribute ~15.97% of model index weight and no single stock exceeds ~0.467%.
-   This stage adds no random source, hard range, mean reversion or display amplifier. */
-window.__marketV110={
- version:110,stage:'KOSPI400_INDEX_VALIDATED',
- ordinaryKOSPI:400,
- new100ModelWeightShare:0.159669,
- maxSingleModelWeightShare:0.004666,
- indexFormulaChanged:false,
- hardRangeAdded:false,meanReversionAdded:false,randomIndexNoiseAdded:false,
- proxyVolatility300:0.00610292,proxyVolatility400:0.00595699
-};
-
-
-/* V111 STEP6 — ETF component relink to KOSPI400.
-   Removed KOSDAQ component references inside ETF baskets are replaced with KOSPI400 constituents.
-   ETF quote formula, leverage/inverse behavior, news/random rules, ETF count and account state are unchanged. */
-window.__marketV111={
- version:111,stage:'ETF_RELINK_KOSPI400',
- removedKosdaqRefsBefore:24,
- removedKosdaqRefsAfter:0,
- replacedComponentCodes:24,
- etfFormulaChanged:false,leverageFormulaChanged:false,
- accountMigrationChanged:false
-};
-
-
-/* V112 STEP7 — integrated regression validation.
-   No market/account/ETF formula is changed in this build. This marker records that the KOSPI400
-   migration, ETF relink, storage protection and legacy leverage paths passed static/regression checks. */
-window.__marketV112={
- version:112,stage:'INTEGRATED_VALIDATION',
- ordinaryKOSPI:400,etfCount:17,catalogTotal:417,
- syntaxErrors:0,
- migrationIdempotent:true,
- removedKosdaqEtfRefs:0,
- marketFormulaChanged:false,accountFormulaChanged:false,etfFormulaChanged:false
-};
-
-
-/* V113 STEP8 — listing/status audit.
-   No stock is removed in this build. Current KRX management-issue matches are flagged for the next replacement stage.
-   The 100 added KOSPI rows still use provisional deterministic reference prices and v90TestReference metadata. */
-window.__marketV113={
- version:113,stage:'LISTING_STATUS_AUDIT',
- managementIssueMatches:2,
- new100ProvisionalReference:true,
- catalogChanged:false,priceFormulaChanged:false,accountMigrationChanged:false
-};
-
-/* V114 — transaction save safety. No stock/reference price is changed in this build. */
-window.__marketV114={version:114,stage:'TRADE_SAVE_SAFETY',rollbackOnSaveFailure:true,new100PriceChanged:false};
-
-/* V116 — KOSPI400 new100 actual reference-price application.
-   98 rows: uploaded 2026-08-27 quotes.csv close.
-   010420/012600: last verified fallback because absent from uploaded CSV.
-   Existing 300 prices/account migration/index formula are unchanged. */
-window.__marketV116={
- version:116,stage:'NEW100_20260827_REFERENCE_APPLIED',
- csvDate:'2026-08-27',csvRows:98,
- fallback:{'010420':1888,'012600':128},
- existing300PriceChanged:false,accountChanged:false,indexFormulaChanged:false
-};
-
-/* ================= V106 SAFE STORAGE + ONE-TIME LEGACY RECOVERY =================
-   Principles:
-   1) Never silently delete a holding just because a future HTML accidentally omits its code.
-   2) Keep an untouched pre-normalize local backup before the first save.
-   3) Refuse to overwrite the main account if the known catalog is unexpectedly incomplete.
-   4) Run the V104-style SAMS2L recovery at most once per user, outside the hot render loop.
-*/
-const V106_EXPECTED_CODES=["005930","000660","373220","207940","005380","028260","105560","068270","000270","035420","012450","034020","329180","055550","012330","005490","032830","402340","035720","051910","000810","086790","009150","033780","015760","267260","096770","006400","138040","066570","316140","064350","259960","030200","017670","011200","047810","003670","003550","042660","010140","009540","029780","024110","034730","032640","352820","326030","079550","042700","010130","010950","003490","090430","021240","271560","097950","004370","007310","005300","282330","139480","007070","069960","008770","383220","051900","278470","192820","161890","251270","036570","018260","064400","307950","323410","377300","006800","005940","071050","039490","005830","001450","088350","138930","175330","139130","078930","267250","000880","006260","010120","298040","241560","454910","443060","086280","028670","000120","000720","000150","011070","272210","003230","028050","047050","180640","161390","007660","016360","047040","009830","000100","128940","267270","001440","062040","353200","010060","000500","066970","034220","088980","052690","011790","085620","002380","082740","004170","000990","004020","001040","018880","036460","111770","009420","103590","006360","035250","022100","011780","008930","012750","336260","023530","302440","031210","017800","483650","375500","007340","004800","489790","026960","450080","001720","003690","005850","011170","004990","204320","000240","103140","279570","005440","009970","081660","030000","018670","014680","051600","181710","112610","002790","073240","462870","457190","439260","475150","071970","089860","006040","020150","023590","011210","361610","322000","120110","001800","001430","020560","097230","294870","006280","001120","069620","007810","298020","012630","001740","229640","093370","280360","005070","082640","281820","003540","415640","192080","017960","004000","300720","030610","001820","000080","006340","032350","003530","000210","003090","003570","192400","003240","077970","286940","185750","009450","009240","030190","005090","034230","003470","000370","195870","285130","006120","006110","005180","079160","071320","100090","004490","499790","003850","298050","137310","214320","036530","000670","456040","064960","003160","317450","094800","268280","017940","100840","069260","005880","002960","005690","033240","000400","002350","001060","001570","383800","000640","001680","014820","248070","006380","001510","002840","108320","075580","453340","079900","001270","002990","114090","025540","090460","058650","006650","003300","016380","007700","005810","178920","003620","336370","039130","284740","001500","008060","009410","001530","019170","377740","004560","001230","000430","001250","002030","002240","002710","003000","003030","003060","003120","003220","003520","004090","004140","004360","004430","004690","004700","004710","004770","004830","005250","005420","005610","005720","005950","006060","006220","006490","006660","006740","006890","007110","007160","007210","007280","007460","007570","008260","008350","008420","008490","008700","009070","009160","009180","009190","009200","009270","009290","009320","009580","009680","009810","010040","010100","010420","010580","010690","011000","011090","011150","011280","011300","011330","011390","011420","011500","011690","012030","012160","012170","012200","012280","012320","012600","012690","013000","013360","013520","014160","014280","014440","014530","014580","014790","015230","015260","015590","015860","016090","016450","016580","016590","016710","016800","016880","017040","017180","0080G0","0098F0","0115D0","0183V0","069500","091160","091170","091180","114800","122630","226490","266420","305720","395160","445290","SAMS2I","SAMS2L"];
-const V106_EXPECTED_SET=new Set(V106_EXPECTED_CODES);
-const V106_CATALOG_OK=()=>V106_EXPECTED_CODES.every(c=>STOCKS.some(s=>s.code===c));
-
-/* Final normalize wrapper: revive previously orphaned holdings when their symbol returns,
-   and preserve currently-missing holdings under orphanHoldings instead of deleting them. */
-const V106_NORMALIZE_BASE=normalizeState;
-normalizeState=function v106ProtectedNormalize(v){
-  const incoming=(v&&typeof v==='object')?v:{};
-  const mergedHoldings={...(incoming.holdings||{})};
-  const oldOrphans=(incoming.orphanHoldings&&typeof incoming.orphanHoldings==='object')?incoming.orphanHoldings:{};
-  for(const [code,h] of Object.entries(oldOrphans)){
-    if(STOCKS.some(s=>s.code===code) && !mergedHoldings[code]) mergedHoldings[code]=h;
-  }
-  const out=V106_NORMALIZE_BASE({...incoming,holdings:mergedHoldings});
-  const orphans={};
-  for(const [code,h] of Object.entries(oldOrphans)){
-    if(!STOCKS.some(s=>s.code===code) && h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0)
-      orphans[code]={qty:Math.floor(+h.qty),avg:+h.avg};
-  }
-  for(const [code,h] of Object.entries(mergedHoldings)){
-    if(!STOCKS.some(s=>s.code===code) && h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0)
-      orphans[code]={qty:Math.floor(+h.qty),avg:+h.avg};
-  }
-  out.orphanHoldings=orphans;
-  out.recoveryV106Done=!!incoming.recoveryV106Done;
-  if(incoming.recoveryV106) out.recoveryV106=incoming.recoveryV106;
-  return out;
-};
-
-/* One pre-normalize backup per session. This is never used by render/price loops. */
-const V106_LOAD_BASE=Store.loadMe.bind(Store);
-Store.loadMe=async function v106ProtectedLoad(id){
-  const raw=await V106_LOAD_BASE(id);
-  if(raw){
-    try{
-      const sessionKey='mockstock:v106-backed:'+id;
-      if(!sessionStorage.getItem(sessionKey)){
-        localStorage.setItem('mockstock:backup:v106:'+id,JSON.stringify(raw));
-        sessionStorage.setItem(sessionKey,'1');
-      }
-    }catch{}
-  }
-  return raw;
-};
-
-/* Catalog guard: if even one expected code disappears in a later patch, do not overwrite
-   the good main save. Put the attempted state in quarantine instead. */
-const V106_SAVE_BASE=Store.saveMe.bind(Store);
-Store.saveMe=async function v106ProtectedSave(id,v){
-  if(!V106_CATALOG_OK()){
-    try{localStorage.setItem('mockstock:quarantine:v106:'+id,JSON.stringify(v));}catch{}
-    console.error('V106 저장 보호: 종목 카탈로그 누락 감지 — 기존 계좌 저장본을 덮어쓰지 않았습니다.');
-    return false;
-  }
-  return V106_SAVE_BASE(id,v);
-};
-
-/* V104 recovery math, but one-time and deferred.
-   It restores only SAMS2L; cash/other holdings are not rolled back or replaced. */
-function v106RecoverDeletedSams2L(current){
-  if(!current||current?.holdings?.SAMS2L?.qty>0)return {state:current,changed:false,reason:'already-present'};
-  const hs=(Array.isArray(current?.equityHistory)?current.equityHistory:[])
-    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value));
-  if(!hs.length)return {state:current,changed:false,reason:'no-history'};
-  const lev=STOCKS.find(s=>s.code==='SAMS2L');
-  if(!lev)return {state:current,changed:false,reason:'symbol-missing'};
-  const logs=(Array.isArray(current?.tradeLog)?current.tradeLog:[])
-    .filter(x=>x&&Number.isFinite(+x.at)&&['buy','sell'].includes(x.type)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price));
-  let best=null;
-
-  /* Newest history first. Stop at the first very-high-confidence integer-share match.
-     This preserves V104's idea but avoids continuously rescanning on every page load. */
-  for(let i=hs.length-1;i>=0;i--){
-    const snap=hs[i],at=+snap.at;
-    let cash=Number.isFinite(+current.cash)?+current.cash:0;
-    const qty={};
-    for(const [code,h] of Object.entries(current.holdings||{})){
-      if(code==='SAMS2L'||code==='SAMS2I')continue;
-      if(Number.isFinite(+h?.qty)&&+h.qty>0)qty[code]=Math.floor(+h.qty);
-    }
-    for(let j=logs.length-1;j>=0;j--){
-      const x=logs[j];if(+x.at<=at)continue;
-      const q=Math.max(0,Math.floor(+x.qty)),px=+x.price;if(!q)continue;
-      if(x.type==='buy'){
-        cash+=Math.round(px*q*(1+FEE));
-        qty[x.code]=(qty[x.code]||0)-q;
-      }else{
-        cash-=Math.round(px*q*(1-FEE-TAX));
-        qty[x.code]=(qty[x.code]||0)+q;
-      }
-    }
-    let known=cash;
-    for(const [code,q0] of Object.entries(qty)){
-      const q=Math.max(0,Math.floor(q0));if(!q)continue;
-      const s=STOCKS.find(x=>x.code===code);if(!s)continue;
-      try{known+=q*fastVisualPriceAt(s,at)}catch{}
-    }
-    const gap=(+snap.value)-known;if(!(gap>0))continue;
-    let px=0;try{px=fastVisualPriceAt(lev,at)}catch{}
-    if(!(px>0))continue;
-    const q=Math.round(gap/px);if(q<1)continue;
-    const err=Math.abs(gap-q*px), rel=err/Math.max(px,gap);
-    if(rel>.006)continue; // tighter than V104's 1.2%: safer auto recovery
-    best={q,px,at,gap,rel};
-    break;
-  }
-  if(!best)return {state:current,changed:false,reason:'no-high-confidence-match'};
-
-  const next={...current,holdings:{...(current.holdings||{}),SAMS2L:{qty:best.q,avg:best.px}},
-    recoveryV106Done:true,
-    recoveryV106:{ok:true,code:'SAMS2L',qty:best.q,avg:best.px,sourceAt:best.at,
-      recoveredValue:Math.round(best.q*best.px),relativeError:best.rel,method:'equityHistory-gap-once'}
-  };
-  return {state:next,changed:true,reason:'recovered'};
-}
-
-function v106ScheduleOneTimeRecovery(){
-  if(!userId||!state)return;
-  let done=false;
-  try{done=localStorage.getItem('mockstock:v106-recovery-done:'+userId)==='1';}catch{}
-  if(done||state?.holdings?.SAMS2L?.qty>0)return;
-  const run=async()=>{
-    let result;
-    try{result=v106RecoverDeletedSams2L(state);}catch(e){console.warn('V106 복구 계산 실패',e);return;}
-    /* Mark attempted even when no candidate is found, so it never becomes recurring load. */
-    try{localStorage.setItem('mockstock:v106-recovery-done:'+userId,'1');}catch{}
-    if(result?.changed){
-      state=normalizeState(result.state);
-      state.recoveryV106Done=true;
-      state.recoveryV106=result.state.recoveryV106;
-      await Store.saveMe(userId,state);
-      render();
-    }
-  };
-  if('requestIdleCallback' in window)requestIdleCallback(()=>run(),{timeout:1400});
-  else setTimeout(run,900);
-}
-window.addEventListener('load',()=>setTimeout(v106ScheduleOneTimeRecovery,350));
-
-window.__marketV106={
-  version:106,
-  expectedCatalog:V106_EXPECTED_CODES.length,
-  preserveUnknownHoldings:true,
-  preNormalizeBackup:true,
-  catalogSaveGuard:true,
-  legacyRecovery:'one-time-deferred',
-  recoveryTolerance:.006,
-  basedOn:'V103'
-};
-
-/* V117 FAST BOOT — local UI first, Firebase in background */
-function v117LoadScript(src){
-  return new Promise((resolve,reject)=>{
-    const s=document.createElement('script');
-    s.src=src;s.async=true;
-    s.onload=()=>resolve(true);
-    s.onerror=()=>reject(new Error('SDK load failed: '+src));
-    document.head.appendChild(s);
-  });
-}
-async function v117LoadFirebase(){
-  if(window.firebase?.auth&&window.firebase?.firestore)return true;
-  if(!window.firebase)await v117LoadScript('https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js');
-  if(!window.firebase?.auth)await v117LoadScript('https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js');
-  if(!window.firebase?.firestore)await v117LoadScript('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js');
-  return !!(window.firebase?.auth&&window.firebase?.firestore);
-}
-function v117EmptyState(){
-  return {nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};
-}
-async function v117ConnectFirebaseInBackground(){
-  try{
-    await v117LoadFirebase();
-    const ok=await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);
-    if(!ok)return false;
-    if(state&&userId){
-      await Store.saveMe(userId,state);
-      if(state.nickname&&state.nickname!=='게스트'){
-        const claim=await Store.claimNickname(state.nickname);
-        if(claim.ok)await Store.pushMyScore(true);
-        else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.');
-      }
-    }
-    return true;
-  }catch(error){
-    console.warn('V117 백그라운드 Firebase 연결 실패',error?.message||error);
-    return false;
-  }
-}
-window.addEventListener('DOMContentLoaded',async()=>{
-  if(isKakaoInApp()){showBrowserBlock();return}
-
-  let localState=null;
-  if(userId)localState=await LocalStore.loadMe(userId);
-
-  if(localState){
-    state=normalizeState(localState);
-    render();
-    if(!state.nickname||state.nickname==='게스트')
-      onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');
-  }else{
-    state=v117EmptyState();
-    render();
-    onboarding(false,'서버에 연결하는 동안 화면을 먼저 준비했어요.');
-  }
-
-  requestAnimationFrame(liveLoop);
-  document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden){
-      refreshLive();
-      Store.scheduleScore(true);
-      if(selected&&$('#chart'))drawChart(selected,chartHoverIndex);
-    }
-  });
-
-  setTimeout(()=>{v117ConnectFirebaseInBackground()},0);
-},{once:true});
-window.__marketV117={
-  version:117,stage:'FAST_LOCAL_FIRST_BOOT',
-  firebaseBlocksFirstPaint:false,firebaseBackground:true,
-  accountSchemaChanged:false,priceFormulaChanged:false
-};
+(async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script>
 
 
@@ -5651,6 +5096,8 @@ document.head.insertAdjacentHTML('beforeend',`
 
 const V60_LOGO_BASE=logo;
 logo=function(s){
+  if(s?.code==='SAMS2L')return `<div class="logo v60-linked-etf"><img src="${V60_LEVERAGE_ICON}" alt="2X"></div>`;
+  if(s?.code==='SAMS2I')return `<div class="logo v60-linked-etf"><img src="${V60_INVERSE_ICON}" alt="인버스 2X"></div>`;
   return V60_LOGO_BASE(s);
 };
 
@@ -5672,6 +5119,7 @@ window.__marketV61={
 
 <script>
 /* ============ V62 — 삼성 2X 상품 합산 보유비중 25% 상한 ============
+   - 대상: SAMS2L + SAMS2I 합산
    - 기준: 주문 확정 시점 총 평가자산(total)의 25%
    - 기존 보유분이 이미 25%를 넘는 경우 강제매도하지 않음; 추가 매수만 차단
    - 매도는 제한하지 않음
@@ -5726,6 +5174,7 @@ trade=async function v62Trade(type,qty){
 window.__marketV62={
   version:62,
   leverageExposureCap:.25,
+  codes:['SAMS2L','SAMS2I'],
   combined:true,
   buyOnly:true,
   forcedSell:false,
@@ -6923,12 +6372,29 @@ function v75PickEventType(cat, r){
   const pool = V75_EVENT_TYPES.filter(e=>e.cat===cat);
   return pool[Math.floor(r()*pool.length)];
 }
+/* V102 — 뉴스 분배 최소 개선
+   - 뉴스 카테고리/발생량/반응/가격영향/개별종목 선택은 그대로 유지한다.
+   - 업종 뉴스만 '37개 업종 완전 균등'에서 '업종 구성 종목수의 제곱근 가중치'로 변경한다.
+   - 종목수 그대로 비례시키지 않아 산업재 같은 대형 업종의 과도한 독점을 막는다.
+   - 기존과 동일하게 난수 1회만 소비하므로 이후 뉴스 생성의 결정론적 흐름을 최대한 보존한다. */
+function v102PickWeightedSector(r,sectors,stocks){
+  if(!Array.isArray(sectors)||!sectors.length)return '산업재';
+  const counts=new Map();
+  for(const s of stocks||[]){
+    if(!s||s.isETF)continue;
+    counts.set(s.sector,(counts.get(s.sector)||0)+1);
+  }
+  const weighted=sectors.map(sector=>[sector,Math.sqrt(Math.max(1,counts.get(sector)||0))]);
+  const total=weighted.reduce((a,x)=>a+x[1],0)||1;
+  let u=r()*total;
+  for(const [sector,w] of weighted){u-=w;if(u<=0)return sector;}
+  return weighted[weighted.length-1][0];
+}
 function v75PickTarget(eventType, r, sectors, stocks){
   if(eventType.needsTarget==='market') return {kind:'market'};
-  if(eventType.needsTarget==='sector') return {kind:'sector', sector: v95PickHotSector(r)};
-  // V92 Step 5: 종목뉴스만 가중 추첨. 총 뉴스 빈도와 이벤트 성격/가격영향은 그대로 유지한다.
-  const stock = v92WeightedNewsStock(r) || stocks[Math.floor(r()*stocks.length)];
-  return {kind:'stock', stock, sector: v94SectorOf(stock)};
+  if(eventType.needsTarget==='sector') return {kind:'sector', sector:v102PickWeightedSector(r,sectors,stocks)};
+  const stock = stocks[Math.floor(r()*stocks.length)];
+  return {kind:'stock', stock, sector:stock.sector};
 }
 
 // 슬롯 하나에서 이벤트 하나를 만든다. day/slot/index로 완전히 결정론적.
@@ -8057,43 +7523,51 @@ v11PostMove=function v87BalancedActivePostMove(s,day,minute,changeRate){
   // changeRate == price/open-1 이므로 open=1, price=1+changeRate로 동일한 V81 곡선을 적용 가능.
   return v81BalanceDeepTail(s,day,minute,Math.max(.01,1+changeRate),1,ret);
 };
-/* V100 PRODUCTION: blue-chip extreme overlap guard
-   - Does NOT create a blue-chip spike.
-   - Does NOT hard-cap blue chips at ±10%.
-   - Leaves ordinary moves untouched.
-   - Only compresses the excess portion after ±12% for blue chips, increasingly with magnitude.
-   - Therefore a day with zero blue-chip spikes remains fully possible.
+
+/* V101: blue 우량주 극단 변동 중첩 완화 — 실제 누적 등락률 기준 수정
+   - ±12% 이내의 일반 움직임은 기존 V88/V81 postMove를 그대로 유지한다.
+   - ±12%를 넘은 뒤에는 현재 누적 등락률이 커질수록 "같은 방향으로 더 밀어붙이는" postMove만 완화한다.
+   - 반대 방향(되돌림/조정) postMove는 막지 않아 하드캡이나 강제반전처럼 보이지 않게 한다.
+   - ETF·비우량주·뉴스·KOSPI·종목 구성은 변경하지 않는다.
 */
 const V100_POSTMOVE_BASE=v11PostMove;
-function v100BlueTailGuard(changeRate){
-  const sign=changeRate<0?-1:1, a=Math.abs(changeRate);
-  if(a<=.12)return changeRate;
-  const excess=a-.12;
-  let kept;
-  if(a<=.18) kept=excess*.82;       // 12~18%: mild compression
-  else if(a<=.25) kept=.06*.82+(a-.18)*.58;
-  else if(a<=.35) kept=.06*.82+.07*.58+(a-.25)*.38;
-  else kept=.06*.82+.07*.58+.10*.38+(a-.35)*.22;
-  return sign*(.12+kept);
+function v101BlueTailMultiplier(absChange){
+  const a=Math.abs(Number(absChange)||0);
+  if(a<=.12)return 1;
+  if(a<=.18){const t=(a-.12)/.06;return 1+(.82-1)*t;}
+  if(a<=.25){const t=(a-.18)/.07;return .82+(.58-.82)*t;}
+  if(a<=.35){const t=(a-.25)/.10;return .58+(.38-.58)*t;}
+  if(a<=.45){const t=(a-.35)/.10;return .38+(.22-.38)*t;}
+  return .22;
 }
-v11PostMove=function v100BlueExtremeOverlapGuard(s,day,minute,changeRate){
+v11PostMove=function v101BlueExtremeOverlapGuard(s,day,minute,changeRate){
   const ret=Number(V100_POSTMOVE_BASE(s,day,minute,changeRate))||0;
-  if(s?.isETF || s?.tier!=='blue')return ret;
-  // Guard only when the stock is already in an extreme daily move.
-  // No force-to-spike logic; zero blue spikes on a day is naturally possible.
-  if(Math.abs(changeRate)<=.12 && Math.abs(ret)<=.12)return ret;
-  return v100BlueTailGuard(ret);
+  if(s?.isETF || s?.tier!=='blue' || ret===0)return ret;
+  const ch=Number(changeRate)||0, a=Math.abs(ch);
+  if(a<=.12)return ret;
+  // 현재 누적 움직임과 같은 방향의 추가 추진력만 줄인다. 반대 방향은 원형 유지.
+  const extendsExtreme=(ch>0&&ret>0)||(ch<0&&ret<0);
+  if(!extendsExtreme)return ret;
+  return ret*v101BlueTailMultiplier(a);
 };
 window.__marketV100={
-  version:100,
+  version:101,
+  basedOn:100,
   production:true,
   blueTailGuard:true,
+  guardBasis:'cumulative-change-rate',
+  continuationOnly:true,
   ordinaryMoveThresholdPct:12,
+  multipliers:{at12:1,at18:.82,at25:.58,at35:.38,at45:.22},
   hardCap:false,
   forcesBlueSpike:false,
-  keepsZeroSpikeDaysPossible:true
+  forcesReversal:false,
+  keepsZeroSpikeDaysPossible:true,
+  stockUniverseChanged:false,
+  newsChanged:false,
+  kospiChanged:false,
+  etfChanged:false
 };
-
 
 try{
   v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
@@ -8198,334 +7672,7 @@ window.__marketV95={
 </script>
 
 
-<script>
-/* ============ V89 STEP 2 VERIFY MARKER — 확장 메타데이터 ============ */
-window.__marketV89Step2={
-  version:89,step:2,
-  metadataOnly:true,
-  existingStocksMarket:'KOSPI',
-  kosdaqExcludedFromKospi:true,
-  newsWeightActive:false,
-  priceEngineChanged:false,
-  newsSelectionChanged:false
-};
-</script>
-
-<script>
-/* V102 SAFE RESTORE: minimal legacy ETF compatibility patch only */
-window.__marketV102={
-  version:103,
-  legacyEtfsRestored:['SAMS2L','SAMS2I'],
-  etfRatioTickCache:true,
-  bootStorageWrapper:false,
-  duplicateTradeWrapper:false,
-  v100BlueGuardPreserved:true
-};
-</script>
-
-<style id="v118-style">
-.logo.v118-samsung2x{overflow:hidden;padding:0;background:transparent!important;border:none!important}
-.logo.v118-samsung2x img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
-.v118-delist-note{margin:12px 20px;padding:12px 14px;border-radius:14px;background:var(--card,#f5f6f8);font-size:13px;line-height:1.45}
-</style>
-<script>
-/* V118 — 100원 미만 장마감 자동 상장폐지 */
-const V118_DELIST_THRESHOLD=100;
-const V118_DELIST_START=new Date(2026,7,28,0,0,0,0).getTime();
-const V118_DELIST_KEY='mockstock:market:v118:delist-ledger';
-const V118_BASE_VISUAL=fastVisualPriceAt;
-const V118_BASE_QUOTE=quote;
-const V118_BASE_KOSPI=gameKospiQuote;
-const V118_BASE_NEWS_TEXT=newsText;
-const V118_BASE_TRADE=trade;
-const V118_BASE_BIND=bind;
-const V118_BASE_HOME=home;
-const V118_BASE_LOGO=logo;
-
-let V118_ETF_CONTEXT_MS=null;
-let V118_LEDGER={events:[],lastScannedDay:''};
-let V118_EVENT_AT_BY_CODE=new Map();
-let V118_EVENT_GROUPS=[];
-let V118_LEDGER_VERSION=0;
-let V118_LAST_MINUTE_CHECK=-1;
-const V118_ETF_COMPONENT_CACHE=new Map();
-const V118_ETF_SCALE_CACHE=new Map();
-let V118_KOSPI_GROUP_CACHE=[];
-
-function v118DayKey(ms){
-  const d=new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function v118DayFromKey(key){
-  const [y,m,d]=String(key).split('-').map(Number);
-  return new Date(y,m-1,d,0,0,0,0).getTime();
-}
-function v118CloseMs(dayMs){
-  const d=new Date(dayMs);
-  return new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
-}
-function v118LoadLedger(){
-  try{
-    const x=JSON.parse(localStorage.getItem(V118_DELIST_KEY)||'null');
-    if(x&&Array.isArray(x.events))V118_LEDGER=x;
-  }catch(e){}
-  v118RebuildLedgerCaches();
-}
-function v118SaveLedger(){
-  try{localStorage.setItem(V118_DELIST_KEY,JSON.stringify(V118_LEDGER))}catch(e){}
-}
-function v118RebuildLedgerCaches(){
-  V118_LEDGER.events=(Array.isArray(V118_LEDGER.events)?V118_LEDGER.events:[])
-    .filter(e=>e&&e.code&&Number.isFinite(+e.at)&&Number.isFinite(+e.price))
-    .sort((a,b)=>a.at-b.at||String(a.code).localeCompare(String(b.code)));
-  V118_EVENT_AT_BY_CODE=new Map();
-  for(const e of V118_LEDGER.events){
-    if(!V118_EVENT_AT_BY_CODE.has(e.code))V118_EVENT_AT_BY_CODE.set(e.code,+e.at);
-  }
-  const gm=new Map();
-  for(const e of V118_LEDGER.events){
-    if(!gm.has(+e.at))gm.set(+e.at,[]);
-    gm.get(+e.at).push(e.code);
-  }
-  V118_EVENT_GROUPS=[...gm].map(([at,codes])=>({at,codes:[...new Set(codes)]})).sort((a,b)=>a.at-b.at);
-  V118_LEDGER_VERSION++;
-  V118_ETF_COMPONENT_CACHE.clear();
-  V118_ETF_SCALE_CACHE.clear();
-  v118RebuildKospiGroupCache();
-}
-function v118OrdinaryDelistedAt(code,ms=Date.now()){
-  const at=V118_EVENT_AT_BY_CODE.get(code);
-  return Number.isFinite(at)&&at<=ms;
-}
-function v118AssetDelistedAt(s,ms=Date.now()){
-  if(!s)return true;
-  if(!s.isETF)return v118OrdinaryDelistedAt(s.code,ms);
-  if(s.linkedCode)return v118OrdinaryDelistedAt(s.linkedCode,ms);
-  return false;
-}
-function v118EventIndexAt(ms){
-  let n=0;
-  for(const g of V118_EVENT_GROUPS){if(g.at<=ms)n++;else break}
-  return n;
-}
-function v118BaseVisualWithContext(s,ms){
-  const prev=V118_ETF_CONTEXT_MS;V118_ETF_CONTEXT_MS=ms;
-  try{return V118_BASE_VISUAL(s,ms)}finally{V118_ETF_CONTEXT_MS=prev}
-}
-
-// ETF 구성종목 상장폐지 시 제외하고 잔여 비중 재정규화.
-etfNormalizedComponents=function v118NormalizedComponents(s){
-  const ms=Number.isFinite(+V118_ETF_CONTEXT_MS)?+V118_ETF_CONTEXT_MS:Date.now();
-  const idx=v118EventIndexAt(ms),key=s.code+'|'+idx;
-  const hit=V118_ETF_COMPONENT_CACHE.get(key);if(hit)return hit;
-  const available=(s.components||[])
-    .map(([code,w])=>[(typeof V23_STOCK_BY_CODE!=='undefined'?V23_STOCK_BY_CODE.get(code):STOCKS.find(x=>x.code===code)),w])
-    .filter(([x,w])=>x&&!x.isETF&&w>0&&!v118OrdinaryDelistedAt(x.code,ms));
-  const target=Math.max(0,1-(s.bondWeight||0));
-  const sum=available.reduce((a,[,w])=>a+w,0)||1;
-  const out=available.map(([x,w])=>[x,w/sum*target]);
-  V118_ETF_COMPONENT_CACHE.set(key,out);
-  return out;
-};
-function v118EtfScaleAt(s,ms){
-  if(!s?.isETF||s.linkedCode||s.indexLinked)return 1;
-  const idx=v118EventIndexAt(ms),key=s.code+'|'+idx+'|'+V118_LEDGER_VERSION;
-  if(V118_ETF_SCALE_CACHE.has(key))return V118_ETF_SCALE_CACHE.get(key);
-  let scale=1;
-  const compCodes=new Set((s.components||[]).map(x=>x[0]));
-  for(const g of V118_EVENT_GROUPS){
-    if(g.at>ms)break;
-    if(!g.codes.some(c=>compCodes.has(c)))continue;
-    const before=Math.max(1,v118BaseVisualWithContext(s,g.at-1));
-    const after=Math.max(1,v118BaseVisualWithContext(s,g.at+1));
-    scale*=before/after;
-  }
-  V118_ETF_SCALE_CACHE.set(key,scale);
-  return scale;
-}
-
-fastVisualPriceAt=function v118Visual(s,ms=Date.now()){
-  if(v118AssetDelistedAt(s,ms))return 0;
-  const raw=v118BaseVisualWithContext(s,ms);
-  if(s?.isETF&&!s.linkedCode&&!s.indexLinked){
-    const px=raw*v118EtfScaleAt(s,ms);
-    return Math.max(5,Math.round(px/5)*5);
-  }
-  return raw;
-};
-smoothPriceAt=fastVisualPriceAt;
-
-quote=function v118Quote(s){
-  const now=Date.now(),q=V118_BASE_QUOTE(s)||{};
-  if(v118AssetDelistedAt(s,now))return {...q,price:0,change:-100,volume:0};
-  if(!s?.isETF)return q;
-  const price=fastVisualPriceAt(s,now);
-  const d=new Date(now),openMs=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
-  const open=Math.max(5,fastVisualPriceAt(s,openMs)||5);
-  return {...q,price,open,change:(price/open-1)*100};
-};
-rawQuote=quote;
-
-// KOSPI 편출 순간 연속성 유지.
-function v118KospiRawRatio(ms,excluded){
-  let weighted=0,totalW=0;
-  for(const s of STOCKS){
-    if(s.isETF||excluded?.has(s.code))continue;
-    const w=kospiWeight(s);if(!(w>0))continue;
-    const anchor=V71_KOSPI_ANCHOR_PRICE.get(s.code)||1;
-    const px=Math.max(1,v118BaseVisualWithContext(s,ms));
-    weighted+=w*(px/anchor);totalW+=w;
-  }
-  return totalW>0?weighted/totalW:1;
-}
-function v118RebuildKospiGroupCache(){
-  V118_KOSPI_GROUP_CACHE=[];
-  const excluded=new Set();let scale=1;
-  for(const g of V118_EVENT_GROUPS){
-    const before=v118KospiRawRatio(g.at,excluded);
-    for(const c of g.codes)excluded.add(c);
-    const after=v118KospiRawRatio(g.at,excluded);
-    if(after>0)scale*=before/after;
-    V118_KOSPI_GROUP_CACHE.push({at:g.at,scale,excluded:new Set(excluded)});
-  }
-}
-function v118KospiStateAt(ms){
-  let scale=1,excluded=new Set();
-  for(const x of V118_KOSPI_GROUP_CACHE){
-    if(x.at>ms)break;
-    scale=x.scale;excluded=x.excluded;
-  }
-  return {scale,excluded};
-}
-gameKospiQuote=function v118Kospi(ms=Date.now()){
-  if(ms<V71_TRANSITION_MS)return V118_BASE_KOSPI(ms);
-  const a=v118KospiStateAt(ms);
-  const ratio=v118KospiRawRatio(ms,a.excluded)*a.scale;
-  const level=Math.min(V73_PRICE_CAP,V71_KOSPI_ANCHOR_LEVEL*ratio);
-  const d=new Date(ms),openMs=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
-  const b=v118KospiStateAt(openMs);
-  const openRatio=v118KospiRawRatio(openMs,b.excluded)*b.scale;
-  const open=Math.min(V73_PRICE_CAP,V71_KOSPI_ANCHOR_LEVEL*openRatio);
-  return {level,open,change:(level/open-1)*100};
-};
-
-// 완료된 실제 장만 스캔. 100원 미만이면 영구 편출.
-async function v118CatchUpDelistings(){
-  const now=Date.now();
-  let day=V118_LEDGER.lastScannedDay?v118DayFromKey(V118_LEDGER.lastScannedDay)+86400000:V118_DELIST_START;
-  day=Math.max(day,V118_DELIST_START);
-  let changed=false;
-  while(day<=now){
-    const close=v118CloseMs(day);
-    if(close>now)break;
-    const already=new Set(V118_LEDGER.events.map(e=>e.code));
-    const add=[];
-    for(const s of STOCKS){
-      if(s.isETF||already.has(s.code))continue;
-      const px=Math.round(v118BaseVisualWithContext(s,close));
-      if(px<V118_DELIST_THRESHOLD)add.push({code:s.code,name:s.name,at:close,price:px,reason:'CLOSE_UNDER_100'});
-    }
-    if(add.length){V118_LEDGER.events.push(...add);changed=true}
-    V118_LEDGER.lastScannedDay=v118DayKey(day);
-    v118SaveLedger();
-    day+=86400000;
-    await new Promise(r=>setTimeout(r,0));
-  }
-  if(changed){
-    v118RebuildLedgerCaches();
-    if(selected&&v118AssetDelistedAt(selected)){selected=null;render();toast('장 마감 기준 100원 미만 종목이 상장폐지되었습니다.');}
-    else render();
-  }
-  return changed;
-}
-v118LoadLedger();
-
-// 검색에서 제외.
-searchRows=function v118SearchRows(term=''){
-  const q=term.trim().toLowerCase();
-  const active=STOCKS.filter(s=>!v118AssetDelistedAt(s));
-  const list=q?active.filter(s=>`${s.name} ${s.code} ${s.sector}`.toLowerCase().includes(q)):active.slice(0,5);
-  return list.length?list.map(s=>{const x=quote(s);return `<div class="stock" data-search-stock="${s.code}">${logo(s)}<div><div class="name">${s.name}</div><small class="sub">${s.code} · ${s.sector}</small></div><div class="price">${fmt(x.price)}원<small class="${x.change<0?'down':'gain'}">${pct(x.change)}</small></div></div>`}).join(''):`<div class="search-hint">일치하는 종목이 없어요.<br>종목명이나 6자리 코드를 확인해주세요.</div>`;
-};
-
-function v118PruneDelistedDom(){
-  document.querySelectorAll('[data-stock],[data-search-stock]').forEach(el=>{
-    const code=el.dataset.stock||el.dataset.searchStock;
-    const s=(typeof V23_STOCK_BY_CODE!=='undefined'?V23_STOCK_BY_CODE.get(code):STOCKS.find(x=>x.code===code));
-    if(s&&v118AssetDelistedAt(s))el.remove();
-  });
-  document.querySelectorAll('.stock .rank-num').forEach((el,i)=>el.textContent=i+1);
-}
-bind=function v118Bind(){
-  v118PruneDelistedDom();
-  return V118_BASE_BIND();
-};
-
-home=function v118Home(){
-  let html=V118_BASE_HOME();
-  const lost=Object.entries(state?.holdings||{}).filter(([code,h])=>h?.qty>0&&v118OrdinaryDelistedAt(code));
-  if(lost.length){
-    const names=lost.map(([c])=>(typeof V23_STOCK_BY_CODE!=='undefined'?V23_STOCK_BY_CODE.get(c)?.name:c)||c).join(', ');
-    html=html.replace('<div class="between filter">',`<div class="v118-delist-note"><b>상장폐지 반영</b><br>${names} · 평가금액 0원 처리</div><div class="between filter">`);
-  }
-  return html;
-};
-
-trade=async function v118Trade(type,qty){
-  if(selected&&v118AssetDelistedAt(selected))return toast('상장폐지된 종목은 거래할 수 없어요.');
-  return V118_BASE_TRADE(type,qty);
-};
-
-newsText=function v118NewsText(){
-  const last=V118_LEDGER.events.length?V118_LEDGER.events[V118_LEDGER.events.length-1]:null;
-  if(last&&Date.now()-last.at<86400000)return `${last.name||last.code}가 장 마감 100원 미만으로 상장폐지되었습니다.`;
-  return V118_BASE_NEWS_TEXT();
-};
-
-const V118_REFRESH_BASE=refreshLive;
-refreshLive=function v118Refresh(){
-  V118_REFRESH_BASE();
-  const minute=Math.floor(Date.now()/60000);
-  if(minute!==V118_LAST_MINUTE_CHECK){V118_LAST_MINUTE_CHECK=minute;v118CatchUpDelistings();}
-  if(selected&&v118AssetDelistedAt(selected)){selected=null;render();toast('상장폐지된 종목은 목록에서 제외되었습니다.');}
-};
-
-const V118_NEWS_PICK_BASE=v92WeightedNewsStock;
-v92WeightedNewsStock=function v118NewsPick(r){
-  let s=V118_NEWS_PICK_BASE(r);
-  if(s&&!v118OrdinaryDelistedAt(s.code))return s;
-  const active=STOCKS.filter(x=>!x.isETF&&!v118OrdinaryDelistedAt(x.code));
-  return active.length?active[Math.floor(r()*active.length)]:null;
-};
-
-// 첨부 이미지: 첫 번째 파랑=SAMS2L, 두 번째 빨강=SAMS2I.
-const V118_SAMS2L_ICON='data:image/jpeg;base64,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';
-const V118_SAMS2I_ICON='data:image/jpeg;base64,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';
-logo=function v118Logo(s){
-  if(s?.code==='SAMS2L')return `<div class="logo v119-sams2l" aria-label="삼성전자 레버리지 2X">X2</div>`;
-  if(s?.code==='SAMS2I')return `<div class="logo v118-samsung2x" aria-label="삼성전자 인버스 2X"><img src="${V118_SAMS2I_ICON}" alt=""></div>`;
-  return V118_BASE_LOGO(s);
-};
-
-setTimeout(()=>v118CatchUpDelistings(),30);
-
-window.__marketV118={
-  version:118,stage:'AUTO_DELIST_UNDER_100_AT_CLOSE',
-  threshold:100,ordinaryStocksOnly:true,checkAt:'23:30 close',
-  etfPriceThresholdDelist:false,etfConstituentRebalance:true,
-  kospiContinuityRebase:true,etfContinuityRebase:true,
-  linkedEtfEndsWithUnderlying:true,separateThermalTimerAdded:false,
-  iconSource:'user supplied images'
-};
-</script>
-
-<script>
-window.__marketV119={
-  version:119,
-  stage:'SAMSUNG_LEVERAGE_ICON_FIX',
-  sams2lIcon:'BLUE_CIRCLE_X2',
-  sams2iIcon:'UNCHANGED_RED_INVERSE_2X',
-  behaviorChanged:false
-};
+<script id="v102-news-distribution-diagnostic">
+window.__marketV102={version:102,stage:'NEWS_SECTOR_DISTRIBUTION_FIX',stockUniverse:300,sectorWeight:'sqrt(stockCount)',individualStockSelectionChanged:false,categoryWeightsChanged:false,newsFrequencyChanged:false,newsPriceImpactChanged:false,marketEngineChanged:false};
 </script>
 </body></html>
