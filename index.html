@@ -5599,22 +5599,18 @@ window.__marketV67={
 const V68_SESSION_MS=(MARKET_CLOSE_MIN-MARKET_OPEN_MIN)*60*1000;
 const V68_STATE_SPEED=MARKET_V9_SPEED*DAY_MS/V68_SESSION_MS*V63_STATE_SPEED;
 
-/* V90 — 체감 변동 압축
-   문제: V68는 실제 장 1회(08:00~23:30, 15.5시간)를 게임 1거래일(390틱)에 그대로 매핑했다.
-        그 결과 30분~1시간만 접속해도 하루치 가격 경로의 6~7%만 반영되어 거의 안 움직이는
-        것처럼 느껴졌다 (기획 의도였던 '짧은 시간 안 극적인 등락'과 반대 방향).
-   해결: 세션(거래 가능 시간대, 08:00~23:30) 자체는 그대로 두되, 그 안에서 게임 거래일이
-        V90_CYCLE_MS 주기로 여러 번 반복 재생되게 한다. 국면/모멘텀/반전 로직(V9~V88)은
-        전혀 건드리지 않는다 — '하루치 경로가 재생되는 속도'만 빨라진다.
+/* V90 — 체감 변동 압축 시도 (폐기됨, 아래 참고)
+   문제 인식은 맞았다: V68는 실제 장 1회(08:00~23:30, 15.5시간)를 게임 1거래일(390틱)에
+   그대로 매핑해서, 30분~1시간만 접속해도 하루치 경로의 6~7%만 반영되어 거의 안 움직이는
+   것처럼 느껴졌다.
+   V90의 해법(day 자체를 부풀려 여러 번 반복 재생)은 day 앵커 기반 연속성 계산(V69)을
+   폭주시켜 로딩이 멈추는 성능 버그를 냈다 → V92에서 day를 원래대로(세션당 1개) 롤백.
+   체감 변동 문제 자체는 이후 V95(파일 하단, day를 전혀 건드리지 않는 연속 위상 이동
+   방식)가 안전하게 대체 해결한다. 이 블록은 기록 목적으로만 남겨둔다.
 */
-const V90_CYCLE_MS=60*60*1000; // 실제 60분 = 화면 표시용 사이클 (day는 원래대로 유지)
-const V90_CYCLES_PER_SESSION=Math.ceil(V68_SESSION_MS/V90_CYCLE_MS);
 
 /* V92 — 성능 회귀 긴급 수정
-   V90은 day 자체를 16배 부풀려서, day 앵커 기반 연속성 계산(V69)이 30일치 이상을
-   재계산하게 만들어 로딩이 멈추는 성능 버그를 냈다. day는 원래(세션당 1개)로 되돌리고,
-   대신 '사이클 진행률(cycleProgress)'만 별도로 계산해서 노출한다.
-   가격 재생 압축 자체는 잠시 보류 — 접속 문제 해결이 우선이라 안전한 상태로 되돌린다.
+   day는 원래(세션당 1개)로 되돌린다. 체감 변동 압축은 V95가 안전한 방식으로 다시 담당한다.
 */
 function v68SessionPosition(ms=Date.now()){
   const d=new Date(ms);
@@ -5681,8 +5677,8 @@ try{
 window.__marketV68={
   version:68,basedOn:67,
   realSession:'08:00-23:30',ticksPerSession:390,
-  internalDaysPerSession:V90_CYCLES_PER_SESSION,internalDayRolloverDuringSession:true,
-  secondsPerPriceTick:V90_CYCLE_MS/DAY_STEPS/1000,
+  internalDaysPerSession:1,internalDayRolloverDuringSession:false,
+  secondsPerPriceTick:V68_SESSION_MS/DAY_STEPS/1000,
   stateSpeedMultiplier:V68_STATE_SPEED,
   stateSpeedDecoupled:true,priceInterpolation:true,
   previousCloseBasis:'previous real session 23:30',
@@ -5691,11 +5687,8 @@ window.__marketV68={
 };
 
 window.__marketV90={
-  version:90,basedOn:68,
-  reason:'세션 15.5시간에 게임 1거래일이 늘어져 체감 변동이 거의 없던 문제 수정',
-  cycleMs:V90_CYCLE_MS,cyclesPerSession:V90_CYCLES_PER_SESSION,
-  realMinutesPerGameDay:V90_CYCLE_MS/60000,
-  regimeMomentumReversalLogicChanged:false
+  version:90,basedOn:68,status:'superseded-by-v95',
+  note:'day를 부풀리는 방식은 성능 문제로 V92에서 롤백됨. 체감 변동 개선은 V95가 담당.'
 };
 </script>
 
