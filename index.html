@@ -7546,4 +7546,51 @@ window.__marketV86={
 };
 </script>
 
+
+<script>
+/* ============ V87 — V86 회귀 수정: V37/V63/V64 활성 postMove 보존 + V81 tail 균형 ============
+   V86은 v34PostBase로 되돌리면서 후속 V37/V63/V64 postMove를 우회했다.
+   V87은 V64 시점의 활성 체인을 그대로 재구성한 뒤 V81을 마지막 magnitude 보정으로만 적용한다.
+   scheduler/렌더링/Firebase/뉴스/시장속도는 변경하지 않는다.
+*/
+function v87PreBalancePostMove(s,day,minute,changeRate){
+  // V64 원형을 그대로 재구성: V64_POSTMOVE_BASE == V63FasterPostMove -> V37UnifiedPostMove
+  const cur=Number(V64_POSTMOVE_BASE(s,day,minute,changeRate))||0;
+  const r=v64Ramp(day,minute);
+  if(!r)return cur;
+  const avg=v64CausalAverage(
+    (d,m)=>V64_POSTMOVE_BASE(s,d,m,changeRate),
+    day,minute,x=>x||0
+  );
+  return cur*(1-r)+avg*r;
+}
+
+v11PostMove=function v87BalancedActivePostMove(s,day,minute,changeRate){
+  let ret=v87PreBalancePostMove(s,day,minute,changeRate);
+  if(s?.isETF || ret===0 || Math.abs(changeRate)<.15)return ret;
+  // changeRate == price/open-1 이므로 open=1, price=1+changeRate로 동일한 V81 곡선을 적용 가능.
+  return v81BalanceDeepTail(s,day,minute,Math.max(.01,1+changeRate),1,ret);
+};
+
+try{
+  v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
+  V29_OPEN_CACHE?.clear?.(); V29_CLOSE_CACHE?.clear?.(); V29_SCALE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.(); V49_PATH_STATE_CACHE?.clear?.();
+  V69_RAW_CACHE?.clear?.(); V69_SCALE_CACHE?.clear?.(); V70_WALK_CACHE?.clear?.();
+  V23_QUOTE_CACHE?.clear?.(); V43_PREVCLOSE_CACHE?.clear?.(); V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_TICK_CACHE?.clear?.(); V52_LIVE_QUOTE_CACHE?.clear?.();
+  V52_LIVE_MOVER_CACHE?.clear?.(); V67_PREV_CLOSE_CACHE?.clear?.(); chartHistoryCache?.clear?.();
+}catch(e){}
+
+window.__marketV87={
+  version:87,basedOn:86,
+  v37Preserved:true,v63StateSpeedPreserved:true,v64CausalSmoothingPreserved:true,
+  v81AppliedOnLivePostMove:true,
+  v85HeavyRawWrapperDisabled:true,
+  schedulerChanged:false,thermalTimersAdded:0,
+  directionForced:false,forcedReversal:false,forcedProfit:false,
+  tierTailTuningPreserved:true
+};
+</script>
+
 </body></html>
