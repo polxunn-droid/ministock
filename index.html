@@ -64,7 +64,9 @@
 </style>
 </head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js">
+/* V99 STEP12: integrated 400-stock + 15-ETF validation build; no price-model retuning */
+</script>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
 <script>
@@ -123,7 +125,7 @@ mk('298040','효성중공업','전력기기','growth',1650000),mk('241560','두�
 mk('454910','두산로보틱스','로봇','theme',95000),mk('443060','HD현대마린솔루션','조선','growth',245000),
 mk('086280','현대글로비스','물류','blue',180000),mk('028670','팬오션','해운','growth',5200),
 mk('000120','CJ대한통운','물류','blue',115000),mk('000720','현대건설','건설','blue',98000)];
-const EXTRA_STOCK_DATA=[["000150","두산",1170000],["011070","LG이노텍",584000],["272210","한화시스템",72500],["003230","삼양식품",1516000],["028050","삼성E&A",47800],["047050","포스코인터내셔널",52000],["180640","한진칼",127800],["161390","한국타이어앤테크놀로지",68000],["007660","이수페타시스",109200],["016360","삼성증권",88300],["047040","대우건설",19070],["009830","한화솔루션",32550],["000100","유한양행",85900],["128940","한미약품",527000],["267270","HD건설기계",136500],["001440","대한전선",27850],["062040","산일전기",175800],["353200","대덕전자",105400],["010060","OCI홀딩스",274000],["000500","가온전선",167600],["066970","엘앤에프",118800],["034220","LG디스플레이",9470],["088980","맥쿼리인프라",9830],["052690","한전기술",121400],["011790","SKC",86400],["085620","미래에셋생명",30200],["002380","KCC",470000],["082740","한화엔진",47700],["004170","신세계",421000],["000990","DB하이텍",90500],["004020","현대제철",29450],["001040","CJ",129600],["018880","한온시스템",3535],["036460","한국가스공사",36950],["111770","영원무역",75800],["009420","한올바이오파마",63700],["103590","일진전기",68800],["006360","GS건설",37450],["035250","강원랜드",14610],["022100","포스코DX",20500],["011780","금호석유화학",123300],["008930","한미사이언스",44550],["012750","에스원",80100],["336260","두산퓨얼셀",46100],["023530","롯데쇼핑",105700],["302440","SK바이오사이언스",37850],["031210","서울보증보험",42400],["017800","현대엘리베이터",75300],["483650","달바글로벌",231500],["375500","DL이앤씨",72800],["007340","DN오토모티브",47650],["004800","효성",157100],["489790","한화비전",52000],["026960","동서",26300],["450080","에코프로머티",36500],["001720","신영증권",157200],["003690","코리안리",14500],["005850","에스엘",53200],["011170","롯데케미칼",56700],["004990","롯데지주",24050],["204320","HL만도",50000],["000240","한국앤컴퍼니",24400],["103140","풍산",82300],["279570","케이뱅크",5640],["005440","현대지에프홀딩스",12220],["009970","영원무역홀딩스",172200],["081660","미스토홀딩스",41800],["030000","제일기획",19210],["018670","SK가스",235000],["014680","한솔케미칼",200500],["051600","한전KPS",47700],["181710","NHN",64200],["112610","씨에스윈드",49850],["002790","아모레퍼시픽홀딩스",26750],["073240","금호타이어",7070],["462870","시프트업",33050],["457190","이수스페셜티케미컬",62800],["439260","대한조선",49600],["475150","SK이터닉스",54000],["071970","HD현대마린엔진",52500],["089860","롯데렌탈",46850],["006040","동원산업",38250],["020150","롯데에너지머티리얼즈",32200],["023590","다우기술",38650],["011210","현대위아",60800],["361610","SK아이이테크놀로지",19960],["322000","HD현대에너지솔루션",141800],["120110","코오롱인더",52800],["001800","오리온홀딩스",26050],["001430","세아베스틸지주",43350],["020560","아시아나항공",7480],["097230","HJ중공업",17050],["294870","IPARK현대산업개발",23000],["006280","녹십자",129500],["001120","LX인터내셔널",38250],["069620","대웅제약",127600],["007810","코리아써키트",58300],["298020","효성티앤씨",322500],["012630","HDC",22850],["001740","SK네트웍스",6780],["229640","LS에코에너지",43950],["093370","후성",12330],["280360","롯데웰푸드",140800],["005070","코스모신소재",38900],["082640","동양생명",8250],["281820","케이씨텍",64900],["003540","대신증권",26750],["415640","KB발해인프라",10260],["192080","더블유게임즈",58600],["017960","한국카본",23800],["004000","롯데정밀화학",46850],["300720","한일시멘트",16140],["030610","교보증권",10230],["001820","삼화콘덴서",106300],["000080","하이트진로",15410],["006340","대원전선",13650],["032350","롯데관광개발",13420],["003530","한화투자증권",4960],["000210","DL",49400],["003090","대웅",17560],["003570","SNT다이내믹스",30550],["192400","쿠쿠홀딩스",27900],["003240","태광산업",891000],["077970","STX엔진",24300],["479080","1Q 머니마켓액티브",53732],["185750","종근당",68400],["009450","경동나비엔",64000],["009240","한샘",39550],["030190","NICE평가정보",15770],["005090","SGC에너지",64300],["034230","파라다이스",9860],["003470","유안타증권",4715],["000370","한화손해보험",7780],["195870","해성디에스",53200],["285130","SK케미칼",52100],["006120","SK디스커버리",51100],["006110","삼아알미늄",58100],["005180","빙그레",94500],["079160","CJ CGV",5260],["071320","지역난방공사",74700],["100090","SK오션플랜트",13450],["004490","세방전지",60000],["499790","GS피앤엘",41550],["003850","보령",9000],["298050","HS효성첨단소재",169400],["137310","에스디바이오센서",6250],["214320","이노션",18840],["036530","SNT홀딩스",46000],["000670","영풍",39250],["456040","OCI",79800],["064960","SNT모티브",26250],["003160","디아이",24500],["317450","명인제약",46150],["094800","맵스리얼티",7150],["268280","미원에스씨",132700],["017940","E1",96700],["100840","SNT에너지",32000],["069260","TKG휴켐스",16140],["005880","대한해운",2040],["002960","한국쉘석유",502000],["005690","파미셀",10820],["033240","자화전자",29950],["000400","롯데손해보험",2065],["002350","넥센타이어",6500],["001060","JW중외제약",27250],["001570","금양",9900],["383800","LX홀딩스",8250],["000640","동아쏘시오홀딩스",93200],["001680","대상",18090],["014820","동원시스템즈",21600],["248070","솔루엠",13030],["006380","카프로",3660],["001510","SK증권",2640],["002840","미원상사",135500],["108320","LX세미콘",37200],["075580","세진중공업",10590],["453340","현대그린푸드",18490],["079900","전진건설로봇",40050],["001270","부국증권",56300],["002990","금호건설",15620],["114090","GKL",9340],["025540","한국단자",56200],["090460","비에이치",16850],["058650","세아홀딩스",133500],["006650","대한유화",87000],["003300","한일홀딩스",18230],["016380","KG스틸",5620],["007700","F&F홀딩스",14290],["005810","풍산홀딩스",38200],["178920","PI첨단소재",18670],["003620","KG모빌리티",2695],["336370","솔루스첨단소재",7490],["039130","하나투어",33300],["284740","쿠쿠홈시스",22950],["001500","현대차증권",8040],["008060","대덕",15770],["009410","태영건설",1650],["001530","DI동일",23650],["019170","신풍제약",9320],["377740","바이오노트",4790]];
+const EXTRA_STOCK_DATA=[["000150","두산",1170000],["011070","LG이노텍",584000],["272210","한화시스템",72500],["003230","삼양식품",1516000],["028050","삼성E&A",47800],["047050","포스코인터내셔널",52000],["180640","한진칼",127800],["161390","한국타이어앤테크놀로지",68000],["007660","이수페타시스",109200],["016360","삼성증권",88300],["047040","대우건설",19070],["009830","한화솔루션",32550],["000100","유한양행",85900],["128940","한미약품",527000],["267270","HD건설기계",136500],["001440","대한전선",27850],["062040","산일전기",175800],["353200","대덕전자",105400],["010060","OCI홀딩스",274000],["000500","가온전선",167600],["066970","엘앤에프",118800],["034220","LG디스플레이",9470],["088980","맥쿼리인프라",9830],["052690","한전기술",121400],["011790","SKC",86400],["085620","미래에셋생명",30200],["002380","KCC",470000],["082740","한화엔진",47700],["004170","신세계",421000],["000990","DB하이텍",90500],["004020","현대제철",29450],["001040","CJ",129600],["018880","한온시스템",3535],["036460","한국가스공사",36950],["111770","영원무역",75800],["009420","한올바이오파마",63700],["103590","일진전기",68800],["006360","GS건설",37450],["035250","강원랜드",14610],["022100","포스코DX",20500],["011780","금호석유화학",123300],["008930","한미사이언스",44550],["012750","에스원",80100],["336260","두산퓨얼셀",46100],["023530","롯데쇼핑",105700],["302440","SK바이오사이언스",37850],["031210","서울보증보험",42400],["017800","현대엘리베이터",75300],["483650","달바글로벌",231500],["375500","DL이앤씨",72800],["007340","DN오토모티브",47650],["004800","효성",157100],["489790","한화비전",52000],["026960","동서",26300],["450080","에코프로머티",36500],["001720","신영증권",157200],["003690","코리안리",14500],["005850","에스엘",53200],["011170","롯데케미칼",56700],["004990","롯데지주",24050],["204320","HL만도",50000],["000240","한국앤컴퍼니",24400],["103140","풍산",82300],["279570","케이뱅크",5640],["005440","현대지에프홀딩스",12220],["009970","영원무역홀딩스",172200],["081660","미스토홀딩스",41800],["030000","제일기획",19210],["018670","SK가스",235000],["014680","한솔케미칼",200500],["051600","한전KPS",47700],["181710","NHN",64200],["112610","씨에스윈드",49850],["002790","아모레퍼시픽홀딩스",26750],["073240","금호타이어",7070],["462870","시프트업",33050],["457190","이수스페셜티케미컬",62800],["439260","대한조선",49600],["475150","SK이터닉스",54000],["071970","HD현대마린엔진",52500],["089860","롯데렌탈",46850],["006040","동원산업",38250],["020150","롯데에너지머티리얼즈",32200],["023590","다우기술",38650],["011210","현대위아",60800],["361610","SK아이이테크놀로지",19960],["322000","HD현대에너지솔루션",141800],["120110","코오롱인더",52800],["001800","오리온홀딩스",26050],["001430","세아베스틸지주",43350],["020560","아시아나항공",7480],["097230","HJ중공업",17050],["294870","IPARK현대산업개발",23000],["006280","녹십자",129500],["001120","LX인터내셔널",38250],["069620","대웅제약",127600],["007810","코리아써키트",58300],["298020","효성티앤씨",322500],["012630","HDC",22850],["001740","SK네트웍스",6780],["229640","LS에코에너지",43950],["093370","후성",12330],["280360","롯데웰푸드",140800],["005070","코스모신소재",38900],["082640","동양생명",8250],["281820","케이씨텍",64900],["003540","대신증권",26750],["415640","KB발해인프라",10260],["192080","더블유게임즈",58600],["017960","한국카본",23800],["004000","롯데정밀화학",46850],["300720","한일시멘트",16140],["030610","교보증권",10230],["001820","삼화콘덴서",106300],["000080","하이트진로",15410],["006340","대원전선",13650],["032350","롯데관광개발",13420],["003530","한화투자증권",4960],["000210","DL",49400],["003090","대웅",17560],["003570","SNT다이내믹스",30550],["192400","쿠쿠홀딩스",27900],["003240","태광산업",891000],["077970","STX엔진",24300],["286940","롯데이노베이트",18500],["185750","종근당",68400],["009450","경동나비엔",64000],["009240","한샘",39550],["030190","NICE평가정보",15770],["005090","SGC에너지",64300],["034230","파라다이스",9860],["003470","유안타증권",4715],["000370","한화손해보험",7780],["195870","해성디에스",53200],["285130","SK케미칼",52100],["006120","SK디스커버리",51100],["006110","삼아알미늄",58100],["005180","빙그레",94500],["079160","CJ CGV",5260],["071320","지역난방공사",74700],["100090","SK오션플랜트",13450],["004490","세방전지",60000],["499790","GS피앤엘",41550],["003850","보령",9000],["298050","HS효성첨단소재",169400],["137310","에스디바이오센서",6250],["214320","이노션",18840],["036530","SNT홀딩스",46000],["000670","영풍",39250],["456040","OCI",79800],["064960","SNT모티브",26250],["003160","디아이",24500],["317450","명인제약",46150],["094800","맵스리얼티",7150],["268280","미원에스씨",132700],["017940","E1",96700],["100840","SNT에너지",32000],["069260","TKG휴켐스",16140],["005880","대한해운",2040],["002960","한국쉘석유",502000],["005690","파미셀",10820],["033240","자화전자",29950],["000400","롯데손해보험",2065],["002350","넥센타이어",6500],["001060","JW중외제약",27250],["001570","금양",9900],["383800","LX홀딩스",8250],["000640","동아쏘시오홀딩스",93200],["001680","대상",18090],["014820","동원시스템즈",21600],["248070","솔루엠",13030],["006380","카프로",3660],["001510","SK증권",2640],["002840","미원상사",135500],["108320","LX세미콘",37200],["075580","세진중공업",10590],["453340","현대그린푸드",18490],["079900","전진건설로봇",40050],["001270","부국증권",56300],["002990","금호건설",15620],["114090","GKL",9340],["025540","한국단자",56200],["090460","비에이치",16850],["058650","세아홀딩스",133500],["006650","대한유화",87000],["003300","한일홀딩스",18230],["016380","KG스틸",5620],["007700","F&F홀딩스",14290],["005810","풍산홀딩스",38200],["178920","PI첨단소재",18670],["003620","KG모빌리티",2695],["336370","솔루스첨단소재",7490],["039130","하나투어",33300],["284740","쿠쿠홈시스",22950],["001500","현대차증권",8040],["008060","대덕",15770],["009410","태영건설",1650],["001530","DI동일",23650],["019170","신풍제약",9320],["377740","바이오노트",4790]];
 function inferSector(name){if(/금융|은행|증권|보험|화재|생명|카드|캐피탈|투자/.test(name))return '금융';if(/반도체|하이닉스|DB하이텍|디아이$/.test(name))return '반도체';if(/현대차|기아|모비스|타이어|오토|만도|에스엘|명신산업/.test(name))return '자동차';if(/제약|약품|바이오|셀트리온|녹십자|유한양행|한미사이언스|종근당|보령|대웅/.test(name))return '바이오';if(/에너지솔루션|삼성SDI|포스코퓨처엠|코스모신소재|TCC스틸|에코프로머티/.test(name))return '2차전지';if(/에어로|로템|항공우주|LIG|풍산|한화시스템|SNT/.test(name))return '방산';if(/조선|중공업|한화오션|마린솔루션/.test(name))return '조선';if(/건설|E&A|엔지니어링|산업개발/.test(name))return '건설';if(/식품|농심|오뚜기|오리온|빙그레|제당|하이트진로|삼양/.test(name))return '식품';if(/화학|케미칼|정밀화학|석유|S-Oil|OCI/.test(name))return '화학';if(/화장품|아모레|생활건강|콜마|코스맥스|에이피알/.test(name))return '화장품';if(/텔레콤|KT$|유플러스/.test(name))return '통신';if(/게임|크래프톤|넷마블|엔씨/.test(name))return '게임';if(/엔터|하이브/.test(name))return '엔터';if(/백화점|마트|리테일|쇼핑|호텔신라/.test(name))return '유통';if(/전력|전기|전선|일렉트릭/.test(name))return '전력기기';if(/철강|제철|스틸|고려아연/.test(name))return '철강';if(/해운|HMM|팬오션/.test(name))return '해운';if(/항공|물류|글로비스|대한통운/.test(name))return '운송';if(/전자|이노텍|디스플레이|SDS|씨엔에스|오토에버/.test(name))return 'IT';return '산업재'}
 const EXTRA_REFERENCE_AT=Date.parse('2026-08-26T05:20:00Z'),EXTRA_REFERENCE_TICK=marketTickAt(EXTRA_REFERENCE_AT);
 for(const [code,name,price] of EXTRA_STOCK_DATA){const s=mk(code,name,inferSector(name),STOCKS.length<180?'blue':'growth',price);s.referencePrice=price;s.referenceTick=EXTRA_REFERENCE_TICK;STOCKS.push(s)}
@@ -148,6 +150,101 @@ for(const s of STOCKS){
   const refPrice=Number(s.referencePrice||MARKET_REFERENCE_PRICES[s.code]||s.base)||0;
   if(refPrice>0 && refPrice<JUNK_TIER_PRICE_THRESHOLD)s.tier='junk';
 }
+
+/* ============ V89 STEP 2 — 400종목 확장용 메타데이터 골격 ============
+   - 기존 300개 개별주는 현재 KOSPI 기준본으로 명시해 기존 지수 결과를 보존.
+   - 향후 신규 KOSDAQ 종목은 market:'KOSDAQ', indexEligible:false로 넣어 KOSPI에서 제외.
+   - sectorExplicit/newsWeight는 향후 업종·뉴스 가중 확장을 위한 메타데이터이며 현재 가격/뉴스 선정에는 미사용.
+*/
+for(const s of STOCKS){
+  if(s.isETF)continue;
+  if(!s.market)s.market='KOSPI';
+  if(s.indexEligible==null)s.indexEligible=(s.market==='KOSPI');
+  if(!s.sectorExplicit)s.sectorExplicit=s.sector;
+  if(!Number.isFinite(+s.newsWeight))s.newsWeight=1;
+}
+
+
+/* ============ V93 STEP 6 TEST — 시장/자산형태/업종 메타데이터 정리 ============
+   - 기존 EXTRA_STOCK_DATA에 일반주식처럼 섞였던 1Q 머니마켓액티브(479080, ETF)를 제거하고
+     KOSPI 일반주식 롯데이노베이트(286940, 2026-08-27 종가 18,500원)로 교체해 개별주 300개를 유지.
+   - 기존 가격엔진의 s.sector는 이번 단계에서 건드리지 않는다. sectorExplicit만 정리해 회귀변화를 최소화.
+   - assetType을 명시해 이후 ETF/주식 혼입을 자동 검출할 수 있게 한다.
+*/
+const V93_SECTOR_EXPLICIT={'000150':'지주','047050':'무역','180640':'지주','007660':'전자부품','009830':'에너지','066970':'2차전지','088980':'인프라','011790':'화학','002380':'화학','082740':'조선','004170':'유통','001040':'지주','018880':'자동차','036460':'유틸리티','111770':'의류','035250':'레저','022100':'IT서비스','012750':'서비스','336260':'에너지','017800':'기계','483650':'화장품','375500':'건설','004800':'지주','489790':'방산','026960':'소비재','003690':'금융','004990':'지주','000240':'지주','279570':'금융','005440':'지주','009970':'지주','081660':'지주','030000':'광고','018670':'에너지','051600':'유틸리티','181710':'IT서비스','112610':'에너지','462870':'게임','457190':'화학','475150':'에너지','071970':'조선','089860':'렌탈','006040':'식품','020150':'2차전지','023590':'IT서비스','011210':'자동차','361610':'2차전지','120110':'화학','001120':'무역','007810':'전자부품','298020':'화학','012630':'지주','001740':'유통','229640':'전력기기','093370':'화학','280360':'식품','281820':'반도체','415640':'인프라','017960':'소재','300720':'건자재','001820':'전자부품','032350':'레저','000210':'지주','192400':'지주','003240':'화학','077970':'조선','286940':'IT서비스','009450':'가전','009240':'가구','030190':'IT서비스','005090':'에너지','034230':'레저','195870':'반도체','006120':'지주','006110':'2차전지','079160':'엔터','071320':'유틸리티','100090':'조선','004490':'2차전지','499790':'지주','298050':'화학','214320':'광고','000670':'비철금속','094800':'리츠','268280':'화학','017940':'에너지','069260':'화학','005690':'바이오','001570':'2차전지','383800':'지주','000640':'지주','001680':'식품','014820':'소재','248070':'전자부품','006380':'화학','002840':'화학','108320':'반도체','453340':'식품','114090':'레저','025540':'전자부품','090460':'전자부품','058650':'지주','006650':'화학','003300':'지주','007700':'지주','178920':'소재','003620':'자동차','336370':'2차전지','039130':'레저','284740':'소비재','008060':'전자부품','001530':'소재'};
+for(const s of STOCKS){
+  s.assetType=s.isETF?'ETF':'STOCK';
+  if(!s.isETF && V93_SECTOR_EXPLICIT[s.code])s.sectorExplicit=V93_SECTOR_EXPLICIT[s.code];
+}
+const V93_MARKET_AUDIT={
+  auditedAt:'2026-08-28',
+  legacyIndividualCount:300,
+  replacement:{removedCode:'479080',removedName:'1Q 머니마켓액티브',reason:'ETF_IN_STOCK_DATA',addedCode:'286940',addedName:'롯데이노베이트'},
+  activeSectorMigration:false
+};
+
+/* ============ V91 STEP 4 TEST — 400종목 밸런스 조정/장기검증 ============
+   - 2단계 메타데이터 구조를 실제 100종목으로 검증하기 위한 테스트 패치.
+   - 모두 market:'KOSDAQ', indexEligible:false -> 기존 GAME KOSPI 산식 불변.
+   - referencePrice는 구조/성능 시뮬레이션용 결정론적 테스트 기준가이며 최종본에서 실제 기준가로 교체한다.
+   - newsWeight는 아직 선택확률에 연결하지 않아 뉴스 희석량을 그대로 측정한다.
+*/
+const V90_STEP3_STOCK_DATA=[["196170","알테오젠","바이오","growth",66600,1.15],["247540","에코프로비엠","2차전지","growth",124900,1.15],["086520","에코프로","2차전지","theme",199500,0.9],["028300","HLB","바이오","theme",20500,0.9],["277810","레인보우로보틱스","로봇","theme",142300,0.9],["141080","리가켐바이오","바이오","growth",12500,1.15],["145020","휴젤","바이오","blue",30300,1.35],["214150","클래시스","바이오","growth",171700,1.15],["087010","펩트론","바이오","theme",60400,0.9],["310210","보로노이","바이오","theme",184600,0.9],["000250","삼천당제약","바이오","growth",37000,1.15],["058470","리노공업","반도체","blue",27900,1.35],["039030","이오테크닉스","반도체","growth",153000,1.15],["357780","솔브레인","반도체","blue",51000,1.35],["403870","HPSP","반도체","growth",145600,1.15],["036930","주성엔지니어링","반도체","growth",131100,1.15],["240810","원익IPS","반도체","growth",16200,1.15],["067310","하나마이크론","반도체","growth",159500,1.15],["095340","ISC","반도체","growth",141000,1.15],["084370","유진테크","반도체","growth",172600,1.15],["131970","두산테스나","반도체","growth",42000,1.15],["089030","테크윙","반도체","growth",74300,1.15],["140860","파크시스템스","반도체","growth",178600,1.15],["036810","에프에스티","반도체","growth",119100,1.15],["039440","에스티아이","반도체","growth",194000,1.15],["222800","심텍","전자부품","growth",96200,1.15],["166090","하나머티리얼즈","반도체","growth",68200,1.15],["101490","에스앤에스텍","반도체","growth",191700,1.15],["319660","피에스케이","반도체","growth",189100,1.15],["031980","피에스케이홀딩스","반도체","growth",12300,1.15],["068760","셀트리온제약","바이오","blue",116400,1.35],["298380","에이비엘바이오","바이오","growth",130200,1.15],["237690","에스티팜","바이오","growth",80400,1.15],["950160","코오롱티슈진","바이오","theme",37500,0.9],["214450","파마리서치","바이오","growth",13600,1.15],["195940","HK이노엔","바이오","blue",43600,1.35],["067630","HLB생명과학","바이오","growth",191500,0.9],["290650","엘앤씨바이오","바이오","growth",109600,1.15],["086450","동국제약","바이오","blue",192500,1.35],["085660","차바이오텍","바이오","growth",113500,0.9],["328130","루닛","AI","theme",95600,0.9],["253450","스튜디오드래곤","엔터","growth",151600,1.15],["293490","카카오게임즈","게임","growth",17400,1.15],["263750","펄어비스","게임","growth",53000,1.15],["112040","위메이드","게임","theme",118100,0.9],["225570","넥슨게임즈","게임","growth",185100,1.15],["095660","네오위즈","게임","growth",173000,1.15],["067160","SOOP","플랫폼","growth",144500,1.15],["035900","JYP Ent.","엔터","blue",28100,1.35],["041510","에스엠","엔터","growth",24800,1.15],["122870","와이지엔터테인먼트","엔터","growth",72500,1.15],["035760","CJ ENM","엔터","blue",14100,1.35],["078340","컴투스","게임","growth",133900,1.15],["194480","데브시스터즈","게임","theme",85700,0.9],["060250","NHN KCP","IT서비스","growth",17800,1.15],["053800","안랩","IT서비스","growth",125200,1.15],["041020","폴라리스오피스","AI","growth",163900,0.9],["108490","로보티즈","로봇","theme",139300,0.9],["056080","유진로봇","로봇","growth",165100,0.9],["090360","로보스타","로봇","growth",19200,0.9],["348370","엔켐","2차전지","growth",50500,1.15],["121600","나노신소재","2차전지","growth",133600,1.15],["078600","대주전자재료","2차전지","growth",159900,1.15],["222080","씨아이에스","2차전지","theme",24200,0.9],["005290","동진쎄미켐","반도체","growth",164800,1.15],["095610","테스","반도체","growth",168000,1.15],["036830","솔브레인홀딩스","반도체","growth",121100,1.15],["131290","티에스이","반도체","growth",162100,1.15],["025900","동화기업","2차전지","growth",156700,1.15],["393890","더블유씨피","2차전지","growth",88100,1.15],["272290","이녹스첨단소재","전자부품","growth",154600,1.15],["204270","제이앤티씨","전자부품","growth",124200,1.15],["161580","필옵틱스","전자부품","growth",181500,1.15],["257720","실리콘투","유통","growth",14300,1.15],["018290","브이티","화장품","growth",148100,1.15],["214430","아이쓰리시스템","방산","growth",199700,1.15],["099320","쎄트렉아이","방산","theme",162800,0.9],["274090","켄코아에어로스페이스","방산","theme",146500,0.9],["189300","인텔리안테크","IT서비스","growth",132000,1.15],["211270","AP위성","방산","growth",71800,0.9],["065350","신성델타테크","전자부품","theme",151600,0.9],["058610","에스피지","로봇","growth",41900,1.15],["090710","휴림로봇","로봇","growth",54200,0.9],["108860","셀바스AI","AI","theme",176300,0.9],["042000","카페24","플랫폼","growth",73800,1.15],["060370","LS마린솔루션","전력기기","growth",29800,1.15],["086900","메디톡스","바이오","growth",49400,1.15],["243070","휴온스","바이오","blue",54100,1.35],["206640","바디텍메드","바이오","growth",173100,1.15],["096530","씨젠","바이오","growth",71900,1.15],["214370","케어젠","바이오","growth",193700,1.15],["206650","유바이오로직스","바이오","growth",174100,1.15],["048410","현대바이오","바이오","theme",150500,0.9],["226950","올릭스","바이오","theme",135000,0.9],["290670","대보마그네틱","2차전지","theme",111600,0.9],["278280","천보","2차전지","growth",189300,1.15],["137400","피엔티","2차전지","growth",20700,1.15],["336570","원텍","바이오","growth",187200,1.15],["030520","한글과컴퓨터","IT서비스","growth",54400,1.15],["417200","LS머트리얼즈","전력기기","growth",161900,1.15]];
+const V90_STEP3_ADDED=[];
+for(const [code,name,sector,tier,price,newsWeight] of V90_STEP3_STOCK_DATA){
+  if(STOCKS.some(s=>s.code===code))continue;
+  const s=mk(code,name,sector,tier,price);
+  s.referencePrice=price;
+  s.referenceTick=MARKET_REFERENCE_TICK;
+  s.market='KOSDAQ';
+  s.indexEligible=false;
+  s.sectorExplicit=sector;
+  s.newsWeight=newsWeight;
+  s.v90TestReference=true;
+  STOCKS.push(s);V90_STEP3_ADDED.push(s);
+}
+window.__marketV90Step3={version:91,step:4,testOnly:true,added:V90_STEP3_ADDED.length,totalNonEtf:STOCKS.filter(s=>!s.isETF).length,kosdaqAdded:V90_STEP3_ADDED.filter(s=>s.market==='KOSDAQ').length,indexEligibleAdded:V90_STEP3_ADDED.filter(s=>s.indexEligible).length,newsWeightActive:true};
+window.__marketV91Step4={version:91,step:4,testOnly:true,themeTarget:18,notes:'신규 100종목 theme 25→18 조정. 가격/뉴스 엔진은 미변경, KOSDAQ은 GAME KOSPI 제외 유지.'};
+
+/* ============ V92 STEP 5 TEST — 400종목 뉴스 가중 타겟 ==========
+   목적: 300→400 확장으로 기존 종목별 뉴스 빈도가 일괄 25% 희석되는 현상을 완화한다.
+   - blue 1.50 / growth 1.05 / theme 0.85 / junk 0.60
+   - KOSDAQ 신규군은 0.80배 시장계수 적용
+   - 뉴스의 총 생성 빈도/감성/신뢰도/가격영향 로직은 변경하지 않고 '어느 종목이 선택되는가'만 가중한다.
+   - ETF는 뉴스 직접 타겟에서 계속 제외한다.
+*/
+const V92_NEWS_TIER_WEIGHT=Object.freeze({blue:1.50,growth:1.05,theme:.85,junk:.60});
+function v92EffectiveNewsWeight(s){
+  if(!s||s.isETF)return 0;
+  const tierW=V92_NEWS_TIER_WEIGHT[s.tier]||1;
+  const marketW=s.market==='KOSDAQ'?0.80:1;
+  return Math.max(.20,tierW*marketW);
+}
+for(const s of STOCKS){
+  if(s.isETF)continue;
+  s.newsWeight=v92EffectiveNewsWeight(s);
+}
+const V92_NEWS_TARGET_POOL=[];
+let V92_NEWS_TARGET_TOTAL=0;
+for(const s of STOCKS){
+  if(s.isETF)continue;
+  const w=v92EffectiveNewsWeight(s);
+  V92_NEWS_TARGET_TOTAL+=w;
+  V92_NEWS_TARGET_POOL.push({stock:s,cum:V92_NEWS_TARGET_TOTAL,weight:w});
+}
+if(V92_NEWS_TARGET_TOTAL<=0)V92_NEWS_TARGET_TOTAL=1;
+function v92WeightedNewsStock(r){
+  const x=r()*V92_NEWS_TARGET_TOTAL;
+  let lo=0,hi=V92_NEWS_TARGET_POOL.length-1;
+  while(lo<hi){
+    const mid=(lo+hi)>>1;
+    if(x<=V92_NEWS_TARGET_POOL[mid].cum)hi=mid;else lo=mid+1;
+  }
+  return V92_NEWS_TARGET_POOL[lo]?.stock||null;
+}
+const V92_KOSDAQ_NEWS_WEIGHT=V92_NEWS_TARGET_POOL.reduce((a,p)=>a+(p.stock.market==='KOSDAQ'?p.weight:0),0);
+window.__marketV92Step5={version:92,step:5,testOnly:true,newsWeightActive:true,totalWeight:V92_NEWS_TARGET_TOTAL,kosdaqWeightShare:V92_KOSDAQ_NEWS_WEIGHT/V92_NEWS_TARGET_TOTAL,picker:'cdf-binary'};
+
 
 const $=s=>document.querySelector(s),fmt=n=>Math.round(n).toLocaleString('ko-KR'),sign=n=>(n>=0?'+':'')+fmt(n),pct=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
 function hash(...xs){let h=2166136261;for(const x of xs.join('|'))for(let i=0;i<x.length;i++)h=Math.imul(h^x.charCodeAt(i),16777619);return h>>>0}
@@ -588,15 +685,39 @@ const ETF_STOCKS=[
     ['005930',.25],['000660',.25]
   ],.50),
   // V59 테스트 ETF: 별도 랜덤/뉴스/업종 효과 없이 게임 속 삼성전자 가격만 ±2배 추종
-  {...etfDef('SAMS2L','삼성전자 레버리지 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:2},
-  {...etfDef('SAMS2I','삼성전자 인버스 2X',20000,'레버리지',[['005930',1]]), linkedCode:'005930', leverage:-2}
 ];
+
+/* V97 STEP10: diversified major domestic ETF test set */
+if(!ETF_STOCKS.some(e=>e.code==='229200')) ETF_STOCKS.push(etfDef('229200','KODEX 코스닥150',13770,'대표지수',[['196170',0.12],['086520',0.08],['247540',0.07],['036930',0.06],['028300',0.06],['240810',0.055],['058470',0.05],['277810',0.05],['298380',0.045],['319660',0.04],['087010',0.04],['039030',0.04],['141080',0.04],['214450',0.035],['403870',0.035],['222800',0.03],['108490',0.03],['000250',0.025],['226950',0.025],['067310',0.02]]));
+if(!ETF_STOCKS.some(e=>e.code==='091160')) ETF_STOCKS.push(etfDef('091160','KODEX 반도체',118955,'반도체',[['005930',0.25],['000660',0.23],['042700',0.08],['058470',0.07],['240810',0.06],['039030',0.055],['036930',0.05],['403870',0.045],['319660',0.04],['067310',0.035],['000990',0.03],['009150',0.025],['007660',0.02]]));
+if(!ETF_STOCKS.some(e=>e.code==='305720')) ETF_STOCKS.push(etfDef('305720','KODEX 2차전지산업',14395,'2차전지',[['373220',0.18],['247540',0.14],['086520',0.12],['051910',0.1],['006400',0.1],['003670',0.08],['066970',0.07],['361610',0.06],['011790',0.05],['020150',0.04]]));
+if(!ETF_STOCKS.some(e=>e.code==='091180')) ETF_STOCKS.push(etfDef('091180','KODEX 자동차',29665,'자동차',[['005380',0.28],['000270',0.24],['012330',0.14],['161390',0.08],['018880',0.06],['204320',0.05],['011210',0.04],['005850',0.035],['064960',0.025]]));
+if(!ETF_STOCKS.some(e=>e.code==='091170')) ETF_STOCKS.push(etfDef('091170','KODEX 은행',15760,'금융',[['105560',0.2],['055550',0.18],['086790',0.16],['138930',0.14],['316140',0.12],['024110',0.08],['139130',0.07],['323410',0.05]]));
+if(!ETF_STOCKS.some(e=>e.code==='266420')) ETF_STOCKS.push(etfDef('266420','KODEX 헬스케어',15990,'바이오',[['207940',0.18],['068270',0.15],['196170',0.12],['028300',0.08],['298380',0.06],['141080',0.06],['214450',0.055],['145020',0.05],['000250',0.045],['087010',0.04],['226950',0.035],['950160',0.03],['085660',0.03],['336570',0.025],['237690',0.025]]));
+
+/* V98 STEP11: high-liquidity domestic theme ETF expansion test */
+if(!ETF_STOCKS.some(e=>e.code==='0080G0')) ETF_STOCKS.push(etfDef('0080G0','KODEX 방산TOP10',10900,'방산',[['012450',0.237],['047810',0.206],['079550',0.193],['064350',0.18],['272210',0.115],['103140',0.04],['189300',0.01],['214430',0.008]]));
+if(!ETF_STOCKS.some(e=>e.code==='0115D0')) ETF_STOCKS.push(etfDef('0115D0','KODEX 조선TOP10',7890,'조선',[['009540',0.2227],['329180',0.2225],['042660',0.2083],['010140',0.1914],['082740',0.0547],['071970',0.0373],['097230',0.0291],['439260',0.0159],['443060',0.0057],['017960',0.005]]));
+if(!ETF_STOCKS.some(e=>e.code==='0098F0')) ETF_STOCKS.push(etfDef('0098F0','KODEX 원자력SMR',16745,'원전',[['034020',0.1968],['000720',0.1928],['015760',0.0933],['375500',0.0889],['047040',0.0793],['028260',0.0725],['052690',0.0695],['051600',0.0557]]));
+
+/* V96 STEP9: real broad-market leveraged/inverse ETF test */
+function v96IndexEtf(code,name,base,leverage){
+  return {code,name,base,referencePrice:base,sector:'ETF',tier:'blue',sigma:.007,drift:0,beta:1,
+    isETF:true,etfCategory:'index',indexLinked:'KOSPI200_PROXY',leverage};
+}
+if(!ETF_STOCKS.some(e=>e.code==='122630')) ETF_STOCKS.push(v96IndexEtf('122630','KODEX 레버리지',118200,2));
+if(!ETF_STOCKS.some(e=>e.code==='114800')) ETF_STOCKS.push(v96IndexEtf('114800','KODEX 인버스',1540,-1));
+
 for(const e of ETF_STOCKS)if(!STOCKS.some(s=>s.code===e.code))STOCKS.push(e);
 
+const V97_ETF_COMPONENT_CACHE=new Map();
 function etfNormalizedComponents(s){
+  if(V97_ETF_COMPONENT_CACHE.has(s.code))return V97_ETF_COMPONENT_CACHE.get(s.code);
   const available=(s.components||[]).map(([code,w])=>[STOCKS.find(x=>x.code===code&&!x.isETF),w]).filter(([x,w])=>x&&w>0);
   const target=Math.max(0,1-(s.bondWeight||0)),sum=available.reduce((a,[,w])=>a+w,0)||1;
-  return available.map(([x,w])=>[x,w/sum*target]);
+  const out=available.map(([x,w])=>[x,w/sum*target]);
+  V97_ETF_COMPONENT_CACHE.set(s.code,out);
+  return out;
 }
 function etfBondRatio(s,t){
   const dd=(t-ETF_REFERENCE_TICK)/390;
@@ -607,6 +728,14 @@ function etfBondRatio(s,t){
 }
 const v10StockDisplayedAt=v9DisplayedAt,v10StockCanonicalPriceAtMs=v9CanonicalPriceAtMs;
 function etfRatioAtTick(s,t){
+  if(s?.indexLinked==='KOSPI200_PROXY'){
+    const day=Math.floor(t/DAY_STEPS), openT=day*DAY_STEPS;
+    const now=gameKospiAt(t)?.level||GAME_KOSPI_BASE;
+    const op=gameKospiAt(openT)?.level||GAME_KOSPI_BASE;
+    const r=op>0?(now/op-1):0;
+    return Math.max(.05,1+r*(Number(s.leverage)||1));
+  }
+
   // V59 삼성전자 2X 테스트 ETF는 오직 삼성전자 시장가 변화만 사용한다.
   // 기준시점 대비 삼성전자 수익률 × (+2 / -2)를 ETF 기준가 20,000원에 그대로 반영한다.
   if(s?.linkedCode&&Number.isFinite(+s.leverage)){
@@ -854,8 +983,8 @@ window.__marketV13={version:13,focus:'tension-jackpot',volumeSafe:true};
 */
 const GAME_KOSPI_BASE=3000;
 function kospiWeight(s){
-  if(s?.isETF)return 0;
-  // 실제 시총 데이터가 없는 게임이므로 대형/우량주가 지수에 더 크게 반영되도록 완만한 가중치만 둔다.
+  if(s?.isETF||s?.indexEligible===false||s?.market==='KOSDAQ')return 0;
+  // V89 Step 2: 기존 KOSPI 종목의 산식은 그대로 유지하고, 향후 KOSDAQ만 지수에서 제외한다.
   const tier={blue:5.0,growth:2.2,theme:.75,junk:.35}[s.tier]||1;
   const beta=Number.isFinite(+s.beta)?Math.max(.75,Math.min(1.25,+s.beta)):1;
   return tier/beta;
@@ -931,7 +1060,7 @@ v11Activity=function(s,day,minute){
   // V12 섹터 순환 효과는 유지하되 정답이 되지 않도록 약하게만 추가한다.
   const sectors=[...new Set(STOCKS.filter(z=>!z.isETF).map(z=>z.sector))];
   const rotBlock=Math.floor(minute/36),hotSector=sectors[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,sectors.length)];
-  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  if(v94SectorOf(s)===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
   return a;
 };
 
@@ -992,7 +1121,7 @@ function v18RumorEvent(day,minute,index=0){
   const sectors=[...new Set(STOCKS.filter(x=>!x.isETF).map(x=>x.sector))];
   const stockTargets=STOCKS.filter(x=>!x.isETF);
   const targetStock=r()<.34?stockTargets[Math.floor(r()*stockTargets.length)]:null;
-  const sector=targetStock?targetStock.sector:sectors[Math.floor(r()*sectors.length)];
+  const sector=targetStock?v94SectorOf(targetStock):v95PickHotSector(r);
   const sentiment=r()<.51?1:-1;
   const behaviorRoll=r();
   const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
@@ -1274,9 +1403,27 @@ window.__marketV22={version:22,focus:'anti-v-rebound',deepDropThreshold:'-18%',s
    4) quote 결과를 짧게 캐시하여 같은 화면 프레임의 중복 가격 계산 제거
    5) 숫자 UI 300ms -> 1000ms, 차트 120ms -> 750ms
 */
+/* V94 STEP7: audited sector routing */
+function v94SectorOf(s){
+  return String(s?.sectorExplicit || s?.sector || '산업재');
+}
 const V23_STOCK_BY_CODE=new Map(STOCKS.map(s=>[s.code,s]));
 const V23_NON_ETF_STOCKS=STOCKS.filter(s=>!s.isETF);
-const V23_SECTORS=[...new Set(V23_NON_ETF_STOCKS.map(s=>s.sector))];
+const V23_SECTORS=[...new Set(V23_NON_ETF_STOCKS.map(s=>v94SectorOf(s)))];
+const V95_SECTOR_COUNTS=new Map();
+for(const s of V23_NON_ETF_STOCKS){
+  const sec=v94SectorOf(s);
+  V95_SECTOR_COUNTS.set(sec,(V95_SECTOR_COUNTS.get(sec)||0)+1);
+}
+// sqrt(count): 1~2종목짜리 업종의 과도한 당첨을 줄이되 대형 업종 독점도 방지.
+const V95_SECTOR_POOL=V23_SECTORS.map(sec=>[sec,Math.sqrt(V95_SECTOR_COUNTS.get(sec)||1)]);
+const V95_SECTOR_TOTAL=V95_SECTOR_POOL.reduce((a,x)=>a+x[1],0)||1;
+function v95PickHotSector(r){
+  let x=(typeof r==='function'?r():Number(r)||0)*V95_SECTOR_TOTAL;
+  for(const [sec,w] of V95_SECTOR_POOL){x-=w;if(x<=0)return sec;}
+  return V95_SECTOR_POOL[V95_SECTOR_POOL.length-1]?.[0]||'산업재';
+}
+
 
 // V16과 결과가 동일하되 sectors를 매 호출마다 다시 만들지 않는다.
 v11Activity=function(s,day,minute){
@@ -1290,8 +1437,8 @@ v11Activity=function(s,day,minute){
   else if(x<.63)a={name:'normal',mult:1.18,flow:1.16};
   else if(x<.90)a={name:'active',mult:2.55,flow:2.65};
   else a={name:'hot',mult:4.35,flow:4.70};
-  const rotBlock=Math.floor(minute/36),hotSector=V23_SECTORS[hash('v16-sector-rotation',day,rotBlock)%Math.max(1,V23_SECTORS.length)];
-  if(s.sector===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
+  const rotBlock=Math.floor(minute/36),hotSector=v95PickHotSector(rnd(hash('v16-sector-rotation',day,rotBlock)));
+  if(v94SectorOf(s)===hotSector){const b=a.name==='quiet'?1.08:a.name==='normal'?1.18:1.12;a={...a,mult:a.mult*b,flow:a.flow*(1+(b-1)*1.25)}}
   return a;
 };
 
@@ -1299,7 +1446,7 @@ v11Activity=function(s,day,minute){
 v18RumorEvent=function(day,minute,index=0){
   const block=Math.floor(minute/12),r=rnd(hash('v18-rumor',day,block,index));
   const targetStock=r()<.34?V23_NON_ETF_STOCKS[Math.floor(r()*V23_NON_ETF_STOCKS.length)]:null;
-  const sector=targetStock?targetStock.sector:V23_SECTORS[Math.floor(r()*V23_SECTORS.length)];
+  const sector=targetStock?v94SectorOf(targetStock):v95PickHotSector(r);
   const sentiment=r()<.51?1:-1,behaviorRoll=r();
   const behavior=behaviorRoll<.35?'real':behaviorRoll<.60?'priced':behaviorRoll<.80?'noise':behaviorRoll<.95?'rumor':'reverse';
   const posActions=['대형 수주 기대','실적 개선 기대','외국인 매수 유입설','신규 공급계약 가능성','정책 수혜 기대','증설 검토설','목표가 상향 움직임','업황 회복 기대'];
@@ -5096,8 +5243,6 @@ document.head.insertAdjacentHTML('beforeend',`
 
 const V60_LOGO_BASE=logo;
 logo=function(s){
-  if(s?.code==='SAMS2L')return `<div class="logo v60-linked-etf"><img src="${V60_LEVERAGE_ICON}" alt="2X"></div>`;
-  if(s?.code==='SAMS2I')return `<div class="logo v60-linked-etf"><img src="${V60_INVERSE_ICON}" alt="인버스 2X"></div>`;
   return V60_LOGO_BASE(s);
 };
 
@@ -5119,13 +5264,11 @@ window.__marketV61={
 
 <script>
 /* ============ V62 — 삼성 2X 상품 합산 보유비중 25% 상한 ============
-   - 대상: SAMS2L + SAMS2I 합산
    - 기준: 주문 확정 시점 총 평가자산(total)의 25%
    - 기존 보유분이 이미 25%를 넘는 경우 강제매도하지 않음; 추가 매수만 차단
    - 매도는 제한하지 않음
    - 시장/ETF 가격 엔진, 랭킹, Firebase 구조 변경 없음
 */
-const V62_LEVERAGED_CODES=new Set(['SAMS2L','SAMS2I']);
 const V62_LEVERAGED_CAP=.25;
 const v62TradeBase=trade;
 
@@ -5174,7 +5317,6 @@ trade=async function v62Trade(type,qty){
 window.__marketV62={
   version:62,
   leverageExposureCap:.25,
-  codes:['SAMS2L','SAMS2I'],
   combined:true,
   buyOnly:true,
   forcedSell:false,
@@ -6374,9 +6516,10 @@ function v75PickEventType(cat, r){
 }
 function v75PickTarget(eventType, r, sectors, stocks){
   if(eventType.needsTarget==='market') return {kind:'market'};
-  if(eventType.needsTarget==='sector') return {kind:'sector', sector: sectors[Math.floor(r()*sectors.length)]};
-  const stock = stocks[Math.floor(r()*stocks.length)];
-  return {kind:'stock', stock, sector: stock.sector};
+  if(eventType.needsTarget==='sector') return {kind:'sector', sector: v95PickHotSector(r)};
+  // V92 Step 5: 종목뉴스만 가중 추첨. 총 뉴스 빈도와 이벤트 성격/가격영향은 그대로 유지한다.
+  const stock = v92WeightedNewsStock(r) || stocks[Math.floor(r()*stocks.length)];
+  return {kind:'stock', stock, sector: v94SectorOf(stock)};
 }
 
 // 슬롯 하나에서 이벤트 하나를 만든다. day/slot/index로 완전히 결정론적.
@@ -7505,6 +7648,43 @@ v11PostMove=function v87BalancedActivePostMove(s,day,minute,changeRate){
   // changeRate == price/open-1 이므로 open=1, price=1+changeRate로 동일한 V81 곡선을 적용 가능.
   return v81BalanceDeepTail(s,day,minute,Math.max(.01,1+changeRate),1,ret);
 };
+/* V100 PRODUCTION: blue-chip extreme overlap guard
+   - Does NOT create a blue-chip spike.
+   - Does NOT hard-cap blue chips at ±10%.
+   - Leaves ordinary moves untouched.
+   - Only compresses the excess portion after ±12% for blue chips, increasingly with magnitude.
+   - Therefore a day with zero blue-chip spikes remains fully possible.
+*/
+const V100_POSTMOVE_BASE=v11PostMove;
+function v100BlueTailGuard(changeRate){
+  const sign=changeRate<0?-1:1, a=Math.abs(changeRate);
+  if(a<=.12)return changeRate;
+  const excess=a-.12;
+  let kept;
+  if(a<=.18) kept=excess*.82;       // 12~18%: mild compression
+  else if(a<=.25) kept=.06*.82+(a-.18)*.58;
+  else if(a<=.35) kept=.06*.82+.07*.58+(a-.25)*.38;
+  else kept=.06*.82+.07*.58+.10*.38+(a-.35)*.22;
+  return sign*(.12+kept);
+}
+v11PostMove=function v100BlueExtremeOverlapGuard(s,day,minute,changeRate){
+  const ret=Number(V100_POSTMOVE_BASE(s,day,minute,changeRate))||0;
+  if(s?.isETF || s?.tier!=='blue')return ret;
+  // Guard only when the stock is already in an extreme daily move.
+  // No force-to-spike logic; zero blue spikes on a day is naturally possible.
+  if(Math.abs(changeRate)<=.12 && Math.abs(ret)<=.12)return ret;
+  return v100BlueTailGuard(ret);
+};
+window.__marketV100={
+  version:100,
+  production:true,
+  blueTailGuard:true,
+  ordinaryMoveThresholdPct:12,
+  hardCap:false,
+  forcesBlueSpike:false,
+  keepsZeroSpikeDaysPossible:true
+};
+
 
 try{
   v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
@@ -7608,4 +7788,17 @@ window.__marketV95={
 };
 </script>
 
+
+<script>
+/* ============ V89 STEP 2 VERIFY MARKER — 확장 메타데이터 ============ */
+window.__marketV89Step2={
+  version:89,step:2,
+  metadataOnly:true,
+  existingStocksMarket:'KOSPI',
+  kosdaqExcludedFromKospi:true,
+  newsWeightActive:false,
+  priceEngineChanged:false,
+  newsSelectionChanged:false
+};
+</script>
 </body></html>
