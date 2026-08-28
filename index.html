@@ -6372,29 +6372,11 @@ function v75PickEventType(cat, r){
   const pool = V75_EVENT_TYPES.filter(e=>e.cat===cat);
   return pool[Math.floor(r()*pool.length)];
 }
-/* V102 — 뉴스 분배 최소 개선
-   - 뉴스 카테고리/발생량/반응/가격영향/개별종목 선택은 그대로 유지한다.
-   - 업종 뉴스만 '37개 업종 완전 균등'에서 '업종 구성 종목수의 제곱근 가중치'로 변경한다.
-   - 종목수 그대로 비례시키지 않아 산업재 같은 대형 업종의 과도한 독점을 막는다.
-   - 기존과 동일하게 난수 1회만 소비하므로 이후 뉴스 생성의 결정론적 흐름을 최대한 보존한다. */
-function v102PickWeightedSector(r,sectors,stocks){
-  if(!Array.isArray(sectors)||!sectors.length)return '산업재';
-  const counts=new Map();
-  for(const s of stocks||[]){
-    if(!s||s.isETF)continue;
-    counts.set(s.sector,(counts.get(s.sector)||0)+1);
-  }
-  const weighted=sectors.map(sector=>[sector,Math.sqrt(Math.max(1,counts.get(sector)||0))]);
-  const total=weighted.reduce((a,x)=>a+x[1],0)||1;
-  let u=r()*total;
-  for(const [sector,w] of weighted){u-=w;if(u<=0)return sector;}
-  return weighted[weighted.length-1][0];
-}
 function v75PickTarget(eventType, r, sectors, stocks){
   if(eventType.needsTarget==='market') return {kind:'market'};
-  if(eventType.needsTarget==='sector') return {kind:'sector', sector:v102PickWeightedSector(r,sectors,stocks)};
+  if(eventType.needsTarget==='sector') return {kind:'sector', sector: sectors[Math.floor(r()*sectors.length)]};
   const stock = stocks[Math.floor(r()*stocks.length)];
-  return {kind:'stock', stock, sector:stock.sector};
+  return {kind:'stock', stock, sector: stock.sector};
 }
 
 // 슬롯 하나에서 이벤트 하나를 만든다. day/slot/index로 완전히 결정론적.
@@ -7672,7 +7654,66 @@ window.__marketV95={
 </script>
 
 
-<script id="v102-news-distribution-diagnostic">
-window.__marketV102={version:102,stage:'NEWS_SECTOR_DISTRIBUTION_FIX',stockUniverse:300,sectorWeight:'sqrt(stockCount)',individualStockSelectionChanged:false,categoryWeightsChanged:false,newsFrequencyChanged:false,newsPriceImpactChanged:false,marketEngineChanged:false};
+<script id="v103-news-distribution-safe-fix">
+/* V103 — 뉴스 업종 분배 안전 패치
+   V101을 원본 기반으로 사용하고, 기존 뉴스 생성/가격 로직은 수정하지 않는다.
+   업종 뉴스의 target 선택 시에만 sqrt(업종 종목수) 가중치를 적용한다.
+   가중치 표는 최초 1회만 계산하여 시작/실행 부하를 최소화한다. */
+(function(){
+  const basePickTarget = v75PickTarget;
+  let cachedKey = '';
+  let cachedWeighted = null;
+
+  function getWeightedSectors(sectors, stocks){
+    const key = (sectors || []).join('|') + '#' + (stocks ? stocks.length : 0);
+    if(cachedWeighted && cachedKey === key) return cachedWeighted;
+
+    const counts = Object.create(null);
+    for(const s of (stocks || [])){
+      if(!s || s.isETF) continue;
+      counts[s.sector] = (counts[s.sector] || 0) + 1;
+    }
+
+    let total = 0;
+    const rows = (sectors || []).map(sector => {
+      const weight = Math.sqrt(Math.max(1, counts[sector] || 0));
+      total += weight;
+      return {sector, weight};
+    });
+
+    cachedKey = key;
+    cachedWeighted = {rows, total: total || 1};
+    return cachedWeighted;
+  }
+
+  v75PickTarget = function(eventType, r, sectors, stocks){
+    if(eventType && eventType.needsTarget === 'sector'){
+      const data = getWeightedSectors(sectors, stocks);
+      if(!data.rows.length) return basePickTarget(eventType, r, sectors, stocks);
+
+      let u = r() * data.total;
+      for(const row of data.rows){
+        u -= row.weight;
+        if(u <= 0) return {kind:'sector', sector:row.sector};
+      }
+      return {kind:'sector', sector:data.rows[data.rows.length - 1].sector};
+    }
+    return basePickTarget(eventType, r, sectors, stocks);
+  };
+
+  window.__marketV103 = {
+    version:103,
+    base:'V101',
+    change:'sector-news-target-distribution-only',
+    sectorWeight:'sqrt(stockCount)',
+    cached:true,
+    categoryWeightsChanged:false,
+    newsFrequencyChanged:false,
+    newsPriceImpactChanged:false,
+    individualStockSelectionChanged:false,
+    marketEngineChanged:false
+  };
+})();
 </script>
+
 </body></html>
