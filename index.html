@@ -7534,4 +7534,113 @@ window.__marketV88={
 };
 </script>
 
+
+
+<script>
+/* ============ V93 — 접속 문제 없이 재생 압축 (사이클 드리프트 레이어) ============
+   V90의 문제: day 자체를 부풀려서, day 앵커 기반 연속성 계산(V69)이 실제보다 훨씬
+   많은 '게임일'을 다시 계산하게 만들어 로딩이 멈췄다.
+
+   V93 해법: day는 절대 건드리지 않는다. 대신
+   1) 실제 세션(08:00~23:30) 안에서 V93_CYCLE_MS(120분)마다 '오늘 하루' 안의
+      390틱 경로를 다시 훑어보되(day 그대로, minute만 다시 0→389로 순회),
+   2) 매번 똑같은 그림이 나오지 않도록, 사이클마다 아주 가벼운(day/연속성 계산을
+      전혀 건드리지 않는) 독립적인 드리프트 배수를 하나 더 곱한다.
+   day를 새로 만들지 않으므로 V69 연속성 계산은 '오늘 하루' 한 번만 계산되고,
+   이후 모든 사이클은 캐시를 그대로 재사용한다 — 접속 성능에 영향이 없다.
+*/
+const V93_BASE_VISUAL=fastVisualPriceAt;
+const V93_BASE_QUOTE=quote;
+const V93_CYCLE_MS=120*60*1000; // 실제 120분 = '오늘 하루' 경로 1회 재생
+const V93_CYCLES_PER_SESSION=Math.max(1,Math.ceil(V68_SESSION_MS/V93_CYCLE_MS));
+const V93_DRIFT_SIGMA={blue:.015,growth:.026,theme:.042,junk:.062};
+const V93_DATE_CACHE=new Map();
+
+function v93DateKey(ms){
+  const d=new Date(ms);
+  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+}
+
+function v93Session(ms){
+  const d=new Date(ms);
+  const open=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
+  const close=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
+  return {open,close};
+}
+
+// 사이클 경계에서의 누적 로그드리프트. cycleIndex는 '오늘' 안에서만 0~V93_CYCLES_PER_SESSION-1로
+// 작으니(최대 8 정도) day 히스토리를 전혀 거슬러 올라가지 않는다 — 성능 걱정 없음.
+function v93CycleLogAt(s,dateKey,cycleIndex){
+  if(cycleIndex<=0)return 0;
+  const key=s.code+'|'+dateKey;
+  let arr=V93_DATE_CACHE.get(key);
+  if(!arr){arr=[0];V93_DATE_CACHE.set(key,arr);}
+  while(arr.length<=cycleIndex){
+    const i=arr.length;
+    const sigma=V93_DRIFT_SIGMA[s.tier]||V93_DRIFT_SIGMA.blue;
+    const step=v9Normal('v93-cycle-drift',s.code,dateKey,i)*sigma;
+    arr.push(arr[i-1]+step);
+  }
+  if(V93_DATE_CACHE.size>STOCKS.length*3){
+    const firstKey=V93_DATE_CACHE.keys().next().value;
+    V93_DATE_CACHE.delete(firstKey);
+  }
+  return arr[cycleIndex];
+}
+
+function v93Position(ms){
+  const {open,close}=v93Session(ms);
+  if(ms<open||ms>=close)return null; // 장 시간 밖에서는 원래(V72) 동작 그대로
+  const elapsed=ms-open;
+  const cycleIndex=Math.min(V93_CYCLES_PER_SESSION-1,Math.floor(elapsed/V93_CYCLE_MS));
+  const elapsedInCycle=elapsed-cycleIndex*V93_CYCLE_MS;
+  const cycleProgress=Math.min(1,elapsedInCycle/V93_CYCLE_MS);
+  const syntheticMs=open+cycleProgress*(close-open);
+  return {syntheticMs,cycleIndex,cycleProgress};
+}
+
+function v93DriftFactor(s,dateKey,cycleIndex,cycleProgress){
+  const base=v93CycleLogAt(s,dateKey,cycleIndex);
+  const sigma=V93_DRIFT_SIGMA[s.tier]||V93_DRIFT_SIGMA.blue;
+  const stepIndex=cycleIndex+1;
+  const nextStep=v9Normal('v93-cycle-drift',s.code,dateKey,stepIndex)*sigma;
+  const x=cycleProgress*cycleProgress*(3-2*cycleProgress); // smoothstep
+  return Math.exp(base+nextStep*x);
+}
+
+fastVisualPriceAt=function v93CycleVisualPrice(s,ms=Date.now()){
+  const pos=v93Position(ms);
+  if(!pos)return V93_BASE_VISUAL(s,ms);
+  const dateKey=v93DateKey(ms);
+  const basePrice=V93_BASE_VISUAL(s,pos.syntheticMs);
+  const factor=v93DriftFactor(s,dateKey,pos.cycleIndex,pos.cycleProgress);
+  const px=basePrice*factor;
+  return s?.isETF?Math.max(5,Math.round(px/5)*5):v65RoundPrice(px);
+};
+smoothPriceAt=fastVisualPriceAt;
+
+quote=function v93CycleQuote(s){
+  const now=Date.now(),pos=v93Position(now);
+  if(!pos)return V93_BASE_QUOTE(s);
+  const dateKey=v93DateKey(now);
+  const q=V93_BASE_QUOTE(s)||{};
+  const price=fastVisualPriceAt(s,now);
+  const {open:sessOpen}=v93Session(now);
+  const cycleStartMs=sessOpen+pos.cycleIndex*V93_CYCLE_MS;
+  const openBase=V93_BASE_VISUAL(s,Math.max(sessOpen,Math.min(now,cycleStartMs)));
+  const openFactor=Math.exp(v93CycleLogAt(s,dateKey,pos.cycleIndex));
+  const open=s?.isETF?Math.max(5,Math.round(openBase*openFactor/5)*5):v65RoundPrice(openBase*openFactor);
+  const change=(price-Math.max(1,open))/Math.max(1,open)*100;
+  return {...q,price,open,change};
+};
+rawQuote=quote;
+
+window.__marketV93={
+  version:93,basedOn:72,
+  reason:'V90 성능 회귀(day 부풀림) 없이 재생 압축 재도입',
+  cycleMs:V93_CYCLE_MS,cyclesPerSession:V93_CYCLES_PER_SESSION,
+  dayUntouched:true,v69ContinuityUnaffected:true
+};
+</script>
+
 </body></html>
