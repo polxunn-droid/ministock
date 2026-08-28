@@ -687,6 +687,16 @@ const ETF_STOCKS=[
   // V59 테스트 ETF: 별도 랜덤/뉴스/업종 효과 없이 게임 속 삼성전자 가격만 ±2배 추종
 ];
 
+/* V101: restore legacy held leveraged products for portfolio compatibility */
+if(!ETF_STOCKS.some(e=>e.code==='SAMS2L')) ETF_STOCKS.push({
+  ...etfDef('SAMS2L','삼성전자 레버리지 2X',20000,'레버리지',[['005930',1]]),
+  linkedCode:'005930', leverage:2
+});
+if(!ETF_STOCKS.some(e=>e.code==='SAMS2I')) ETF_STOCKS.push({
+  ...etfDef('SAMS2I','삼성전자 인버스 2X',20000,'레버리지',[['005930',1]]),
+  linkedCode:'005930', leverage:-2
+});
+
 /* V97 STEP10: diversified major domestic ETF test set */
 if(!ETF_STOCKS.some(e=>e.code==='229200')) ETF_STOCKS.push(etfDef('229200','KODEX 코스닥150',13770,'대표지수',[['196170',0.12],['086520',0.08],['247540',0.07],['036930',0.06],['028300',0.06],['240810',0.055],['058470',0.05],['277810',0.05],['298380',0.045],['319660',0.04],['087010',0.04],['039030',0.04],['141080',0.04],['214450',0.035],['403870',0.035],['222800',0.03],['108490',0.03],['000250',0.025],['226950',0.025],['067310',0.02]]));
 if(!ETF_STOCKS.some(e=>e.code==='091160')) ETF_STOCKS.push(etfDef('091160','KODEX 반도체',118955,'반도체',[['005930',0.25],['000660',0.23],['042700',0.08],['058470',0.07],['240810',0.06],['039030',0.055],['036930',0.05],['403870',0.045],['319660',0.04],['067310',0.035],['000990',0.03],['009150',0.025],['007660',0.02]]));
@@ -1814,6 +1824,39 @@ const homeRewardBase=home;home=function(){return homeRewardBase().replace('<div 
 const bindRewardBase=bind;bind=function(){bindRewardBase();document.querySelector('[data-hourly-reward]')?.addEventListener('click',claimHourlyReward)};
 document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]'))e.target.closest('.reward-pop')?.remove();if(e.target.classList.contains('reward-pop'))e.target.remove()});
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
+
+
+/* V101 legacy-holding recovery:
+   The V100 build could normalize unknown legacy ETF codes out of the active save.
+   Recover only exact qty/avg values that still exist in another retained mockstock:* local snapshot.
+   Never invent a position. */
+function v101RecoverLegacyLeverageFromLocalSnapshots(raw){
+  if(!raw||typeof raw!=='object')return raw;
+  raw.holdings=raw.holdings&&typeof raw.holdings==='object'?raw.holdings:{};
+  const need=['SAMS2L','SAMS2I'].filter(code=>!raw.holdings?.[code]?.qty);
+  if(!need.length)return raw;
+  try{
+    const candidates=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key||!key.startsWith('mockstock:')||key==='mockstock:uid')continue;
+      try{
+        const x=JSON.parse(localStorage.getItem(key)||'null');
+        if(x&&typeof x==='object')candidates.push(x);
+      }catch{}
+    }
+    for(const code of need){
+      const found=candidates.find(x=>Number.isFinite(+x?.holdings?.[code]?.qty)&&+x.holdings[code].qty>0&&Number.isFinite(+x.holdings[code].avg)&&+x.holdings[code].avg>0);
+      if(found)raw.holdings[code]={qty:Math.floor(+found.holdings[code].qty),avg:+found.holdings[code].avg};
+    }
+  }catch{}
+  return raw;
+}
+const V101_STORE_LOAD_BASE=Store.loadMe.bind(Store);
+Store.loadMe=async function(id){
+  const raw=await V101_STORE_LOAD_BASE(id);
+  return v101RecoverLegacyLeverageFromLocalSnapshots(raw);
+};
 
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script>
@@ -5326,6 +5369,38 @@ window.__marketV62={
 };
 </script>
 <script>
+
+/* V101: restore legacy SAMS2L/SAMS2I combined 25% holding cap */
+const V101_LEGACY_LEVERAGED_CODES=new Set(['SAMS2L','SAMS2I']);
+const V101_LEGACY_LEVERAGED_CAP=.25;
+const V101_TRADE_BASE=trade;
+function v101LegacyLeveragedValue(){
+  let value=0;
+  for(const code of V101_LEGACY_LEVERAGED_CODES){
+    const h=state?.holdings?.[code],s=STOCKS.find(x=>x.code===code);
+    if(h?.qty>0&&s)value+=h.qty*quote(s).price;
+  }
+  return value;
+}
+trade=async function v101LegacyLeveragedTrade(type,qty){
+  qty=Math.floor(Number(qty));
+  if(type!=='buy'||!selected||!V101_LEGACY_LEVERAGED_CODES.has(selected.code))
+    return V101_TRADE_BASE(type,qty);
+  if(!Number.isFinite(qty)||qty<1||!pendingOrder||pendingOrder.type!=='buy'||pendingOrder.code!==selected.code)
+    return V101_TRADE_BASE(type,qty);
+  const q=quote(selected),totalAssets=Math.max(1,total());
+  const capValue=totalAssets*V101_LEGACY_LEVERAGED_CAP;
+  const current=v101LegacyLeveragedValue();
+  const room=Math.max(0,capValue-current);
+  const maxQty=Math.floor(room/Math.max(1,q.price));
+  if(qty>maxQty){
+    return toast(maxQty>0
+      ? `레버리지·인버스는 합산 총자산의 25%까지 보유할 수 있어요. 현재 최대 ${fmt(maxQty)}주 더 살 수 있어요.`
+      : '레버리지·인버스는 합산 총자산의 25%까지 보유할 수 있어요.');
+  }
+  return V101_TRADE_BASE(type,qty);
+};
+
 /* ============ V63 — 시장 상태 유지시간 45% 단축 ============
    목적:
    - 급등·급락 이후 높은/낮은 등락률에서 오래 굳어 보이는 현상 완화
