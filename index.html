@@ -7138,4 +7138,209 @@ window.__marketV83={
 };
 </script>
 
+
+<script id="v84-news-variety">
+/* ============ V84 — 뉴스 문장 다양성 확장 ============
+   361개 문장조각 → 500개
+   25개 문장틀 → 45개
+   뉴스 발생빈도/지속시간/후속확률/가격영향/Firebase는 변경하지 않는다.
+*/
+
+// 축별 +3 주체 / +3 긍정표현 / +3 부정표현 = 99개 추가
+const V84_PHRASE_EXPANSION={
+  tech:{
+    subject:['글로벌 첨단패키징 업체','AI 서버 부품 공급망','차세대 메모리 개발진'],
+    pos:['성능 개선 결과 공개','핵심 기술 인증 통과','공정 효율 개선 진전'],
+    neg:['개발비 부담 확대','핵심 인력 확보 난항','공정 전환 차질 우려']
+  },
+  demand:{
+    subject:['글로벌 기업고객 구매팀','국내 주요 판매채널','아시아 대형 유통망'],
+    pos:['선주문 증가세 확인','구매계획 상향 움직임','주요 제품 판매 호조'],
+    neg:['선주문 감소세 포착','구매계획 축소 움직임','주요 제품 판매 둔화']
+  },
+  supply:{
+    subject:['국제 공급망 관리업체','국내 핵심 협력업체','아시아 소재 생산사'],
+    pos:['부품 조달 여건 개선','생산 병목 해소 진전','공급 일정 정상화'],
+    neg:['부품 조달 불안 확대','생산 병목 심화','공급 일정 추가 지연']
+  },
+  oil:{
+    subject:['글로벌 원유 중개업계','주요 정유사 협의체','국제 석유시장 분석기관'],
+    pos:['원유 재고 회복 전망','정제설비 정상화 진전','공급 불안 완화 조짐'],
+    neg:['원유 재고 감소 전망','정제설비 가동 차질','공급 불안 확대 조짐']
+  },
+  fx:{
+    subject:['아시아 외환시장 참가자','국내 외환전략가','글로벌 매크로 펀드'],
+    pos:['원화 강세 전환 가능성','환율 상단 안정 기대','달러 수요 진정 조짐'],
+    neg:['원화 약세 심화 가능성','환율 상단 재확대 우려','달러 수요 확대 조짐']
+  },
+  risk:{
+    subject:['국제 분쟁조정 기구','현지 외교 소식통','글로벌 지정학 분석기관'],
+    pos:['휴전 논의 진전','대치 수위 완화 조짐','외교 접촉 확대'],
+    neg:['휴전 논의 난항','대치 수위 상승 조짐','외교 접촉 중단 우려']
+  },
+  policy:{
+    subject:['정부 경제정책 라인','산업 지원기관','공정거래 관련 당국'],
+    pos:['지원대상 확대 논의','행정절차 간소화 검토','투자촉진 방안 추진'],
+    neg:['지원요건 강화 검토','행정심사 확대 가능성','추가 규제 도입 논의']
+  },
+  liquidity:{
+    subject:['글로벌 ETF 자금','국내 주식형 펀드','단기 매매자금'],
+    pos:['대형주 중심 자금 유입','매수 프로그램 강화','거래대금 회복 조짐'],
+    neg:['대형주 중심 자금 이탈','매도 프로그램 강화','거래대금 위축 조짐']
+  },
+  rate:{
+    subject:['글로벌 금리선물 시장','국내 채권 운용사','주요 중앙은행 인사'],
+    pos:['금리 인하 기대 재확산','채권금리 하향 안정','긴축 종료 기대 부각'],
+    neg:['금리 인하 기대 약화','채권금리 상승 압력','긴축 장기화 우려 부각']
+  },
+  logistics:{
+    subject:['국제 운송주선 업계','주요 물류 허브 운영사','글로벌 선복시장 참가자'],
+    pos:['선복 공급 회복','운송시간 단축 조짐','물류비 부담 완화'],
+    neg:['선복 부족 재확대','운송시간 증가 우려','물류비 부담 확대']
+  },
+  commodity:{
+    subject:['글로벌 금속 수요업체','국제 광물시장 참가자','주요 원재료 가공업체'],
+    pos:['현물가격 안정 조짐','공급계약 조건 개선','원재료 확보 여건 개선'],
+    neg:['현물가격 상승 압력','공급계약 조건 악화','원재료 확보 경쟁 심화']
+  }
+};
+for(const [axis,x] of Object.entries(V84_PHRASE_EXPANSION)){
+  V75_SUBJECT[axis]?.push(...x.subject);
+  V75_ACTION_POS[axis]?.push(...x.pos);
+  V75_ACTION_NEG[axis]?.push(...x.neg);
+}
+
+// 강도/상황 +10
+V75_INTENSITY.push(
+  '장중 수급 변화와 맞물리며','관련 지표가 공개된 뒤','시장 예상이 엇갈리는 가운데',
+  '거래량이 늘어난 가운데','투자자 경계감이 남아 있는 가운데','업계 전망이 엇갈리는 상황에서',
+  '최근 흐름과 대비되며','주요 수치가 확인되면서','단기 기대감이 유입되며','불확실성이 남아 있는 가운데'
+);
+
+// 후속표현 +18
+V75_FOLLOWUP_POS.push(
+  '추가 수주 여부가 다음 변수라는 평가','이익 전망 상향으로 이어질지 관심',
+  '외국인 수급 개선 여부도 주목','업종 내 확산 여부가 관건이라는 시각',
+  '후속 공시가 기대를 뒷받침할지 관심','중장기 성장 기대가 유지될지 주목'
+);
+V75_FOLLOWUP_NEG.push(
+  '추가 비용 발생 여부가 변수라는 평가','이익 전망 하향으로 번질지 관심',
+  '외국인 매도 확대 여부도 주목','업종 내 부담 확산 여부가 관건이라는 시각',
+  '후속 공시에서 추가 부담이 확인될지 관심','중장기 성장 전망 훼손 여부를 주목'
+);
+V75_FOLLOWUP_NEUTRAL.push(
+  '실제 실적 반영 정도는 더 지켜봐야 한다는 평가','수급과 펀더멘털의 방향이 다를 수 있다는 시각',
+  '추가 정보 확인 전까지 해석이 엇갈릴 가능성','시장 전체 흐름에 따라 영향이 달라질 수 있다는 평가',
+  '단기 변동성 확대 가능성만 우선 거론','같은 재료에도 종목별 반응 차이가 예상된다는 시각'
+);
+
+// 찌라시 +8 / 속보 머리말 +4
+V75_RUMOR_TAIL.push(
+  '…가능성이 거론되고 있다','…설이 증권가에서 돌고 있다','…관측이 일부에서 제기됐다',
+  '…이야기가 업계 안팎에서 흘러나온다','…가능성이 확인되지 않은 채 거론된다',
+  '…전망이 시장 일각에서 돌고 있다','…관련 소문이 확산되는 분위기다','…주장이 일부 채널을 통해 퍼지고 있다'
+);
+V75_BREAKING_LEAD.push('[긴급속보]','[시장속보]','[주요속보]','[장중속보]');
+
+// 제목 생성기는 가격 방향과 무관한 표현 조합만 확장한다.
+v75GenerateTitle=function v84GenerateTitle(ev,r){
+  const axis=v75PickAxis(ev.type,r),subjects=V75_SUBJECT[axis]||['시장 참여자'];
+  const subject=subjects[Math.floor(r()*subjects.length)];
+  const actionsPool=ev.sentiment>0?(V75_ACTION_POS[axis]||['긍정적 재료 부각']):(V75_ACTION_NEG[axis]||['부정적 재료 부각']);
+  const action=actionsPool[Math.floor(r()*actionsPool.length)];
+  const intensity=V75_INTENSITY[Math.floor(r()*V75_INTENSITY.length)];
+  const targetName=v75BuildTargetName(ev.target);
+  let followPool=ev.sentiment>0?V75_FOLLOWUP_POS:V75_FOLLOWUP_NEG;
+  if(ev.cat==='rumor'||r()<.16)followPool=V75_FOLLOWUP_NEUTRAL;
+  const followup=followPool[Math.floor(r()*followPool.length)];
+
+  // 찌라시: 4 → 10개 틀
+  if(ev.cat==='rumor'){
+    const tail=V75_RUMOR_TAIL[Math.floor(r()*V75_RUMOR_TAIL.length)];
+    const f=[
+      `${targetName}, ${action} ${tail}`,
+      `${subject}발 ${targetName} 관련 ${action} ${tail}`,
+      `${targetName} 두고 ${action} ${tail}… ${followup}`,
+      `${action} 관련 ${targetName} 거론… ${followup}`,
+      `${targetName} 관련 ${action} 이야기가 도는 가운데 ${followup}`,
+      `${subject} 주변에서 ${targetName} 관련 ${action} 관측… 아직 확인은 안 된 상태`,
+      `${targetName}, ${action} 가능성 거론… ${followup}`,
+      `${action}설에 ${targetName} 시장 관심… ${followup}`,
+      `${subject} 쪽에서 ${action} 이야기가 흘러나오며 ${targetName} 주목`,
+      `${targetName} 관련 ${action} 소문 확산… 후속 확인 필요`
+    ];
+    return f[Math.floor(r()*f.length)];
+  }
+
+  // 속보: 3 → 7개 틀
+  if(ev.cat==='breaking'){
+    const lead=V75_BREAKING_LEAD[Math.floor(r()*V75_BREAKING_LEAD.length)];
+    const f=[
+      `${lead} ${targetName}, ${action}… ${followup}`,
+      `${lead} ${action}… ${targetName} 영향 주목`,
+      `${lead} ${subject}, ${action}… ${targetName} 관련 변동성 주목`,
+      `${lead} ${targetName} 관련 ${action} 확인… 시장 반응 주목`,
+      `${lead} ${subject}발 ${action} 소식… ${targetName} 단기 영향 관심`,
+      `${lead} ${action} 전해져… ${targetName} 수급 변화 여부 주목`,
+      `${lead} ${targetName}, ${intensity} ${action}… 후속 상황 확인 중`
+    ];
+    return f[Math.floor(r()*f.length)];
+  }
+
+  // 종목/업종형: 10 → 16개 틀
+  if(ev.target.kind!=='market'){
+    const f=[
+      `${subject}, ${targetName} 관련 ${action}… ${intensity} ${followup}`,
+      `${targetName}, ${action} 관측… ${followup}`,
+      `${action} 소식에 ${targetName} 주목… ${followup}`,
+      `${subject}, ${intensity} ${targetName} 관련 ${action}`,
+      `${targetName} 관련 ${action}… ${followup}`,
+      `${subject}발 ${action}… ${targetName} 영향은 엇갈릴 가능성`,
+      `${intensity} ${action}… ${targetName} 투자심리 변화 주목`,
+      `${targetName}, ${subject} 움직임에 관심… ${action}`,
+      `${action} 이후 ${targetName} 수급 주목… ${followup}`,
+      `${subject}, ${targetName} 놓고 ${action}… 시장 해석 엇갈려`,
+      `${targetName}, ${intensity} ${action} 소식… 후속 흐름 주목`,
+      `${subject} 움직임 속 ${targetName} 관련 ${action} 부각`,
+      `${action} 재료 부각… ${targetName} 실제 영향 두고 시각 엇갈려`,
+      `${targetName} 관련 ${action}, ${subject} 동향과 함께 관심`,
+      `${intensity} ${targetName} 관련 ${action}… 업종 내 반응 차별화`,
+      `${subject}, ${action} 언급… ${targetName} 단기 수급 변수로 부상`
+    ];
+    return f[Math.floor(r()*f.length)];
+  }
+
+  // 시장형: 8 → 12개 틀
+  const f=[
+    `${subject}, ${action}… ${intensity} ${followup}`,
+    `${action} 관측… ${followup}`,
+    `${subject}, ${intensity} ${action}`,
+    `${action} 이후 시장 수급 변화 주목… ${followup}`,
+    `${subject}발 ${action}… 국내 증시 영향은 엇갈릴 가능성`,
+    `${intensity} ${action}… 위험선호 변화 여부 주목`,
+    `${subject}, ${action} 언급… 시장 해석 엇갈려`,
+    `${action} 소식… 업종별 차별화 가능성`,
+    `${subject} 움직임 속 ${action} 부각… 시장 방향성 주목`,
+    `${intensity} ${action} 재료 등장… 외국인·기관 수급 반응 관심`,
+    `${action} 관련 기대와 경계 공존… 업종별 반응 차이 예상`,
+    `${subject}, ${action} 가능성 거론… 국내 증시 단기 변동성 변수`
+  ];
+  return f[Math.floor(r()*f.length)];
+};
+
+window.__marketV84={
+  version:84,basedOn:83,
+  phraseFragmentsBefore:361,
+  phraseFragmentsAfter:500,
+  titleTemplatesBefore:25,
+  titleTemplatesAfter:45,
+  newsFrequencyChanged:false,
+  newsDurationChanged:false,
+  followupProbabilityChanged:false,
+  priceImpactChanged:false,
+  firebaseReadsAdded:0,
+  firebaseWritesAdded:0
+};
+</script>
+
 </body></html>
