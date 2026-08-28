@@ -7537,109 +7537,81 @@ window.__marketV88={
 
 
 <script>
-/* ============ V93 — 접속 문제 없이 재생 압축 (사이클 드리프트 레이어) ============
-   V90의 문제: day 자체를 부풀려서, day 앵커 기반 연속성 계산(V69)이 실제보다 훨씬
-   많은 '게임일'을 다시 계산하게 만들어 로딩이 멈췄다.
+/* ============ V95 — 사이클 경계 없이 계속 이어지는 변동성 (연속 위상 이동) ============
+   V94까지의 문제: 사이클(120분) 단위로 정방향/역방향을 오가다 보니, 크게 보면
+   같은 하루 그림이 앞으로 갔다 뒤로 갔다를 반복하는 형태였다.
 
-   V93 해법: day는 절대 건드리지 않는다. 대신
-   1) 실제 세션(08:00~23:30) 안에서 V93_CYCLE_MS(120분)마다 '오늘 하루' 안의
-      390틱 경로를 다시 훑어보되(day 그대로, minute만 다시 0→389로 순회),
-   2) 매번 똑같은 그림이 나오지 않도록, 사이클마다 아주 가벼운(day/연속성 계산을
-      전혀 건드리지 않는) 독립적인 드리프트 배수를 하나 더 곱한다.
-   day를 새로 만들지 않으므로 V69 연속성 계산은 '오늘 하루' 한 번만 계산되고,
-   이후 모든 사이클은 캐시를 그대로 재사용한다 — 접속 성능에 영향이 없다.
+   V95 해법: day는 여전히 건드리지 않는다. 대신 '오늘 하루' 경로 위에서 현재
+   보여줄 위치(position, 0~1)를, 서로 주기가 다른 사인파 여러 개를 겹쳐서
+   실제 시간에 따라 연속적으로 이동시킨다. 주기들을 서로소(17/41/97/227분)로
+   골라서 전체 패턴이 사실상 반복되지 않고(반복 주기가 수십 년 단위), 위치가
+   딱딱 끊기지 않고 항상 부드럽게 흘러간다. 종목마다 위상(phase)을 다르게 줘서
+   전 종목이 똑같이 움직이지도 않는다.
+   등락률은 항상 '오늘 진짜 시가'를 기준으로 계산하므로, 갑자기 리셋되는 순간이
+   없다 — position 자체가 연속이라 change도 항상 연속적으로 흐른다.
 */
-const V93_BASE_VISUAL=fastVisualPriceAt;
-const V93_BASE_QUOTE=quote;
-const V93_CYCLE_MS=120*60*1000; // 실제 120분 = '오늘 하루' 경로 1회 재생
-const V93_CYCLES_PER_SESSION=Math.max(1,Math.ceil(V68_SESSION_MS/V93_CYCLE_MS));
-const V93_DRIFT_SIGMA={blue:.015,growth:.026,theme:.042,junk:.062};
-const V93_DATE_CACHE=new Map();
+const V95_BASE_VISUAL=fastVisualPriceAt;
+const V95_BASE_QUOTE=quote;
 
-function v93DateKey(ms){
-  const d=new Date(ms);
-  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+// 주기(분)들을 서로소로 골라 전체 패턴이 사실상 반복되지 않게 한다.
+const V95_WAVES=[
+  {periodMin:227,weight:.45},
+  {periodMin:97, weight:.30},
+  {periodMin:41, weight:.15},
+  {periodMin:17, weight:.10},
+];
+const V95_PHASE_CACHE=new Map();
+function v95Phases(code){
+  let arr=V95_PHASE_CACHE.get(code);
+  if(arr)return arr;
+  arr=V95_WAVES.map((w,i)=>v9Unit('v95-phase',code,i)*Math.PI*2);
+  V95_PHASE_CACHE.set(code,arr);
+  return arr;
 }
 
-function v93Session(ms){
+function v95Session(ms){
   const d=new Date(ms);
   const open=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
   const close=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
   return {open,close};
 }
 
-// 사이클 경계에서의 누적 로그드리프트. cycleIndex는 '오늘' 안에서만 0~V93_CYCLES_PER_SESSION-1로
-// 작으니(최대 8 정도) day 히스토리를 전혀 거슬러 올라가지 않는다 — 성능 걱정 없음.
-function v93CycleLogAt(s,dateKey,cycleIndex){
-  if(cycleIndex<=0)return 0;
-  const key=s.code+'|'+dateKey;
-  let arr=V93_DATE_CACHE.get(key);
-  if(!arr){arr=[0];V93_DATE_CACHE.set(key,arr);}
-  while(arr.length<=cycleIndex){
-    const i=arr.length;
-    const sigma=V93_DRIFT_SIGMA[s.tier]||V93_DRIFT_SIGMA.blue;
-    const step=v9Normal('v93-cycle-drift',s.code,dateKey,i)*sigma;
-    arr.push(arr[i-1]+step);
+function v95Position(code,ms){
+  const phases=v95Phases(code);
+  let sum=0;
+  for(let i=0;i<V95_WAVES.length;i++){
+    const {periodMin,weight}=V95_WAVES[i];
+    sum+=weight*Math.sin((2*Math.PI*ms)/(periodMin*60000)+phases[i]);
   }
-  if(V93_DATE_CACHE.size>STOCKS.length*3){
-    const firstKey=V93_DATE_CACHE.keys().next().value;
-    V93_DATE_CACHE.delete(firstKey);
-  }
-  return arr[cycleIndex];
+  return Math.max(0,Math.min(1,0.5+0.5*sum));
 }
 
-function v93Position(ms){
-  const {open,close}=v93Session(ms);
-  if(ms<open||ms>=close)return null; // 장 시간 밖에서는 원래(V72) 동작 그대로
-  const elapsed=ms-open;
-  const cycleIndex=Math.min(V93_CYCLES_PER_SESSION-1,Math.floor(elapsed/V93_CYCLE_MS));
-  const elapsedInCycle=elapsed-cycleIndex*V93_CYCLE_MS;
-  const cycleProgress=Math.min(1,elapsedInCycle/V93_CYCLE_MS);
-  const syntheticMs=open+cycleProgress*(close-open);
-  return {syntheticMs,cycleIndex,cycleProgress};
-}
-
-function v93DriftFactor(s,dateKey,cycleIndex,cycleProgress){
-  const base=v93CycleLogAt(s,dateKey,cycleIndex);
-  const sigma=V93_DRIFT_SIGMA[s.tier]||V93_DRIFT_SIGMA.blue;
-  const stepIndex=cycleIndex+1;
-  const nextStep=v9Normal('v93-cycle-drift',s.code,dateKey,stepIndex)*sigma;
-  const x=cycleProgress*cycleProgress*(3-2*cycleProgress); // smoothstep
-  return Math.exp(base+nextStep*x);
-}
-
-fastVisualPriceAt=function v93CycleVisualPrice(s,ms=Date.now()){
-  const pos=v93Position(ms);
-  if(!pos)return V93_BASE_VISUAL(s,ms);
-  const dateKey=v93DateKey(ms);
-  const basePrice=V93_BASE_VISUAL(s,pos.syntheticMs);
-  const factor=v93DriftFactor(s,dateKey,pos.cycleIndex,pos.cycleProgress);
-  const px=basePrice*factor;
-  return s?.isETF?Math.max(5,Math.round(px/5)*5):v65RoundPrice(px);
+fastVisualPriceAt=function v95FlowingVisual(s,ms=Date.now()){
+  const {open,close}=v95Session(ms);
+  if(ms<open||ms>=close)return V95_BASE_VISUAL(s,ms); // 장 시간 밖은 원래(V72) 동작 그대로
+  const pos=v95Position(s.code,ms);
+  const syntheticMs=open+pos*(close-open);
+  return V95_BASE_VISUAL(s,syntheticMs);
 };
 smoothPriceAt=fastVisualPriceAt;
 
-quote=function v93CycleQuote(s){
-  const now=Date.now(),pos=v93Position(now);
-  if(!pos)return V93_BASE_QUOTE(s);
-  const dateKey=v93DateKey(now);
-  const q=V93_BASE_QUOTE(s)||{};
+quote=function v95FlowingQuote(s){
+  const now=Date.now(),{open,close}=v95Session(now);
+  if(now<open||now>=close)return V95_BASE_QUOTE(s);
+  const q=V95_BASE_QUOTE(s)||{};
   const price=fastVisualPriceAt(s,now);
-  const {open:sessOpen}=v93Session(now);
-  const cycleStartMs=sessOpen+pos.cycleIndex*V93_CYCLE_MS;
-  const openBase=V93_BASE_VISUAL(s,Math.max(sessOpen,Math.min(now,cycleStartMs)));
-  const openFactor=Math.exp(v93CycleLogAt(s,dateKey,pos.cycleIndex));
-  const open=s?.isETF?Math.max(5,Math.round(openBase*openFactor/5)*5):v65RoundPrice(openBase*openFactor);
-  const change=(price-Math.max(1,open))/Math.max(1,open)*100;
-  return {...q,price,open,change};
+  const openRaw=V95_BASE_VISUAL(s,open); // 오늘 진짜 시가 — 항상 고정된 기준
+  const openPx=s?.isETF?Math.max(5,Math.round(openRaw/5)*5):v65RoundPrice(openRaw);
+  const change=(price-Math.max(1,openPx))/Math.max(1,openPx)*100;
+  return {...q,price,open:openPx,change};
 };
 rawQuote=quote;
 
-window.__marketV93={
-  version:93,basedOn:72,
-  reason:'V90 성능 회귀(day 부풀림) 없이 재생 압축 재도입',
-  cycleMs:V93_CYCLE_MS,cyclesPerSession:V93_CYCLES_PER_SESSION,
-  dayUntouched:true,v69ContinuityUnaffected:true
+window.__marketV95={
+  version:95,basedOn:72,
+  reason:'사이클 경계 없이 연속적으로 흐르는 체감 변동, day 미변경으로 성능 안전',
+  waves:V95_WAVES,
+  practicallyNonRepeating:true
 };
 </script>
 
