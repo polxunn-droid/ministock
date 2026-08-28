@@ -5599,6 +5599,17 @@ window.__marketV67={
 const V68_SESSION_MS=(MARKET_CLOSE_MIN-MARKET_OPEN_MIN)*60*1000;
 const V68_STATE_SPEED=MARKET_V9_SPEED*DAY_MS/V68_SESSION_MS*V63_STATE_SPEED;
 
+/* V90 — 체감 변동 압축
+   문제: V68는 실제 장 1회(08:00~23:30, 15.5시간)를 게임 1거래일(390틱)에 그대로 매핑했다.
+        그 결과 30분~1시간만 접속해도 하루치 가격 경로의 6~7%만 반영되어 거의 안 움직이는
+        것처럼 느껴졌다 (기획 의도였던 '짧은 시간 안 극적인 등락'과 반대 방향).
+   해결: 세션(거래 가능 시간대, 08:00~23:30) 자체는 그대로 두되, 그 안에서 게임 거래일이
+        V90_CYCLE_MS 주기로 여러 번 반복 재생되게 한다. 국면/모멘텀/반전 로직(V9~V88)은
+        전혀 건드리지 않는다 — '하루치 경로가 재생되는 속도'만 빨라진다.
+*/
+const V90_CYCLE_MS=60*60*1000; // 실제 60분 = 게임 1거래일
+const V90_CYCLES_PER_SESSION=Math.ceil(V68_SESSION_MS/V90_CYCLE_MS);
+
 function v68SessionPosition(ms=Date.now()){
   const d=new Date(ms);
   let sessionDate=new Date(d.getFullYear(),d.getMonth(),d.getDate());
@@ -5616,8 +5627,13 @@ function v68SessionPosition(ms=Date.now()){
   }
 
   const sessionStart=new Date(sessionDate.getFullYear(),sessionDate.getMonth(),sessionDate.getDate()).getTime();
-  const day=Math.round((sessionStart-MARKET_EPOCH)/DAY_MS);
-  const progress=Math.max(0,Math.min(1,(effective-open)/Math.max(1,close-open)));
+  const baseDay=Math.round((sessionStart-MARKET_EPOCH)/DAY_MS);
+
+  const elapsed=Math.max(0,effective-open);
+  const cycleIndex=Math.min(V90_CYCLES_PER_SESSION-1,Math.floor(elapsed/V90_CYCLE_MS));
+  const cycleElapsed=elapsed-cycleIndex*V90_CYCLE_MS;
+  const day=baseDay*V90_CYCLES_PER_SESSION+cycleIndex;
+  const progress=elapsed>=V90_CYCLES_PER_SESSION*V90_CYCLE_MS?1:Math.max(0,Math.min(1,cycleElapsed/V90_CYCLE_MS));
   const raw=progress*DAY_STEPS;
   const minute=progress>=1?DAY_STEPS-1:Math.max(0,Math.min(DAY_STEPS-1,Math.floor(raw)));
   const phase=progress>=1?1:raw-minute;
@@ -5664,13 +5680,21 @@ try{
 window.__marketV68={
   version:68,basedOn:67,
   realSession:'08:00-23:30',ticksPerSession:390,
-  internalDaysPerSession:1,internalDayRolloverDuringSession:false,
-  secondsPerPriceTick:V68_SESSION_MS/DAY_STEPS/1000,
+  internalDaysPerSession:V90_CYCLES_PER_SESSION,internalDayRolloverDuringSession:true,
+  secondsPerPriceTick:V90_CYCLE_MS/DAY_STEPS/1000,
   stateSpeedMultiplier:V68_STATE_SPEED,
   stateSpeedDecoupled:true,priceInterpolation:true,
   previousCloseBasis:'previous real session 23:30',
   marketSpeedLabelPreserved:true,executionRulesChanged:false,
   firebaseSchemaChanged:false,rankingChanged:false
+};
+
+window.__marketV90={
+  version:90,basedOn:68,
+  reason:'세션 15.5시간에 게임 1거래일이 늘어져 체감 변동이 거의 없던 문제 수정',
+  cycleMs:V90_CYCLE_MS,cyclesPerSession:V90_CYCLES_PER_SESSION,
+  realMinutesPerGameDay:V90_CYCLE_MS/60000,
+  regimeMomentumReversalLogicChanged:false
 };
 </script>
 
@@ -6063,7 +6087,14 @@ quote=function v72LongMarketQuote(s){
   const price=s?.isETF?Math.max(5,Math.round((+q.price||1)*f/5)*5):v65RoundPrice((+q.price||1)*f);
   const open=s?.isETF?Math.max(5,Math.round((+q.open||1)*f/5)*5):v65RoundPrice((+q.open||1)*f);
   const prevMs=v67SessionPrevCloseMs(now),prevClose=Math.max(1,fastVisualPriceAt(s,prevMs));
-  return {...q,price,open,prevClose,change:(price-prevClose)/prevClose*100};
+  /* V91: 등락률을 '어제 23:30 종가' 대신 '이번 게임일(120분 사이클) 시가' 기준으로 계산한다.
+     - 이유: 가격은 120분마다 새 사이클로 재생되는데 %는 실제 하루 단위로만 리셋되면
+       화면상 움직임과 % 숫자가 따로 노는 느낌이 생긴다. 사이클 시가 기준으로 바꾸면
+       지금 보고 있는 흐름이 그대로 %에 반영되고, 사이클마다 자연스럽게 리셋된다.
+     - prevClose 필드는 그대로 유지한다(다른 화면에서 참조할 수 있어 값만 보존).
+  */
+  const change=(price-Math.max(1,open))/Math.max(1,open)*100;
+  return {...q,price,open,prevClose,change};
 };
 rawQuote=quote;
 
