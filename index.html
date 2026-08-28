@@ -7487,4 +7487,63 @@ window.__marketV85={
 };
 </script>
 
+
+<script>
+/* ============ V86 — V85 접속 정지 수정 + 활성 postMove 경로 tail 균형 ============
+   V85의 최종 raw 경로 재구성은 첫 화면에서 종목×틱 전체를 동기 계산하여 메인 스레드를 막을 수 있었다.
+   이를 제거하고, 실제 매 틱 호출되는 v11PostMove 경로에서 V34 비대칭을 걷어낸 뒤 deep-tail 보정을 가볍게 적용한다.
+   V85의 tier별 Trend/Shock 희소화는 그대로 유지한다.
+*/
+
+// 1) V85의 고비용 raw 재구성 wrapper 제거 — V69 활성 경로로 즉시 복귀
+if(typeof V85_RAW_BASE==='function'){
+  v9RawPriceAt=V85_RAW_BASE;
+  priceAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v9RawPriceAt(s,t)};
+}
+try{ V85_PATH_CACHE?.clear?.(); }catch(e){}
+
+// 2) V34 이전의 실제 V29 postMove를 기준으로 활성 경로에서 직접 균형 적용
+//    방향을 뒤집지 않고, 이미 선택된 방향의 이동폭만 조절한다.
+if(typeof v34PostBase==='function'){
+  v11PostMove=function v86LiveBalancedPostMove(s,day,minute,changeRate){
+    let ret=Number(v34PostBase(s,day,minute,changeRate))||0;
+    if(s?.isETF || ret===0 || Math.abs(changeRate)<.15)return ret;
+
+    const heat=Math.max(0,Math.min(1,(Math.abs(changeRate)-.15)/.25));
+    if(changeRate>0){
+      // 깊은 상승: 추가상승만 점진 압축, 조정은 약간 자연스럽게
+      if(ret>0) ret*=.82-heat*.27;
+      else      ret*=1.03+heat*.10;
+    }else{
+      // 깊은 하락: 추가하락은 아주 약하게만 보강, 즉시 반등만 소폭 완화
+      if(ret<0) ret*=1.025+heat*.065;
+      else      ret*=1.00-heat*.04;
+    }
+    return Math.max(-.00185,Math.min(.00122,ret));
+  };
+}
+
+// 3) 가격/quote 캐시만 비워 새 활성 함수를 즉시 사용
+try{
+  v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
+  V29_OPEN_CACHE?.clear?.(); V29_CLOSE_CACHE?.clear?.(); V29_SCALE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.(); V49_PATH_STATE_CACHE?.clear?.();
+  V69_RAW_CACHE?.clear?.(); V69_SCALE_CACHE?.clear?.(); V70_WALK_CACHE?.clear?.();
+  V23_QUOTE_CACHE?.clear?.(); V43_PREVCLOSE_CACHE?.clear?.(); V43_FINAL_QUOTE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.(); V45_QUOTE_TICK_CACHE?.clear?.(); V52_LIVE_QUOTE_CACHE?.clear?.();
+  V52_LIVE_MOVER_CACHE?.clear?.(); V67_PREV_CLOSE_CACHE?.clear?.(); chartHistoryCache?.clear?.();
+}catch(e){}
+
+window.__marketV86={
+  version:86,basedOn:85,
+  v85HeavyRawWrapperDisabled:true,
+  liveBalanceLocation:'v11PostMove',
+  v34AsymmetricWrapperBypassed:true,
+  v85TierTailTuningPreserved:true,
+  directionForced:false,
+  forcedReversal:false,
+  forcedProfit:false
+};
+</script>
+
 </body></html>
