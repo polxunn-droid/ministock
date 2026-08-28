@@ -62,7 +62,7 @@
 .v76-news-summary{font-size:11px;color:var(--muted);padding:0 2px 10px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}.v76-news-summary::-webkit-scrollbar{display:none}
 .v76-news-list{max-height:50vh;overflow-y:auto;overscroll-behavior:contain}.v76-news-note{margin:12px 2px 2px;color:var(--muted);font-size:10.5px;line-height:1.55}
 </style>
-<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000008d188211a341c5b04c77441f%26fn%3Dindex%252820260828-031027%2529.html%26cd%3Dattachment%26ts%3D496644%26p%3Dfs%26cid%3D1%26sig%3Dab4ee946c21cf1d14e4cf2ad84996f9f5b220f3d9ae1e0a52a81dcdc42ae56e5%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
+<script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787921995006&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000002f848211bc775813c056e9bb%26fn%3Dministock_v104_final.html%26cd%3Dattachment%26ts%3D496646%26p%3Dfs%26cid%3D1%26sig%3D4034cb9a056d74128cd4f2be3e9d1be51292c44a0c313ecad753c9abf6fd8460%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787921995006&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_000000008d188211a341c5b04c77441f%26fn%3Dindex%252820260828-031027%2529.html%26cd%3Dattachment%26ts%3D496644%26p%3Dfs%26cid%3D1%26sig%3Dab4ee946c21cf1d14e4cf2ad84996f9f5b220f3d9ae1e0a52a81dcdc42ae56e5%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="d3615a47b4784eb0a86883ceeba" src="//local.adguard.org?ts=1787907679330&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
@@ -7712,6 +7712,115 @@ window.__marketV95={
     newsPriceImpactChanged:false,
     individualStockSelectionChanged:false,
     marketEngineChanged:false
+  };
+})();
+</script>
+
+
+<script id="v104-forward-flow-final">
+/* V104 — V95 경로 되감기 제거 + 순방향 미세흐름
+   - V95의 sine position으로 오늘 경로를 앞/뒤로 훑는 방식은 사용하지 않는다.
+   - V95 직전(V72)의 실제 세션 시간 가격을 그대로 순방향으로 사용한다.
+   - 단기 체감이 너무 잔잔해지지 않도록 ordinary stock에만 결정론적 Brownian-bridge
+     미세흐름을 추가한다. 시가/종가에서 offset=0이라 장 연속성을 훼손하지 않는다.
+   - ETF는 구성종목 NAV를 그대로 유지한다.
+   - 뉴스/쇼크/tier/V81/V101/KOSPI/계좌/장시간 로직은 변경하지 않는다.
+*/
+(function(){
+  const BASE_VISUAL = V95_BASE_VISUAL;   // V95 직전 활성 visual (V72)
+  const BASE_QUOTE  = V95_BASE_QUOTE;    // V95 직전 quote
+  const STEP_MS = 5 * 60 * 1000;
+  const FLOW_CACHE = new Map();
+  const SIGMA = {blue:.0022, growth:.0030, theme:.0045, junk:.0055};
+
+  function sessionBounds(ms){
+    const d = new Date(ms);
+    const open = new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime();
+    const close = new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime();
+    return {open,close};
+  }
+
+  function flowArray(s, open, close){
+    const od=new Date(open);
+    const dayKey = od.getFullYear()+'-'+String(od.getMonth()+1).padStart(2,'0')+'-'+String(od.getDate()).padStart(2,'0');
+    const key = s.code + '|' + dayKey;
+    let hit = FLOW_CACHE.get(key);
+    if(hit) return hit;
+
+    const n = Math.max(2, Math.ceil((close-open)/STEP_MS)+1);
+    const sigma = SIGMA[s.tier] || SIGMA.growth;
+    const a = new Float64Array(n);
+    let v = 0;
+    for(let i=1;i<n;i++){
+      v += normal(rnd(hash('v104-forward-micro', s.code, dayKey, i))) * sigma;
+      a[i] = v;
+    }
+    // Brownian bridge: 시가와 종가에서 0, 중간만 독립적인 미세흐름.
+    const end = a[n-1];
+    for(let i=1;i<n;i++) a[i] -= end * (i/(n-1));
+
+    // 비정상 단일 미세파동이 본체를 압도하지 않도록 tier별 절대 안전범위.
+    const cap = s.tier==='blue' ? .024 : s.tier==='growth' ? .034 : s.tier==='theme' ? .050 : .062;
+    for(let i=1;i<n-1;i++) a[i] = Math.max(-cap, Math.min(cap, a[i]));
+
+    hit = {a,n,open,close};
+    FLOW_CACHE.set(key, hit);
+    if(FLOW_CACHE.size > 900){
+      const cut = FLOW_CACHE.size - 650;
+      let i=0;
+      for(const k of FLOW_CACHE.keys()){ FLOW_CACHE.delete(k); if(++i>=cut) break; }
+    }
+    return hit;
+  }
+
+  function microOffset(s, ms, open, close){
+    if(!s || s.isETF || ms<=open || ms>=close) return 0;
+    const f = flowArray(s,open,close);
+    const x = Math.max(0,Math.min(f.n-1,(ms-open)/STEP_MS));
+    const i = Math.floor(x), j = Math.min(f.n-1,i+1), p = x-i;
+    const sm = p*p*(3-2*p);
+    return f.a[i] + (f.a[j]-f.a[i])*sm;
+  }
+
+  fastVisualPriceAt = function v104ForwardVisual(s, ms=Date.now()){
+    const {open,close} = sessionBounds(ms);
+    const base = BASE_VISUAL(s,ms);  // 실제 시간순서: 절대 과거/미래 위치로 되감지 않음
+    if(ms<open || ms>=close || s?.isETF) return base;
+    const px = base * Math.exp(microOffset(s,ms,open,close));
+    return v65RoundPrice(px);
+  };
+  smoothPriceAt = fastVisualPriceAt;
+
+  quote = function v104ForwardQuote(s){
+    const now = Date.now(), {open,close} = sessionBounds(now);
+    if(now<open || now>=close) return BASE_QUOTE(s);
+    const q = BASE_QUOTE(s) || {};
+    const price = fastVisualPriceAt(s,now);
+    const openRaw = BASE_VISUAL(s,open);
+    const openPx = s?.isETF ? Math.max(5,Math.round(openRaw/5)*5) : v65RoundPrice(openRaw);
+    const change = (price-Math.max(1,openPx))/Math.max(1,openPx)*100;
+    return {...q,price,open:openPx,change};
+  };
+  rawQuote = quote;
+
+  window.__marketV104 = {
+    version:104,
+    basedOn:103,
+    productionCandidate:true,
+    v95RewindRemoved:true,
+    chronologicalBase:'V72',
+    microFlow:'deterministic-brownian-bridge',
+    microStepMinutes:5,
+    microSigma:{...SIGMA},
+    microEndsAtOpenAndClose:true,
+    etfMicroFlow:false,
+    newsChanged:false,
+    shockChanged:false,
+    tierTailChanged:false,
+    v101Changed:false,
+    kospiChanged:false,
+    accountChanged:false,
+    marketHoursChanged:false
   };
 })();
 </script>
