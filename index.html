@@ -1833,35 +1833,97 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-reward-close]')
 window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuckets:REWARD_PRICE_BUCKETS,cashShare:.60,stockShare:.40};
 
 
-/* V104: one-time recovery for SAMS2L deleted by V100.
-   No remembered quantity is required.
-   It scans retained equityHistory snapshots, reconstructs cash/known holdings at each
-   snapshot by reversing later trades, and attributes the unexplained positive gap
-   to the legacy Samsung 2X holding. The recovered quantity is valued at that exact
-   historical snapshot price. */
-function v104RecoverDeletedSams2L(raw){
-  if(!raw||typeof raw!=='object')return raw;
-  if(raw?.recoveryV104Done)return raw;
-  const hs=Array.isArray(raw.equityHistory)?raw.equityHistory.filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value)):[];
-  if(!hs.length){raw.recoveryV104Done=true;return raw;}
-  raw.holdings=raw.holdings&&typeof raw.holdings==='object'?raw.holdings:{};
-  if(raw.holdings?.SAMS2L?.qty>0){raw.recoveryV104Done=true;return raw;}
+/* ================= V106 SAFE STORAGE + ONE-TIME LEGACY RECOVERY =================
+   Principles:
+   1) Never silently delete a holding just because a future HTML accidentally omits its code.
+   2) Keep an untouched pre-normalize local backup before the first save.
+   3) Refuse to overwrite the main account if the known catalog is unexpectedly incomplete.
+   4) Run the V104-style SAMS2L recovery at most once per user, outside the hot render loop.
+*/
+const V106_EXPECTED_CODES=["005930","000660","373220","207940","005380","028260","105560","068270","000270","035420","012450","034020","329180","055550","012330","005490","032830","402340","035720","051910","000810","086790","009150","033780","015760","267260","096770","006400","138040","066570","316140","064350","259960","030200","017670","011200","047810","003670","003550","042660","010140","009540","029780","024110","034730","032640","352820","326030","079550","042700","010130","010950","003490","090430","021240","271560","097950","004370","007310","005300","282330","139480","007070","069960","008770","383220","051900","278470","192820","161890","251270","036570","018260","064400","307950","323410","377300","006800","005940","071050","039490","005830","001450","088350","138930","175330","139130","078930","267250","000880","006260","010120","298040","241560","454910","443060","086280","028670","000120","000720","000150","011070","272210","003230","028050","047050","180640","161390","007660","016360","047040","009830","000100","128940","267270","001440","062040","353200","010060","000500","066970","034220","088980","052690","011790","085620","002380","082740","004170","000990","004020","001040","018880","036460","111770","009420","103590","006360","035250","022100","011780","008930","012750","336260","023530","302440","031210","017800","483650","375500","007340","004800","489790","026960","450080","001720","003690","005850","011170","004990","204320","000240","103140","279570","005440","009970","081660","030000","018670","014680","051600","181710","112610","002790","073240","462870","457190","439260","475150","071970","089860","006040","020150","023590","011210","361610","322000","120110","001800","001430","020560","097230","294870","006280","001120","069620","007810","298020","012630","001740","229640","093370","280360","005070","082640","281820","003540","415640","192080","017960","004000","300720","030610","001820","000080","006340","032350","003530","000210","003090","003570","192400","003240","077970","286940","185750","009450","009240","030190","005090","034230","003470","000370","195870","285130","006120","006110","005180","079160","071320","100090","004490","499790","003850","298050","137310","214320","036530","000670","456040","064960","003160","317450","094800","268280","017940","100840","069260","005880","002960","005690","033240","000400","002350","001060","001570","383800","000640","001680","014820","248070","006380","001510","002840","108320","075580","453340","079900","001270","002990","114090","025540","090460","058650","006650","003300","016380","007700","005810","178920","003620","336370","039130","284740","001500","008060","009410","001530","019170","377740","196170","247540","086520","028300","277810","141080","145020","214150","087010","310210","000250","058470","039030","357780","403870","036930","240810","067310","095340","084370","131970","089030","140860","036810","039440","222800","166090","101490","319660","031980","068760","298380","237690","950160","214450","195940","067630","290650","086450","085660","328130","253450","293490","263750","112040","225570","095660","067160","035900","041510","122870","035760","078340","194480","060250","053800","041020","108490","056080","090360","348370","121600","078600","222080","005290","095610","036830","131290","025900","393890","272290","204270","161580","257720","018290","214430","099320","274090","189300","211270","065350","058610","090710","108860","042000","060370","086900","243070","206640","096530","214370","206650","048410","226950","290670","278280","137400","336570","030520","417200","0080G0","0098F0","0115D0","0183V0","069500","091160","091170","091180","114800","122630","229200","266420","305720","395160","445290","SAMS2I","SAMS2L"];
+const V106_EXPECTED_SET=new Set(V106_EXPECTED_CODES);
+const V106_CATALOG_OK=()=>V106_EXPECTED_CODES.every(c=>STOCKS.some(s=>s.code===c));
+
+/* Final normalize wrapper: revive previously orphaned holdings when their symbol returns,
+   and preserve currently-missing holdings under orphanHoldings instead of deleting them. */
+const V106_NORMALIZE_BASE=normalizeState;
+normalizeState=function v106ProtectedNormalize(v){
+  const incoming=(v&&typeof v==='object')?v:{};
+  const mergedHoldings={...(incoming.holdings||{})};
+  const oldOrphans=(incoming.orphanHoldings&&typeof incoming.orphanHoldings==='object')?incoming.orphanHoldings:{};
+  for(const [code,h] of Object.entries(oldOrphans)){
+    if(STOCKS.some(s=>s.code===code) && !mergedHoldings[code]) mergedHoldings[code]=h;
+  }
+  const out=V106_NORMALIZE_BASE({...incoming,holdings:mergedHoldings});
+  const orphans={};
+  for(const [code,h] of Object.entries(oldOrphans)){
+    if(!STOCKS.some(s=>s.code===code) && h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0)
+      orphans[code]={qty:Math.floor(+h.qty),avg:+h.avg};
+  }
+  for(const [code,h] of Object.entries(mergedHoldings)){
+    if(!STOCKS.some(s=>s.code===code) && h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0)
+      orphans[code]={qty:Math.floor(+h.qty),avg:+h.avg};
+  }
+  out.orphanHoldings=orphans;
+  out.recoveryV106Done=!!incoming.recoveryV106Done;
+  if(incoming.recoveryV106) out.recoveryV106=incoming.recoveryV106;
+  return out;
+};
+
+/* One pre-normalize backup per session. This is never used by render/price loops. */
+const V106_LOAD_BASE=Store.loadMe.bind(Store);
+Store.loadMe=async function v106ProtectedLoad(id){
+  const raw=await V106_LOAD_BASE(id);
+  if(raw){
+    try{
+      const sessionKey='mockstock:v106-backed:'+id;
+      if(!sessionStorage.getItem(sessionKey)){
+        localStorage.setItem('mockstock:backup:v106:'+id,JSON.stringify(raw));
+        sessionStorage.setItem(sessionKey,'1');
+      }
+    }catch{}
+  }
+  return raw;
+};
+
+/* Catalog guard: if even one expected code disappears in a later patch, do not overwrite
+   the good main save. Put the attempted state in quarantine instead. */
+const V106_SAVE_BASE=Store.saveMe.bind(Store);
+Store.saveMe=async function v106ProtectedSave(id,v){
+  if(!V106_CATALOG_OK()){
+    try{localStorage.setItem('mockstock:quarantine:v106:'+id,JSON.stringify(v));}catch{}
+    console.error('V106 저장 보호: 종목 카탈로그 누락 감지 — 기존 계좌 저장본을 덮어쓰지 않았습니다.');
+    return false;
+  }
+  return V106_SAVE_BASE(id,v);
+};
+
+/* V104 recovery math, but one-time and deferred.
+   It restores only SAMS2L; cash/other holdings are not rolled back or replaced. */
+function v106RecoverDeletedSams2L(current){
+  if(!current||current?.holdings?.SAMS2L?.qty>0)return {state:current,changed:false,reason:'already-present'};
+  const hs=(Array.isArray(current?.equityHistory)?current.equityHistory:[])
+    .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value));
+  if(!hs.length)return {state:current,changed:false,reason:'no-history'};
   const lev=STOCKS.find(s=>s.code==='SAMS2L');
-  if(!lev){return raw;}
-  const logs=Array.isArray(raw.tradeLog)?raw.tradeLog.filter(x=>x&&Number.isFinite(+x.at)&&['buy','sell'].includes(x.type)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price)):[];
+  if(!lev)return {state:current,changed:false,reason:'symbol-missing'};
+  const logs=(Array.isArray(current?.tradeLog)?current.tradeLog:[])
+    .filter(x=>x&&Number.isFinite(+x.at)&&['buy','sell'].includes(x.type)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price));
   let best=null;
+
+  /* Newest history first. Stop at the first very-high-confidence integer-share match.
+     This preserves V104's idea but avoids continuously rescanning on every page load. */
   for(let i=hs.length-1;i>=0;i--){
-    const snap=hs[i], at=+snap.at;
-    // Current cash -> cash at historical snapshot by reversing subsequent known trades.
-    let cash=Number.isFinite(+raw.cash)?+raw.cash:0;
+    const snap=hs[i],at=+snap.at;
+    let cash=Number.isFinite(+current.cash)?+current.cash:0;
     const qty={};
-    for(const [code,h] of Object.entries(raw.holdings||{})){
+    for(const [code,h] of Object.entries(current.holdings||{})){
       if(code==='SAMS2L'||code==='SAMS2I')continue;
       if(Number.isFinite(+h?.qty)&&+h.qty>0)qty[code]=Math.floor(+h.qty);
     }
     for(let j=logs.length-1;j>=0;j--){
-      const x=logs[j]; if(+x.at<=at)continue;
-      const q=Math.floor(+x.qty),px=+x.price;
+      const x=logs[j];if(+x.at<=at)continue;
+      const q=Math.max(0,Math.floor(+x.qty)),px=+x.price;if(!q)continue;
       if(x.type==='buy'){
         cash+=Math.round(px*q*(1+FEE));
         qty[x.code]=(qty[x.code]||0)-q;
@@ -1872,39 +1934,62 @@ function v104RecoverDeletedSams2L(raw){
     }
     let known=cash;
     for(const [code,q0] of Object.entries(qty)){
-      const q=Math.max(0,Math.floor(q0)); if(!q)continue;
-      const s=STOCKS.find(x=>x.code===code); if(!s)continue;
+      const q=Math.max(0,Math.floor(q0));if(!q)continue;
+      const s=STOCKS.find(x=>x.code===code);if(!s)continue;
       try{known+=q*fastVisualPriceAt(s,at)}catch{}
     }
-    const gap=(+snap.value)-known;
-    if(!(gap>0))continue;
-    let px=0; try{px=fastVisualPriceAt(lev,at)}catch{}
+    const gap=(+snap.value)-known;if(!(gap>0))continue;
+    let px=0;try{px=fastVisualPriceAt(lev,at)}catch{}
     if(!(px>0))continue;
-    const q=Math.round(gap/px);
-    if(q<1)continue;
-    const err=Math.abs(gap-q*px);
-    const rel=err/Math.max(px,gap);
-    // Require the historical account gap to be very close to an integer number of shares.
-    if(rel>.012)continue;
-    const score=rel + Math.max(0,(Date.now()-at)/(1000*60*60*24))*0.00001;
-    if(!best||score<best.score)best={q,px,at,gap,err,score};
+    const q=Math.round(gap/px);if(q<1)continue;
+    const err=Math.abs(gap-q*px), rel=err/Math.max(px,gap);
+    if(rel>.006)continue; // tighter than V104's 1.2%: safer auto recovery
+    best={q,px,at,gap,rel};
+    break;
   }
-  if(best){
-    raw.holdings.SAMS2L={qty:best.q,avg:best.px};
-    raw.recoveryV104={
-      code:'SAMS2L',qty:best.q,restoredAvg:best.px,sourceAt:best.at,
-      recoveredValue:Math.round(best.q*best.px),method:'equityHistory-gap'
-    };
-  }
-  raw.recoveryV104Done=true;
-  return raw;
-}
-const V104_LOAD_BASE=Store.loadMe.bind(Store);
-Store.loadMe=async function(id){
-  const raw=await V104_LOAD_BASE(id);
-  return v104RecoverDeletedSams2L(raw);
-};
+  if(!best)return {state:current,changed:false,reason:'no-high-confidence-match'};
 
+  const next={...current,holdings:{...(current.holdings||{}),SAMS2L:{qty:best.q,avg:best.px}},
+    recoveryV106Done:true,
+    recoveryV106:{ok:true,code:'SAMS2L',qty:best.q,avg:best.px,sourceAt:best.at,
+      recoveredValue:Math.round(best.q*best.px),relativeError:best.rel,method:'equityHistory-gap-once'}
+  };
+  return {state:next,changed:true,reason:'recovered'};
+}
+
+function v106ScheduleOneTimeRecovery(){
+  if(!userId||!state)return;
+  let done=false;
+  try{done=localStorage.getItem('mockstock:v106-recovery-done:'+userId)==='1';}catch{}
+  if(done||state?.holdings?.SAMS2L?.qty>0)return;
+  const run=async()=>{
+    let result;
+    try{result=v106RecoverDeletedSams2L(state);}catch(e){console.warn('V106 복구 계산 실패',e);return;}
+    /* Mark attempted even when no candidate is found, so it never becomes recurring load. */
+    try{localStorage.setItem('mockstock:v106-recovery-done:'+userId,'1');}catch{}
+    if(result?.changed){
+      state=normalizeState(result.state);
+      state.recoveryV106Done=true;
+      state.recoveryV106=result.state.recoveryV106;
+      await Store.saveMe(userId,state);
+      render();
+    }
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(()=>run(),{timeout:1400});
+  else setTimeout(run,900);
+}
+window.addEventListener('load',()=>setTimeout(v106ScheduleOneTimeRecovery,350));
+
+window.__marketV106={
+  version:106,
+  expectedCatalog:V106_EXPECTED_CODES.length,
+  preserveUnknownHoldings:true,
+  preNormalizeBackup:true,
+  catalogSaveGuard:true,
+  legacyRecovery:'one-time-deferred',
+  recoveryTolerance:.006,
+  basedOn:'V103'
+};
 (async()=>{if(isKakaoInApp()){showBrowserBlock();return}await Promise.race([Store.init(),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);if(userId)state=await Store.loadMe(userId);if(!state){state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};render();onboarding(false,Store.online?'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.':'서버 연결이 늦어지고 있어요. 잠시 후 다시 시도해주세요.')}else{state=normalizeState(state);await Store.saveMe(userId,state);render();if(!state.nickname||state.nickname==='게스트')onboarding(true,'게스트 이름은 더 이상 사용할 수 없어요. 새 닉네임을 정해주세요.');else if(Store.online){const claim=await Store.claimNickname(state.nickname);if(claim.ok)await Store.pushMyScore(true);else if(claim.reason==='duplicate')onboarding(true,'같은 닉네임을 다른 참가자가 사용 중이에요. 새 이름을 정해주세요.')} }requestAnimationFrame(liveLoop);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();Store.scheduleScore(true);if(selected&&$('#chart'))drawChart(selected,chartHoverIndex)}})})();
 </script>
 
