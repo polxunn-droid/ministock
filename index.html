@@ -5607,9 +5607,15 @@ const V68_STATE_SPEED=MARKET_V9_SPEED*DAY_MS/V68_SESSION_MS*V63_STATE_SPEED;
         V90_CYCLE_MS 주기로 여러 번 반복 재생되게 한다. 국면/모멘텀/반전 로직(V9~V88)은
         전혀 건드리지 않는다 — '하루치 경로가 재생되는 속도'만 빨라진다.
 */
-const V90_CYCLE_MS=60*60*1000; // 실제 60분 = 게임 1거래일
+const V90_CYCLE_MS=60*60*1000; // 실제 60분 = 화면 표시용 사이클 (day는 원래대로 유지)
 const V90_CYCLES_PER_SESSION=Math.ceil(V68_SESSION_MS/V90_CYCLE_MS);
 
+/* V92 — 성능 회귀 긴급 수정
+   V90은 day 자체를 16배 부풀려서, day 앵커 기반 연속성 계산(V69)이 30일치 이상을
+   재계산하게 만들어 로딩이 멈추는 성능 버그를 냈다. day는 원래(세션당 1개)로 되돌리고,
+   대신 '사이클 진행률(cycleProgress)'만 별도로 계산해서 노출한다.
+   가격 재생 압축 자체는 잠시 보류 — 접속 문제 해결이 우선이라 안전한 상태로 되돌린다.
+*/
 function v68SessionPosition(ms=Date.now()){
   const d=new Date(ms);
   let sessionDate=new Date(d.getFullYear(),d.getMonth(),d.getDate());
@@ -5627,13 +5633,8 @@ function v68SessionPosition(ms=Date.now()){
   }
 
   const sessionStart=new Date(sessionDate.getFullYear(),sessionDate.getMonth(),sessionDate.getDate()).getTime();
-  const baseDay=Math.round((sessionStart-MARKET_EPOCH)/DAY_MS);
-
-  const elapsed=Math.max(0,effective-open);
-  const cycleIndex=Math.min(V90_CYCLES_PER_SESSION-1,Math.floor(elapsed/V90_CYCLE_MS));
-  const cycleElapsed=elapsed-cycleIndex*V90_CYCLE_MS;
-  const day=baseDay*V90_CYCLES_PER_SESSION+cycleIndex;
-  const progress=elapsed>=V90_CYCLES_PER_SESSION*V90_CYCLE_MS?1:Math.max(0,Math.min(1,cycleElapsed/V90_CYCLE_MS));
+  const day=Math.round((sessionStart-MARKET_EPOCH)/DAY_MS);
+  const progress=Math.max(0,Math.min(1,(effective-open)/Math.max(1,close-open)));
   const raw=progress*DAY_STEPS;
   const minute=progress>=1?DAY_STEPS-1:Math.max(0,Math.min(DAY_STEPS-1,Math.floor(raw)));
   const phase=progress>=1?1:raw-minute;
