@@ -4118,8 +4118,8 @@ bind=function(){
   RKV2_BIND_BASE();
 };
 
-// 1초마다 "체크"만 할 뿐 네트워크 비용은 없음. 실제 조회는
-// rkv2LoadRanking 내부의 RKV2_POLL_MS 스로틀이 지날 때만 발생한다.
+// 5초마다 랭킹 탭 진입 여부만 확인한다. 네트워크 비용은 없고 실제 조회는
+// rkv2LoadRanking 내부의 RKV2_POLL_MS(10분) 스로틀이 지날 때만 발생한다.
 let RKV2_LAST_VIEW=view;
 setInterval(()=>{
   if(document.hidden)return;
@@ -4128,7 +4128,7 @@ setInterval(()=>{
     else rkv2LoadRanking(false);
   }
   RKV2_LAST_VIEW=view;
-},1000);
+},5000);
 
 window.__rankingRKV2={
   rankingMode:'poll-total-value',
@@ -7426,46 +7426,10 @@ v9Shock=function v85TierBalancedShock(s,day,minute){
   return base;
 };
 
-// ---- C. V81을 '실제로 사용되는' V69 최종 raw 경로에 연결 ----
-const V85_RAW_BASE=v9RawPriceAt;
-const V85_PATH_CACHE=new Map();
-function v85ActiveBalancedRaw(s,t=marketTick()){
-  if(s?.isETF)return V85_RAW_BASE(s,t);
-  const day=Math.floor(t/DAY_STEPS),minute=((t%DAY_STEPS)+DAY_STEPS)%DAY_STEPS;
-  const key=s.code+'|'+day;
-  let st=V85_PATH_CACHE.get(key);
-  if(!st){
-    const first=V85_RAW_BASE(s,day*DAY_STEPS);
-    const open=Math.max(1,Number(first.open)||1);
-    st={open,filled:-1,prices:new Array(DAY_STEPS),raw:new Array(DAY_STEPS)};
-    V85_PATH_CACHE.set(key,st);
-  }
-  for(let i=st.filled+1;i<=minute;i++){
-    const cur=V85_RAW_BASE(s,day*DAY_STEPS+i);
-    const curRaw=Math.max(1,Number(cur.price)||1);
-    const prevRaw=i===0?st.open:Math.max(1,st.raw[i-1]);
-    let p=i===0?st.open:Math.max(1,st.prices[i-1]);
-    let r=Math.log(curRaw/prevRaw);
-
-    // 기존 엔진에서 일반 ret은 ±1.2%로 제한되고 shock은 그 밖에서 별도 적용된다.
-    // 따라서 큰 단발 jump는 손대지 않고, 일반 틱만 V81에 통과시킨다.
-    if(Math.abs(r)<=.0121)r=v81BalanceDeepTail(s,day,i,p,st.open,r);
-    p*=Math.exp(r);
-    p=Math.max(st.open*.10,Math.min(st.open*2.20,p));
-    st.raw[i]=curRaw;
-    st.prices[i]=p;
-    st.filled=i;
-  }
-  const base=V85_RAW_BASE(s,t);
-  return {...base,price:v65RoundPrice(st.prices[minute]),open:v65RoundPrice(st.open),day,minute};
-}
-
-v9RawPriceAt=function v85LiveBalancedRaw(s,t=marketTick()){return v85ActiveBalancedRaw(s,t)};
-priceAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v9RawPriceAt(s,t)};
-
-// stale 계산 결과 제거. 데이터/Firebase 내용은 건드리지 않는다.
+// ---- C. 활성 가격 경로는 건드리지 않는다 ----
+// V85 초안의 전 구간 raw 재구성 방식은 제거됨.
+// V81은 아래 V87/V88의 실제 활성 postMove 경로에서 O(1) 비용으로 적용한다.
 try{
-  V85_PATH_CACHE.clear();
   v9PriceCache?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();priceCache?.clear?.();
   V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();V29_SCALE_CACHE?.clear?.();
   V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
@@ -7477,8 +7441,9 @@ try{
 
 window.__marketV85={
   version:85,basedOn:84,
-  liveV81Connected:true,
-  deadV29TransitionDependencyRemovedAtFinalRouter:true,
+  liveV81Connected:false,
+  heavyRawWrapperRemoved:true,
+  liveV81Location:'postMove-final',
   shockTailShare:{blue:.005,growth:.012,theme:.025,junk:.030},
   trendStrongShare:{blue:.08,growth:.11,theme:.15,junk:.15},
   trendTailShare:{blue:.005,growth:.012,theme:.025,junk:.030},
@@ -7488,69 +7453,13 @@ window.__marketV85={
 </script>
 
 
-<script>
-/* ============ V86 — V85 접속 정지 수정 + 활성 postMove 경로 tail 균형 ============
-   V85의 최종 raw 경로 재구성은 첫 화면에서 종목×틱 전체를 동기 계산하여 메인 스레드를 막을 수 있었다.
-   이를 제거하고, 실제 매 틱 호출되는 v11PostMove 경로에서 V34 비대칭을 걷어낸 뒤 deep-tail 보정을 가볍게 적용한다.
-   V85의 tier별 Trend/Shock 희소화는 그대로 유지한다.
-*/
 
-// 1) V85의 고비용 raw 재구성 wrapper 제거 — V69 활성 경로로 즉시 복귀
-if(typeof V85_RAW_BASE==='function'){
-  v9RawPriceAt=V85_RAW_BASE;
-  priceAt=function(s,t=marketTick()){return s?.isETF?etfDisplayedAt(s,t):v9RawPriceAt(s,t)};
-}
-try{ V85_PATH_CACHE?.clear?.(); }catch(e){}
-
-// 2) V34 이전의 실제 V29 postMove를 기준으로 활성 경로에서 직접 균형 적용
-//    방향을 뒤집지 않고, 이미 선택된 방향의 이동폭만 조절한다.
-if(typeof v34PostBase==='function'){
-  v11PostMove=function v86LiveBalancedPostMove(s,day,minute,changeRate){
-    let ret=Number(v34PostBase(s,day,minute,changeRate))||0;
-    if(s?.isETF || ret===0 || Math.abs(changeRate)<.15)return ret;
-
-    const heat=Math.max(0,Math.min(1,(Math.abs(changeRate)-.15)/.25));
-    if(changeRate>0){
-      // 깊은 상승: 추가상승만 점진 압축, 조정은 약간 자연스럽게
-      if(ret>0) ret*=.82-heat*.27;
-      else      ret*=1.03+heat*.10;
-    }else{
-      // 깊은 하락: 추가하락은 아주 약하게만 보강, 즉시 반등만 소폭 완화
-      if(ret<0) ret*=1.025+heat*.065;
-      else      ret*=1.00-heat*.04;
-    }
-    return Math.max(-.00185,Math.min(.00122,ret));
-  };
-}
-
-// 3) 가격/quote 캐시만 비워 새 활성 함수를 즉시 사용
-try{
-  v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
-  V29_OPEN_CACHE?.clear?.(); V29_CLOSE_CACHE?.clear?.(); V29_SCALE_CACHE?.clear?.();
-  V48_RAW_TICK_CACHE?.clear?.(); V49_PATH_STATE_CACHE?.clear?.();
-  V69_RAW_CACHE?.clear?.(); V69_SCALE_CACHE?.clear?.(); V70_WALK_CACHE?.clear?.();
-  V23_QUOTE_CACHE?.clear?.(); V43_PREVCLOSE_CACHE?.clear?.(); V43_FINAL_QUOTE_CACHE?.clear?.();
-  V45_QUOTE_CACHE?.clear?.(); V45_QUOTE_TICK_CACHE?.clear?.(); V52_LIVE_QUOTE_CACHE?.clear?.();
-  V52_LIVE_MOVER_CACHE?.clear?.(); V67_PREV_CLOSE_CACHE?.clear?.(); chartHistoryCache?.clear?.();
-}catch(e){}
-
-window.__marketV86={
-  version:86,basedOn:85,
-  v85HeavyRawWrapperDisabled:true,
-  liveBalanceLocation:'v11PostMove',
-  v34AsymmetricWrapperBypassed:true,
-  v85TierTailTuningPreserved:true,
-  directionForced:false,
-  forcedReversal:false,
-  forcedProfit:false
-};
-</script>
 
 
 <script>
-/* ============ V87 — V86 회귀 수정: V37/V63/V64 활성 postMove 보존 + V81 tail 균형 ============
-   V86은 v34PostBase로 되돌리면서 후속 V37/V63/V64 postMove를 우회했다.
-   V87은 V64 시점의 활성 체인을 그대로 재구성한 뒤 V81을 마지막 magnitude 보정으로만 적용한다.
+/* ============ V88 — 정리본: V37/V63/V64 활성 postMove 보존 + V81 tail 균형 ============
+   V85의 고비용 raw 재구성과 V86 임시 우회 코드는 제거했다.
+   V64 시점의 활성 체인을 그대로 재구성한 뒤 V81을 마지막 magnitude 보정으로만 적용한다.
    scheduler/렌더링/Firebase/뉴스/시장속도는 변경하지 않는다.
 */
 function v87PreBalancePostMove(s,day,minute,changeRate){
@@ -7582,12 +7491,12 @@ try{
   V52_LIVE_MOVER_CACHE?.clear?.(); V67_PREV_CLOSE_CACHE?.clear?.(); chartHistoryCache?.clear?.();
 }catch(e){}
 
-window.__marketV87={
-  version:87,basedOn:86,
+window.__marketV88={
+  version:88,basedOn:85,
   v37Preserved:true,v63StateSpeedPreserved:true,v64CausalSmoothingPreserved:true,
   v81AppliedOnLivePostMove:true,
-  v85HeavyRawWrapperDisabled:true,
-  schedulerChanged:false,thermalTimersAdded:0,
+  v85HeavyRawWrapperRemoved:true,
+  schedulerChanged:true,rankingViewCheckMs:5000,thermalTimersAdded:0,
   directionForced:false,forcedReversal:false,forcedProfit:false,
   tierTailTuningPreserved:true
 };
