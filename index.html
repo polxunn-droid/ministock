@@ -69,7 +69,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
 <script>
 const firebaseConfig={apiKey:"AIzaSyD5fQcqEpUY_ChwUdT5KlMLAzI9hzHPvEs",authDomain:"mini-stock-1c189.firebaseapp.com",projectId:"mini-stock-1c189",storageBucket:"mini-stock-1c189.firebasestorage.app",messagingSenderId:"680510173510",appId:"1:680510173510:web:15319b15831f9543c03547"};
-const MARKET_EPOCH=new Date(2026,0,1).setHours(0,0,0,0),TICK_MS=800,DAY_STEPS=390,DAY_MS=86400000,START=1_000_000,FEE=.00015,TAX=.0018;
+const MARKET_EPOCH=new Date(2026,0,1).setHours(0,0,0,0),TICK_MS=800,DAY_STEPS=390,DAY_MS=86400000,START=1_000_000,FEE=.0005,TAX=.0018;
 const mk=(code,name,sector,tier='blue',base)=>(
 {code,name,sector,tier,base:base||((Number(code)%1800)+120)*100,sigma:{blue:.012,growth:.018,theme:.026,junk:.038}[tier],drift:tier==='blue'?.00014:tier==='growth'?.0002:0,beta:tier==='blue'?.9:tier==='growth'?1.1:1.25});
 const STOCKS=[
@@ -8137,6 +8137,172 @@ window.__marketV95={
     ranges:['week','quarter','year','five','all'],yearStatsAligned:true,
     cachedBy:'stock + range + local calendar day'
   };
+})();
+</script>
+
+<script id="v109-detail-lazy-charts">
+/* V109 — 종목 상세 지연 계산
+   상세 진입은 현재가와 1일 차트를 우선 표시하고, 52주 통계는 유휴 시간에 계산한다.
+   장기 차트는 사용자가 누른 기간만 계산하며 계산 중에는 가벼운 스켈레톤을 표시한다. */
+(function(){
+  let buildingDetail=false,rangeJob=0;
+  const YEAR_READY=new Map(),YEAR_PENDING=new Map();
+  const baseDetail=detail,baseLongChartSeries=longChartSeries;
+
+  // 기존 detail HTML 생성 과정에서 52주 이력을 동기 계산하지 않도록 현재가 임시값을 제공한다.
+  longChartSeries=function v109LazyLongChartSeries(s,range){
+    if(buildingDetail&&range==='year'){
+      const px=Math.max(1,Number(quote(s).price)||1);
+      return [px,px];
+    }
+    return baseLongChartSeries(s,range);
+  };
+
+  detail=function v109FastDetail(s){
+    buildingDetail=true;
+    let html;
+    try{html=baseDetail(s)}finally{buildingDetail=false}
+    return html
+      .replace(/(<small>52주 최고<\/small><strong>)[^<]*(<\/strong>)/,'$1계산 중$2')
+      .replace(/(<small>52주 최저<\/small><strong>)[^<]*(<\/strong>)/,'$1계산 중$2');
+  };
+
+  function idleRun(fn){
+    if('requestIdleCallback' in window)return requestIdleCallback(fn,{timeout:900});
+    return setTimeout(fn,80);
+  }
+  function scheduleYearStats(s){
+    const key=s.code+'|'+new Date().toDateString();
+    if(YEAR_READY.has(key)||YEAR_PENDING.has(key))return;
+    YEAR_PENDING.set(key,true);
+    idleRun(()=>{
+      try{
+        const a=baseLongChartSeries(s,'year');
+        YEAR_READY.set(key,{hi:Math.max(...a),lo:Math.min(...a)});
+      }finally{
+        YEAR_PENDING.delete(key);
+      }
+    });
+  }
+  v44YearStats=function v109DeferredYearStats(s){
+    const key=s.code+'|'+new Date().toDateString(),hit=YEAR_READY.get(key);
+    if(hit)return hit;
+    scheduleYearStats(s);
+    const px=Math.max(1,Number(quote(s).price)||1);
+    return {hi:px,lo:px,pending:true};
+  };
+
+  function paintSkeleton(){
+    const c=document.querySelector('#chart');if(!c)return;
+    const ctx=c.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,2);
+    const w=Math.max(1,c.clientWidth),h=Math.max(1,c.clientHeight);
+    c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);ctx.strokeStyle='#e9edf2';ctx.lineWidth=7;ctx.lineCap='round';
+    ctx.beginPath();
+    for(let i=0;i<7;i++){
+      const x=24+i*(w-48)/6,y=h*.56+Math.sin(i*.95)*h*.08;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.stroke();ctx.fillStyle='#8b95a1';ctx.font='14px sans-serif';ctx.textAlign='center';
+    ctx.fillText('차트 계산 중…',w/2,h*.80);
+  }
+
+  const baseBind=bind;
+  bind=function v109LazyChartBind(){
+    baseBind();
+    if(!selected||!document.querySelector('#chart'))return;
+    scheduleYearStats(selected);
+    document.querySelectorAll('[data-range]').forEach(btn=>{
+      btn.onclick=()=>{
+        const next=btn.dataset.range,job=++rangeJob,stock=selected;
+        chartRange=next;chartHoverIndex=-1;
+        document.querySelectorAll('[data-range]').forEach(x=>x.classList.toggle('active',x===btn));
+        document.querySelector('#chart')?.setAttribute('aria-label',`${stock.name} ${CHART_RANGES[next]?.label||next} 가격 차트`);
+        if(next==='day'){
+          try{V46_CHART_SIG=''}catch(e){}
+          updateRangeChange(stock);drawChart(stock);return;
+        }
+        paintSkeleton();
+        setTimeout(()=>{
+          if(job!==rangeJob||selected!==stock||chartRange!==next)return;
+          baseLongChartSeries(stock,next); // 선택한 기간 하나만 생성·캐시
+          try{V46_CHART_SIG=''}catch(e){}
+          updateRangeChange(stock);drawChart(stock);
+        },0);
+      };
+    });
+  };
+
+  window.__marketV109={
+    version:109,basedOn:108,detailFirstPaint:'price + day chart',
+    yearStats:'idle deferred and daily cached',longRanges:'selected range only',
+    loadingSkeleton:true,priceEngineChanged:false,marketBalanceChanged:false
+  };
+})();
+</script>
+
+<script id="v110-trade-cost-transparency">
+/* V110 — 거래비용 투명성. 총자산/평가손익 산식은 유지한다. */
+(function(){
+  const LEGACY_FEE=.00015,NEW_FEE=.0005;
+  const baseTrade=trade,baseAccountDetail=accountDetail;
+
+  trade=async function v110CostLoggedTrade(type,qty){
+    const before=state?.tradeLog?.length||0;
+    await baseTrade(type,qty);
+    const log=state?.tradeLog||[];
+    if(log.length===before)return;
+    const x=log.at(-1);if(!x||x.type!==type||x.costVersion)return;
+    const gross=Math.round((+x.price||0)*(+x.qty||0));
+    if(type==='buy'){
+      const settlement=Math.round(gross*(1+NEW_FEE));
+      Object.assign(x,{costVersion:110,feeRate:NEW_FEE,fee:settlement-gross,taxRate:0,tax:0,settlement});
+    }else{
+      const settlement=Math.round(gross*(1-NEW_FEE-TAX));
+      const totalCost=gross-settlement,fee=Math.round(gross*NEW_FEE);
+      Object.assign(x,{costVersion:110,feeRate:NEW_FEE,fee,taxRate:TAX,tax:totalCost-fee,settlement});
+    }
+    await Store.saveMe(userId,state);
+  };
+
+  accountDetail=function v110AccurateFeeLabel(){
+    return baseAccountDetail().replace('● 예상 수수료·세금 포함','● 보유주식은 현재가 기준 · 매도 비용은 매도 시 반영');
+  };
+
+  function tradeCost(x){
+    const gross=Math.round((+x.price||0)*(+x.qty||0));
+    if(x.costVersion===110&&Number.isFinite(+x.settlement))return {gross,fee:+x.fee||0,tax:+x.tax||0,settlement:+x.settlement};
+    if(x.type==='buy'){
+      const settlement=Math.round(gross*(1+LEGACY_FEE));
+      return {gross,fee:settlement-gross,tax:0,settlement};
+    }
+    const settlement=Math.round(gross*(1-LEGACY_FEE-TAX));
+    const total=gross-settlement,fee=Math.round(gross*LEGACY_FEE);
+    return {gross,fee,tax:total-fee,settlement};
+  }
+
+  openTradeLog=function v110DetailedTradeLog(){
+    const rows=[
+      ...(state?.tradeLog||[]).map(x=>({kind:'trade',at:+x.at||0,x})),
+      ...(state?.grants||[]).map(x=>({kind:'grant',at:+x.at||0,x})),
+      ...(state?.stockGrants||[]).map(x=>({kind:'stockGrant',at:+x.at||0,x}))
+    ].sort((a,b)=>b.at-a.at);
+    const html=rows.length?rows.map(r=>{
+      if(r.kind==='stockGrant'){
+        const g=r.x;return `<div class="log-row"><b class="tag-grant">주식 지급 · ${escHtml(g.stockName)}</b><b>${fmt(g.qty)}주</b><small>${new Date(g.at).toLocaleString('ko-KR')} · 지급가 ${fmt(g.grantPrice)}원${g.message?' · '+escHtml(g.message):''}</small></div>`;
+      }
+      if(r.kind==='grant'){
+        const g=r.x,plus=g.amount>=0;return `<div class="log-row"><b class="tag-grant">${plus?'원화 지급':'원화 차감'} · ${escHtml(g.title||'관리자')}</b><b class="${plus?'gain':'down'}">${plus?'+':'-'}${fmt(Math.abs(g.amount))}원</b><small>${new Date(g.at).toLocaleString('ko-KR')}${g.message?' · '+escHtml(g.message):''}</small></div>`;
+      }
+      const x=r.x,s=STOCKS.find(v=>v.code===x.code);if(!s)return '';
+      const c=tradeCost(x),buy=x.type==='buy';
+      const costText=buy?`수수료 ${fmt(c.fee)}원 · 실제 출금 ${fmt(c.settlement)}원`:`수수료 ${fmt(c.fee)}원 · 세금 ${fmt(c.tax)}원 · 실제 입금 ${fmt(c.settlement)}원`;
+      return `<div class="log-row"><b class="${buy?'gain':'down'}">${buy?'매수':'매도'} · ${escHtml(s.name)}</b><b>${fmt(c.gross)}원</b><small>${new Date(x.at).toLocaleString('ko-KR')} · ${fmt(x.price)}원 × ${fmt(x.qty)}주<br>${costText}</small></div>`;
+    }).join(''):'<div class="empty">아직 거래내역이 없어요.</div>';
+    document.body.insertAdjacentHTML('beforeend',`<div class="overlay"><div class="sheet"><div class="sheet-head"><h2>거래내역</h2>${closeButton()}</div><div class="log-list">${html}</div></div></div>`);
+  };
+
+  window.__marketV110={version:110,basedOn:109,buyFeeRate:NEW_FEE,sellFeeRate:NEW_FEE,sellTaxRate:TAX,flatPriceRoundTripCost:NEW_FEE*2+TAX,tradeLogCosts:true,legacyTradeFeeRate:LEGACY_FEE,totalAssetFormulaChanged:false,marketBalanceChanged:false};
 })();
 </script>
 
