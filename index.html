@@ -783,7 +783,7 @@ discover=function(watch=false){
 
 // 장 마감/시작 경계를 넘겼을 때 화면 상태도 자동 갱신한다.
 let v12LastSessionOpen=marketSessionInfo().open;
-setInterval(()=>{const nowOpen=marketSessionInfo().open;if(nowOpen!==v12LastSessionOpen){v12LastSessionOpen=nowOpen;render()}},5000);
+// V112에서 V83 장 경계 타이머와 하나로 통합한다.
 window.__marketV12={version:12,marketOpen:()=>marketSessionInfo().open,hours:'08:00-23:30',microMs:2000};
 
 
@@ -6566,15 +6566,18 @@ openMarketSummary=function(){
   sheet.appendChild(board);
 
   // 열려있는 동안만 5초마다 목록을 다시 확인(스펙 21) — 시그니처가 바뀔 때만 DOM 재생성
-  let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
-  const timer=setInterval(()=>{
-    if(document.hidden||!document.body.contains(sheet)){clearInterval(timer);return}
-    const list=v75GetActiveNewsCached();
-    const newSig=list.map(e=>e.id).join(',');
-    if(newSig===sig)return;
-    sig=newSig;
-    board.innerHTML=`<h2 style="margin-top:14px">실시간 이슈</h2>${v75NewsBoardHtml()}`;
-  },5000);
+  // 최종 V80 상황판이 존재하면 구버전 보드 타이머는 만들지 않는다.
+  if(!window.__marketV80){
+    let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+    const timer=setInterval(()=>{
+      if(document.hidden||!document.body.contains(sheet)){clearInterval(timer);return}
+      const list=v75GetActiveNewsCached();
+      const newSig=list.map(e=>e.id).join(',');
+      if(newSig===sig)return;
+      sig=newSig;
+      board.innerHTML=`<h2 style="margin-top:14px">실시간 이슈</h2>${v75NewsBoardHtml()}`;
+    },5000);
+  }
 };
 
 window.__marketV75={
@@ -6736,13 +6739,16 @@ openMarketSummary=function(){
   sheet.prepend(board);
   v78BindBoardFilters(board);
 
-  let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
-  const timer=setInterval(()=>{
-    if(document.hidden||!document.body.contains(sheet)){clearInterval(timer);return}
-    const nowSig=v75GetActiveNewsCached().map(e=>e.id).join(',');
-    if(nowSig===sig)return; sig=nowSig;
-    const body=board.querySelector('[data-v78-list]');if(body)body.innerHTML=v78BoardListHtml();
-  },5000);
+  // 최종 V80 상황판이 존재하면 교체될 V78 보드의 타이머는 만들지 않는다.
+  if(!window.__marketV80){
+    let sig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+    const timer=setInterval(()=>{
+      if(document.hidden||!document.body.contains(sheet)){clearInterval(timer);return}
+      const nowSig=v75GetActiveNewsCached().map(e=>e.id).join(',');
+      if(nowSig===sig)return; sig=nowSig;
+      const body=board.querySelector('[data-v78-list]');if(body)body.innerHTML=v78BoardListHtml();
+    },5000);
+  }
 };
 window.__marketV78={version:78,newsSignal:'reduced',boardDesign:'clean-demo-inspired',closeFreezeAudit:true};
 </script>
@@ -7131,7 +7137,8 @@ const V83_SESSION_TIMER=setInterval(()=>{
     V47_DISCOVER_SNAPSHOT?.clear?.();
     V47_SNAPSHOT_AT=0;
     V83_LAST_MOVER=0;
-    refreshLive();
+    v12LastSessionOpen=open;
+    render();
     if(open)v47BuildSnapshot(true);
   }catch(e){}
 },5000);
@@ -8444,7 +8451,156 @@ window.__marketV95={
     chartRanges:Object.keys(CHART_RANGES),chartSource:'game-engine history',realMarketDataMixed:false,
     buyFeeRate:FEE_RATE,sellFeeRate:FEE_RATE,sellTaxRate:TAX_RATE,roundTripFlatCost:FEE_RATE*2+TAX_RATE,
     marketPricePathChanged:false,eventProbabilityChanged:false,tierBalanceChanged:false,
-    previewChangeAt:(code,ms)=>{const s=STOCKS.find(x=>x.code===code);return s?v111DisplayQuoteAt(s,ms):null}
+    previewChangeAt:(code,ms)=>{const s=STOCKS.find(x=>x.code===code);return s?v111DisplayQuoteAt(s,ms):null},
+    previewRelatedNews:code=>{const s=STOCKS.find(x=>x.code===code);return s?relatedNews(s):null}
+  };
+})();
+</script>
+
+<script id="v112-lifecycle-dedup-optimization">
+/* V112 — 사용자 체감 보존형 lifecycle 중복 제거
+   여러 visibilitychange listener가 같은 복귀 순간 호출하는 시세/차트 갱신을 마지막 1회로 합친다.
+   가격·확률·뉴스·체결·표시 주기는 변경하지 않는다. */
+(function(){
+  const BASE_REFRESH=refreshLive,BASE_DRAW=drawChart;
+  let resuming=false,flushPending=false,pendingStock=null;
+  const stats={resumeEvents:0,refreshSuppressed:0,drawSuppressed:0,refreshFlushes:0,drawFlushes:0};
+
+  refreshLive=function v112CoalescedRefresh(...args){
+    if(resuming){stats.refreshSuppressed++;return}
+    return BASE_REFRESH(...args);
+  };
+  drawChart=function v112CoalescedDraw(s,hover=-1){
+    if(resuming&&hover<0){pendingStock=s||pendingStock;stats.drawSuppressed++;return}
+    return BASE_DRAW(s,hover);
+  };
+
+  function flushResume(){
+    flushPending=false;resuming=false;
+    if(document.hidden)return;
+    try{stats.refreshFlushes++;BASE_REFRESH()}catch(e){}
+    const s=selected||pendingStock;pendingStock=null;
+    if(s&&document.querySelector('#chart')){
+      try{stats.drawFlushes++;BASE_DRAW(s,chartHoverIndex)}catch(e){}
+    }
+    try{v46ScheduleLive(80)}catch(e){}
+  }
+
+  // capture 단계에서 먼저 표시해 기존 복귀 listener들의 중복 렌더를 흡수한다.
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)return;
+    stats.resumeEvents++;resuming=true;
+    if(flushPending)return;
+    flushPending=true;
+    if(typeof queueMicrotask==='function')queueMicrotask(flushResume);
+    else Promise.resolve().then(flushResume);
+  },{capture:true,passive:true});
+
+  window.__marketV112={
+    version:112,basedOn:111,sessionBoundaryTimers:1,
+    legacyNewsBoardTimersDisabled:true,resumeRefreshCoalesced:true,
+    openSchedulerMs:500,closedSchedulerMs:5000,
+    priceEngineChanged:false,marketProbabilityChanged:false,newsContentChanged:false,
+    executionRulesChanged:false,chartCadenceChanged:false,stats
+  };
+})();
+</script>
+
+<style id="v113-related-news-style">
+.v113-related-news{display:grid;gap:10px}.v113-news-card{margin:0}.v113-news-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px}.v113-news-meta span{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f2f4f6;color:#6b7684;font-size:10px;font-weight:750}.v113-news-meta span:first-child{background:#eef4ff;color:#3867d6}.v113-news-title{font-size:14px;line-height:1.5;color:var(--ink);word-break:keep-all}.v113-news-empty{padding:18px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+</style>
+
+<script id="v113-detail-news-relevance-expiry">
+/* V113 — 상세 뉴스 연결 정상화
+   무관한 회사 뉴스의 종목명 바꿔치기를 제거하고, 실제 활성 이벤트만 표시한다.
+   가격 영향·사건 확률·뉴스 생성/수명은 바꾸지 않고 상세 표시와 만료 동기화만 담당한다. */
+(function(){
+  const BASE_DETAIL=detail,BASE_REFRESH=refreshLive;
+  const MACRO_CATS=new Set(['global','market','breaking']);
+  let lastSyncAt=0;
+
+  function relationFor(ev,s){
+    const target=ev?.target;
+    if(!target||!s)return null;
+    if(target.kind==='stock'){
+      return target.stock?.code===s.code?{group:'direct',rank:300,label:'종목 직접 뉴스'}:null;
+    }
+    if(target.kind==='sector'&&target.sector===s.sector){
+      return {group:'sector',rank:220,label:'업종 영향 뉴스'};
+    }
+    // 다른 종목의 기업 기사·찌라시는 절대 가져오지 않는다.
+    if(ev.cat==='company'||ev.cat==='rumor')return null;
+    if(target.kind==='market'&&MACRO_CATS.has(ev.cat)){
+      const label=ev.cat==='global'?'글로벌 영향 뉴스':ev.cat==='breaking'?'속보 영향 뉴스':'시장 영향 뉴스';
+      return {group:'macro',rank:120,label};
+    }
+    // 다른 업종을 지목한 글로벌/속보라도 이 종목 업종의 실제 민감도가 충분할 때만 연결한다.
+    if(target.kind==='sector'&&(ev.cat==='global'||ev.cat==='breaking')){
+      const sensitivity=typeof v75SectorSensitivity==='function'?v75SectorSensitivity(s.sector,ev.axis):0;
+      if(sensitivity>=.30){
+        return {group:'macro',rank:100+sensitivity*10,label:ev.cat==='global'?'글로벌 영향 뉴스':'속보 영향 뉴스'};
+      }
+    }
+    return null;
+  }
+
+  function relatedEvents(s){
+    const list=typeof v75GetActiveNewsCached==='function'?v75GetActiveNewsCached():[];
+    const groups={direct:[],sector:[],macro:[]};
+    for(const ev of list){
+      const relation=relationFor(ev,s);if(!relation)continue;
+      groups[relation.group].push({ev,relation});
+    }
+    const sort=(a,b)=>b.relation.rank-a.relation.rank||(+b.ev.startTick||0)-(+a.ev.startTick||0)||(+b.ev.severity||0)-(+a.ev.severity||0);
+    Object.values(groups).forEach(x=>x.sort(sort));
+    // 직접·업종·거시 뉴스에서 각각 가장 관련도 높은 1건씩, 최대 3건만 표시한다.
+    return [groups.direct[0],groups.sector[0],groups.macro[0]].filter(Boolean);
+  }
+
+  function newsMinute(){const t=sessionTick();return ((t%390)+390)%390}
+  function newsAge(ev,minute){
+    if(typeof v79NewsAge==='function')return v79NewsAge(ev,minute);
+    if(typeof v78NewsAge==='function')return v78NewsAge(ev,minute);
+    return '활성 뉴스';
+  }
+  function signatureFor(rows,minute){
+    const state=typeof marketSessionInfo==='function'&&marketSessionInfo().open?'open':'closed';
+    return `${state}|${minute}|${rows.map(x=>x.ev.id+':'+x.relation.group).join('|')}`;
+  }
+  function relatedNewsHtml(s){
+    const rows=relatedEvents(s),minute=newsMinute(),signature=signatureFor(rows,minute);
+    const body=rows.length?rows.map(({ev,relation})=>{
+      const category=V75_CATEGORY?.[ev.cat]?.label||'시장';
+      return `<div class="card v113-news-card"><div class="v113-news-meta"><span>${escHtml(relation.label)}</span><span>${escHtml(category)}</span><span>${escHtml(newsAge(ev,minute))}</span></div><div class="v113-news-title">${escHtml(ev.title)}</div></div>`;
+    }).join(''):`<div class="card v113-news-empty">현재 이 종목에 영향을 주는 활성 뉴스가 없습니다.</div>`;
+    return `<div class="v113-related-news" data-v113-related-news data-v113-signature="${escHtml(signature)}">${body}</div>`;
+  }
+
+  detail=function v113RelevantNewsDetail(s){
+    let html=BASE_DETAIL(s);
+    return html.replace(/<h2>관련 뉴스<\/h2><div class="card">[\s\S]*?<\/div>(?=<div class="notice">)/,
+      `<h2>관련 뉴스</h2>${relatedNewsHtml(s)}`);
+  };
+
+  function syncDetailNews(force=false){
+    if(!selected||document.hidden||document.querySelector('.overlay'))return;
+    const now=Date.now();if(!force&&now-lastSyncAt<5000)return;lastSyncAt=now;
+    const host=document.querySelector('[data-v113-related-news]');if(!host)return;
+    const next=relatedNewsHtml(selected),match=next.match(/data-v113-signature="([^"]*)"/);
+    if(match&&host.dataset.v113Signature===match[1])return;
+    host.outerHTML=next;
+  }
+
+  refreshLive=function v113RefreshWithNewsExpiry(...args){
+    const out=BASE_REFRESH(...args);syncDetailNews(false);return out;
+  };
+
+  window.__marketV113={
+    version:113,basedOn:112,maxDetailNews:3,
+    exactStock:true,exactSector:true,macroMarket:true,globalCrossSectorSensitivity:.30,
+    unrelatedCompanyRewrite:false,emptyState:true,detailExpirySyncMs:5000,
+    priceEngineChanged:false,eventGenerationChanged:false,eventDurationChanged:false,
+    preview:code=>{const s=STOCKS.find(x=>x.code===code);return s?relatedEvents(s).map(x=>({id:x.ev.id,category:x.ev.cat,relation:x.relation.label,title:x.ev.title})):[]}
   };
 })();
 </script>
