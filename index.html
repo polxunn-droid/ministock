@@ -8807,7 +8807,8 @@ window.__marketV95={
     const sessionKey=s.code+'|'+pos.day;
     let anchor=FINAL_SESSION_CACHE.get(sessionKey);
     if(!anchor){
-      const prevMs=v67SessionPrevCloseMs(ms);
+      // 자정 이후 재접속해도 08:00 개장 전까지는 직전 마감 세션의 기준가를 유지한다.
+      const prevMs=v67SessionPrevCloseMs(pos.open);
       const rawPrev=Math.max(1,Number(BASE_FINAL_VISUAL(s,prevMs))||1);
       const rawOpen=Math.max(1,Number(BASE_FINAL_VISUAL(s,pos.open))||1);
       const prevAdjusted=prevMs<TRANSITION_MS?rawPrev:finalBalancedVisual(s,prevMs);
