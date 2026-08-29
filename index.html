@@ -7885,26 +7885,26 @@ window.__marketV95={
     return f.a[i] + (f.a[j]-f.a[i])*sm;
   }
 
-  fastVisualPriceAt = function v104ForwardVisual(s, ms=Date.now()){
+  function v104ForwardVisual(s, ms=Date.now()){
     const {open,close} = sessionBounds(ms);
     const base = BASE_VISUAL(s,ms);  // 실제 시간순서: 절대 과거/미래 위치로 되감지 않음
     if(ms<open || ms>=close || s?.isETF) return base;
     const px = base * Math.exp(microOffset(s,ms,open,close));
     return v65RoundPrice(px);
-  };
-  smoothPriceAt = fastVisualPriceAt;
+  }
 
-  quote = function v104ForwardQuote(s){
+  function v104ForwardQuote(s){
     const now = Date.now(), {open,close} = sessionBounds(now);
     if(now<open || now>=close) return BASE_QUOTE(s);
     const q = BASE_QUOTE(s) || {};
-    const price = fastVisualPriceAt(s,now);
+    const price = v104ForwardVisual(s,now);
     const openRaw = BASE_VISUAL(s,open);
     const openPx = s?.isETF ? Math.max(5,Math.round(openRaw/5)*5) : v65RoundPrice(openRaw);
     const change = (price-Math.max(1,openPx))/Math.max(1,openPx)*100;
     return {...q,price,open:openPx,change};
-  };
-  rawQuote = quote;
+  }
+  window.__v104ForwardVisual=v104ForwardVisual;
+  window.__v104ForwardQuote=v104ForwardQuote;
 
   window.__marketV104 = {
     version:104,
@@ -8007,7 +8007,7 @@ window.__marketV95={
    - 장 마감 1일 차트 마지막 점은 동일 가격 경로로 연결 */
 (function(){
   const TRANSITION_MS=Date.parse('2026-08-29T00:00:00+09:00');
-  const BASE_VISUAL=fastVisualPriceAt;
+  const BASE_VISUAL=window.__v104ForwardVisual||fastVisualPriceAt;
   const BASE_TREND=v25TrendEvent;
   const BASE_POST=v11PostMove;
 
@@ -8091,14 +8091,14 @@ window.__marketV95={
   };
   smoothPriceAt=fastVisualPriceAt;
 
-  const BASE_QUOTE=quote;
-  quote=function v106BalancedQuote(s){
+  const BASE_QUOTE=window.__v104ForwardQuote||quote;
+  function v106BalancedQuote(s){
     const q=BASE_QUOTE(s)||{};if(!s||s.isETF)return q;
     const now=Date.now(),price=fastVisualPriceAt(s,now);
     const pos=v68SessionPosition(now),open=fastVisualPriceAt(s,pos.open),prevMs=v67SessionPrevCloseMs(now),prevClose=fastVisualPriceAt(s,prevMs);
     return {...q,price,open,prevClose,change:(price-Math.max(1,prevClose))/Math.max(1,prevClose)*100};
-  };
-  rawQuote=quote;
+  }
+  window.__v106BalancedQuote=v106BalancedQuote;
 
   const BASE_DAY_SERIES=v411DaySeries;
   v411DaySeries=function v106ClosedDaySeries(s,count=CHART_RANGES.day.count){
@@ -8310,9 +8310,7 @@ window.__marketV95={
     ctx.fillText('차트 계산 중…',w/2,h*.80);
   }
 
-  const baseBind=bind;
-  bind=function v109LazyChartBind(){
-    baseBind();
+  function v109BindChartRange(){
     if(!selected||!document.querySelector('#chart'))return;
     scheduleYearStats(selected);
     document.querySelectorAll('[data-range]').forEach(btn=>{
@@ -8334,7 +8332,14 @@ window.__marketV95={
         },0);
       };
     });
+  }
+
+  const baseBind=bind;
+  bind=function v109LazyChartBind(){
+    baseBind();
+    v109BindChartRange();
   };
+  window.__v109BindChartRange=v109BindChartRange;
 
   window.__marketV109={
     version:109,basedOn:108,detailFirstPaint:'price + day chart',
@@ -8413,7 +8418,7 @@ window.__marketV95={
 /* V111 — 개장 전 전일 등락 유지 / 종목 관련뉴스 / 차트 기간 명확화 / 거래비용 소폭 상향
    가격 생성 경로, 이벤트 확률, 등급 분포는 변경하지 않는다. */
 (function(){
-  const BASE_QUOTE=quote,BASE_DETAIL=detail,BASE_TRADE=trade;
+  const BASE_QUOTE=window.__v106BalancedQuote||quote,BASE_DETAIL=detail,BASE_TRADE=trade;
   const FEE_RATE=.0008,TAX_RATE=.002;
 
   function isPreOpen(ms=Date.now()){
@@ -8887,6 +8892,364 @@ window.__marketV115={
   priceEngineChanged:false,marketProbabilityChanged:false,newsChanged:false,
   tradingRulesChanged:false,storageSchemaChanged:false
 };
+</script>
+
+<script id="v118-runtime-facade">
+/* V118 1단계 통합 — 기존 최종 구현을 변경하지 않고 공개 진입점을 한곳으로 고정한다. */
+(function(){
+  const services={
+    market:{
+      quote,
+      visualPriceAt:fastVisualPriceAt,
+      smoothPriceAt,
+      kospiQuote:gameKospiQuote
+    },
+    trading:{execute:trade},
+    state:{normalize:normalizeState},
+    view:{render,bind,refresh:refreshLive,discover,detail}
+  };
+
+  // V52~V56, V58, V83에 흩어진 mover 계산·DOM 갱신·주기 제한을 한 경로로 통합한다.
+  const MoverController=(function(){
+    const OPEN_REFRESH_MS=5000;
+    let lastRefresh=0,lastForce=0;
+
+    function snapshot(){
+      let rows=v53MoverUniverse().map(s=>{
+        const q=services.market.quote(s);
+        return {s,q,change:Number(q.change)||0};
+      });
+      rows=rows.filter(x=>sort==='rise'?x.change>0:x.change<0);
+      rows.sort((a,b)=>sort==='rise'?b.change-a.change:a.change-b.change);
+      return rows;
+    }
+
+    function rowsHtml(){
+      const rows=snapshot();
+      if(!rows.length)return `<div class="empty">${sort==='rise'?'현재 상승 종목이 없어요':'현재 하락 종목이 없어요'}</div>`;
+      return rows.map((x,i)=>`<div class="stock v55-mover-row" data-stock="${x.s.code}">
+        <div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div>
+        <div><div class="name">${x.s.name}</div><small class="${x.change<0?'down':'gain'}" data-v55-mover-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.change)}</small></div>
+        <button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button>
+      </div>`).join('');
+    }
+
+    function wireRow(row){
+      row.onclick=e=>{
+        if(e.target.closest('[data-watch]'))return;
+        selected=STOCKS.find(s=>s.code===row.dataset.stock);
+        chartRange='day';chartMode='line';chartHoverIndex=-1;
+        $('#app').innerHTML=services.view.detail(selected);bind();
+      };
+      const heart=row.querySelector('[data-watch]');
+      if(heart)heart.onclick=e=>{
+        e.stopPropagation();
+        const code=heart.dataset.watch;
+        state.watch=state.watch.includes(code)?state.watch.filter(v=>v!==code):[...state.watch,code];
+        Store.saveMe(userId,state);
+        heart.textContent=state.watch.includes(code)?'♥':'♡';
+      };
+    }
+
+    function refresh(force=false){
+      if(view!=='discover'||selected||(sort!=='rise'&&sort!=='fall'))return;
+      const list=document.getElementById('v53-mover-list');
+      if(!list)return;
+      const now=Date.now();
+      if(force){
+        if(now-lastForce<50)return;
+        lastForce=now;
+      }else{
+        if(!marketSessionInfo().open||now-lastRefresh<OPEN_REFRESH_MS)return;
+      }
+      lastRefresh=now;
+
+      const data=snapshot();
+      if(!data.length){
+        const msg=sort==='rise'?'현재 상승 종목이 없어요':'현재 하락 종목이 없어요';
+        if(list.dataset.v118Empty!==msg)list.innerHTML=`<div class="empty">${msg}</div>`;
+        list.dataset.v118Empty=msg;
+        return;
+      }
+      delete list.dataset.v118Empty;
+
+      const existing=new Map([...list.querySelectorAll('.stock[data-stock]')].map(el=>[el.dataset.stock,el]));
+      const wanted=new Set();
+      data.forEach((x,i)=>{
+        wanted.add(x.s.code);
+        let row=existing.get(x.s.code);
+        if(!row){
+          row=document.createElement('div');
+          row.className='stock v55-mover-row';row.dataset.stock=x.s.code;
+          row.innerHTML=`<div class="row"><span class="rank-num"></span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small data-v55-mover-quote="${x.s.code}"></small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}"></button>`;
+          wireRow(row);
+        }
+        row.classList.remove('hidden');row.classList.add('v55-mover-row');
+        const rank=row.querySelector('.rank-num');if(rank)rank.textContent=String(i+1);
+        const qel=row.querySelector('[data-v55-mover-quote]');
+        if(qel){qel.textContent=`${fmt(x.q.price)}원 · ${pct(x.change)}`;qel.className=x.change<0?'down':'gain'}
+        const heart=row.querySelector('[data-watch]');if(heart)heart.textContent=state.watch.includes(x.s.code)?'♥':'♡';
+        const at=list.children[i];if(at!==row)list.insertBefore(row,at||null);
+      });
+      existing.forEach((row,code)=>{if(!wanted.has(code))row.remove()});
+    }
+
+    return {snapshot,rowsHtml,refresh,refreshMs:OPEN_REFRESH_MS};
+  })();
+
+  v53MoverRowsHtml=MoverController.rowsHtml;
+  v53RefreshMoverList=MoverController.refresh;
+
+  // V45/V46/V58/V83의 타이머 교체 체인을 하나의 활성 스케줄러로 수렴한다.
+  const SchedulerController=(function(){
+    const OPEN_MS=500,CLOSED_MS=5000,stats={scheduled:0,runs:0,stops:0};
+    function cadence(){return marketSessionInfo().open?OPEN_MS:CLOSED_MS}
+    function stop(){
+      if(V46_NEXT_TIMER){clearTimeout(V46_NEXT_TIMER);V46_NEXT_TIMER=0;stats.stops++}
+    }
+    function schedule(delay){
+      if(V46_NEXT_TIMER||document.hidden)return;
+      const wait=Number.isFinite(+delay)?Math.max(80,+delay):cadence();
+      stats.scheduled++;
+      V46_NEXT_TIMER=setTimeout(()=>{
+        V46_NEXT_TIMER=0;
+        if(document.hidden)return;
+        V46_IN_LIVE_LOOP=true;
+        try{v45LiveLoopBase(performance.now());stats.runs++}
+        finally{V46_IN_LIVE_LOOP=false}
+        schedule();
+      },wait);
+    }
+    function resume(){stop();schedule(80)}
+    return {schedule,stop,resume,stats,openMs:OPEN_MS,closedMs:CLOSED_MS};
+  })();
+
+  SchedulerController.stop();
+  v46ScheduleLive=SchedulerController.schedule;
+  SchedulerController.schedule(80);
+
+  // 누적된 bind 래퍼를 화면당 한 번 실행되는 단일 바인더로 통합한다.
+  const UiController=(function(){
+    let bindCount=0;
+    function bindAll(){
+      bindCount++;
+      V46_CHART_SIG='';
+
+      // 최초 구현의 화면/정렬/섹터/종목/차트/주문 이벤트.
+      bindBase();
+
+      if(selected&&$('#chart'))bindChartPointer(selected);
+      document.querySelectorAll('[data-market]').forEach(b=>b.onclick=openMarketSummary);
+      document.querySelectorAll('[data-settings]').forEach(b=>b.onclick=openSettings);
+      const tradeLog=$('#reset');if(tradeLog)tradeLog.onclick=openTradeLog;
+
+      const fav=$('.detail-head .icons');
+      if(selected&&fav){
+        fav.style.cursor='pointer';fav.setAttribute('role','button');fav.setAttribute('tabindex','0');fav.setAttribute('aria-label','관심 종목 설정');
+        fav.onclick=()=>{
+          const code=selected.code;
+          state.watch=state.watch.includes(code)?state.watch.filter(x=>x!==code):[...state.watch,code];
+          Store.saveMe(userId,state);$('#app').innerHTML=services.view.detail(selected);bind();
+        };
+        fav.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fav.click()}};
+      }
+
+      const accountOpen=$('.account-open');if(accountOpen)accountOpen.onclick=openAccountDetail;
+      const accountBack=$('.account-back');if(accountBack)accountBack.onclick=()=>{accountView=false;render()};
+      if(selected&&$('#chart'))requestAnimationFrame(()=>drawChart(selected,chartHoverIndex));
+
+      document.querySelectorAll('[data-asset]').forEach(b=>b.onclick=()=>{
+        assetFilter=b.dataset.asset;sectorFilter='전체';sort='value';render();
+      });
+
+      requestAnimationFrame(()=>document.querySelector('.chip.active')?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
+      v18StartRumorCarousel();
+      const reward=document.querySelector('[data-hourly-reward]');if(reward)reward.onclick=claimHourlyReward;
+      v44ScheduleTrack();
+
+      // 내비게이션은 기존 V47의 즉시 선택 표시 후 지연 렌더 동작을 유지한다.
+      document.querySelectorAll('.nav [data-view]').forEach(btn=>{
+        btn.onclick=e=>{
+          e.preventDefault();
+          const next=btn.dataset.view;if(!next||next===view)return;
+          document.querySelectorAll('.nav [data-view]').forEach(x=>x.classList.toggle('active',x===btn));
+          view=next;
+          requestAnimationFrame(()=>setTimeout(()=>render(),0));
+        };
+      });
+
+      if(view==='discover'&&(sort==='rise'||sort==='fall'))setTimeout(()=>MoverController.refresh(true),0);
+
+      document.querySelectorAll('[data-latest-news]').forEach(b=>b.onclick=openMarketSummary);
+      clearInterval(V77_DISCOVER_TIMER);
+      if(view==='discover'&&!selected)V77_DISCOVER_TIMER=setInterval(v77RefreshDiscoverMeta,5000);
+
+      // V109의 비동기 장기 차트 계산과 스켈레톤 동작을 마지막에 덮어쓴다.
+      window.__v109BindChartRange?.();
+    }
+    return {bind:bindAll,get bindCount(){return bindCount}};
+  })();
+
+  services.view.bind=UiController.bind;
+
+  // normalizeState의 버전별 래퍼를 한 번의 명시적 순차 변환으로 통합한다.
+  const StateMigrator=(function(){
+    const LEGACY={
+      '005930':['005930',71800,105000],
+      '105560':['105560',68400,122000],'035720':['035420',45200,258000],
+      '068270':['068270',173500,189000],'047810':['012450',59200,940000],
+      '950130':['326030',12800,132000],'352820':['352820',86400,318000],
+      '010950':['010950',28400,89000],'001230':['034020',3720,78000]
+    };
+    const stockByCode=new Map(STOCKS.map(s=>[s.code,s]));
+
+    function sanitizeCore(v){
+      const out={
+        nickname:cleanNickname(v?.nickname),
+        cash:Number.isFinite(+v?.cash)?Math.max(0,+v.cash):START,
+        holdings:{},tradeLog:[],watch:[]
+      };
+      for(const s of STOCKS){
+        const h=v?.holdings?.[s.code];
+        if(h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0){
+          out.holdings[s.code]={qty:Math.floor(+h.qty),avg:+h.avg};
+        }
+      }
+      out.watch=[...new Set(Array.isArray(v?.watch)?v.watch.filter(code=>stockByCode.has(code)):[])];
+      out.tradeLog=(Array.isArray(v?.tradeLog)?v.tradeLog:[])
+        .filter(x=>x&&['buy','sell'].includes(x.type)&&stockByCode.has(x.code)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price))
+        .slice(-300);
+      return out;
+    }
+
+    function legacyToV2(v){
+      if(v?.marketVersion===2)return v;
+      const holdings={},watch=[];
+      for(const [old,h] of Object.entries(v?.holdings||{})){
+        const map=LEGACY[old];
+        if(map&&h?.qty>0)holdings[map[0]]={qty:h.qty,avg:(+h.avg||map[1])*map[2]/map[1]};
+      }
+      for(const old of v?.watch||[]){
+        const code=LEGACY[old]?.[0];if(code&&!watch.includes(code))watch.push(code);
+      }
+      return {...v,holdings,watch,tradeLog:[]};
+    }
+
+    function migrate(value){
+      const raw=value&&typeof value==='object'?value:{};
+      const originalVersion=+raw.marketVersion||0;
+      let prepared=raw;
+
+      if(raw.marketVersion===2){
+        const holdings={};
+        for(const [code,h] of Object.entries(raw.holdings||{})){
+          const s=stockByCode.get(code);if(!s||!h?.qty)continue;
+          const oldPrice=legacyVisualPrice(s),newPrice=services.market.quote(s).price;
+          holdings[code]={...h,avg:(+h.avg||oldPrice)*newPrice/Math.max(1,oldPrice)};
+        }
+        prepared={...raw,holdings};
+      }
+
+      const baseInput=+prepared.marketVersion>=2?{...prepared,marketVersion:2}:prepared;
+      let out=sanitizeCore(legacyToV2(baseInput));
+      out.marketVersion=3;
+
+      if(originalVersion<=3){
+        for(const [code,h] of Object.entries(out.holdings)){
+          const s=stockByCode.get(code);if(!s||!h.qty)continue;
+          const oldPrice=v3VisualPrice(s),newPrice=services.market.quote(s).price;
+          h.avg=(+h.avg||oldPrice)*newPrice/Math.max(1,oldPrice);
+        }
+      }
+      out.realizedPnl=Number.isFinite(+raw.realizedPnl)?+raw.realizedPnl:realizedFromTrades(out.tradeLog);
+      out.equityHistory=(Array.isArray(raw.equityHistory)?raw.equityHistory:[])
+        .filter(x=>x&&Number.isFinite(+x.at)&&Number.isFinite(+x.value)).slice(-180);
+      out.marketVersion=4;
+
+      if(originalVersion===4){
+        for(const [code,h] of Object.entries(out.holdings)){
+          const s=stockByCode.get(code);if(!s||!h.qty)continue;
+          const oldPrice=rawQuote(s).price,newPrice=services.market.quote(s).price;
+          h.avg=(+h.avg||oldPrice)*newPrice/Math.max(1,oldPrice);
+        }
+      }
+      out.marketVersion=5;
+
+      out.grants=(Array.isArray(raw.grants)?raw.grants:[])
+        .filter(g=>g&&typeof g.id==='string'&&Number.isFinite(+g.amount))
+        .map(g=>({id:String(g.id),amount:Math.round(+g.amount),title:String(g.title||'').slice(0,60),message:String(g.message||'').slice(0,500),at:Number.isFinite(+g.at)?+g.at:Date.now(),acked:!!g.acked})).slice(-200);
+      out.grantCutoff=Number.isFinite(+raw.grantCutoff)?+raw.grantCutoff:0;
+
+      const claims=raw.rewardClaims&&typeof raw.rewardClaims==='object'?raw.rewardClaims:{};
+      out.rewardClaims={};
+      for(const key of Object.keys(claims).sort().slice(-80)){
+        const claim=claims[key];if(claim&&['cash','stock'].includes(claim.type))out.rewardClaims[key]=claim;
+      }
+
+      out.stockGrants=(Array.isArray(raw.stockGrants)?raw.stockGrants:[])
+        .filter(g=>g&&typeof g.id==='string'&&typeof g.stockCode==='string'&&Number.isFinite(+g.qty))
+        .map(g=>({
+          id:String(g.id),stockCode:String(g.stockCode),stockName:String(g.stockName||''),
+          qty:Math.max(1,Math.floor(+g.qty)),grantPrice:Math.max(1,Math.round(+g.grantPrice||1)),
+          title:String(g.title||'').slice(0,60),message:String(g.message||'').slice(0,500),
+          at:Number.isFinite(+g.at)?+g.at:Date.now(),acked:!!g.acked
+        })).slice(-200);
+      out.stockGrantCutoff=Number.isFinite(+raw.stockGrantCutoff)?+raw.stockGrantCutoff:0;
+      return out;
+    }
+    return {migrate,currentMarketVersion:5};
+  })();
+
+  services.state.normalize=StateMigrator.migrate;
+
+  const QuoteController=Object.freeze({
+    forwardVisual:window.__v104ForwardVisual,
+    forwardQuote:window.__v104ForwardQuote,
+    balanced:window.__v106BalancedQuote,
+    final:services.market.quote
+  });
+
+  const Runtime={
+    version:118,
+    basedOn:117,
+    services,
+    controllers:{movers:MoverController,scheduler:SchedulerController,ui:UiController,state:StateMigrator,quote:QuoteController},
+    invariants:Object.freeze({
+      marketFormulaChanged:false,
+      tradeRulesChanged:false,
+      storageSchemaChanged:false,
+      uiChanged:false
+    })
+  };
+
+  // 기존 호출부와의 호환성을 유지하면서 이후 수정은 services의 한 지점만 교체한다.
+  quote=(s)=>services.market.quote(s);
+  rawQuote=quote;
+  fastVisualPriceAt=(s,ms=Date.now())=>services.market.visualPriceAt(s,ms);
+  smoothPriceAt=(s,ms=Date.now())=>services.market.smoothPriceAt(s,ms);
+  gameKospiQuote=(ms=Date.now())=>services.market.kospiQuote(ms);
+  trade=(type,qty)=>services.trading.execute(type,qty);
+  normalizeState=(value)=>services.state.normalize(value);
+  render=()=>services.view.render();
+  bind=()=>services.view.bind();
+  refreshLive=()=>services.view.refresh();
+  discover=(watch=false)=>services.view.discover(watch);
+  detail=(stock)=>services.view.detail(stock);
+
+  window.MockStockRuntime=Runtime;
+  window.__marketV118={
+    version:118,basedOn:117,stage:7,
+    stableRuntimeFacade:true,
+    moverPipelineUnified:true,
+    activeSchedulerUnified:true,
+    bindPipelineUnified:true,
+    stateMigrationUnified:true,
+    quoteEntryUnified:true,
+    pricePathUnified:true,
+    midnightKospiJumpFixed:true,
+    behaviorChanged:false
+  };
+})();
 </script>
 
 </body></html>
