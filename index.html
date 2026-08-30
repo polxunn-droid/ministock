@@ -12188,4 +12188,43 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 <script id="v168-chart-hotfix-meta">window.__v168ChartHotfix={version:168,usEtfDayAxis:'08:00-23:30 fixed',futureSlotsHidden:true,dayChangeBase:'previous close',usStockDayAxisAudited:true,usStockFutureSlotsHidden:true};</script>
+
+<script id="v169-firestore-schema-compat">
+(()=>{
+  // 기존 Firestore stock_grants/{id}/claims 규칙의 hasOnly 목록과 정확히 일치시킨다.
+  // 미국주식의 실제 소수 단가는 로컬 state에 유지하고 claim 문서에는 정수 확인값만 기록한다.
+  StockGrantWatch.reserve=async function v169ReserveStockGrant(g,grantPrice){
+    if(!Store.online||!Store.db||!Store.uid)return false;
+    try{
+      const ref=Store.db.collection('stock_grants').doc(g.id).collection('claims').doc(Store.uid);
+      return await Store.db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);if(snap.exists)return false;
+        tx.set(ref,{
+          uid:Store.uid,nickname:state?.nickname||'',
+          stockCode:String(g.stockCode||''),stockName:String(g.stockName||''),
+          qty:Math.floor(+g.qty||0),grantPrice:Math.max(1,Math.round(+grantPrice||1)),
+          claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return true;
+      });
+    }catch(error){console.warn('주식 지급 중복 확인 실패',error?.code||error?.message);return false}
+  };
+  StockGrantWatch.ensureClaim=async function v169EnsureStockClaim(g){
+    if(!Store.online||!Store.db||!Store.uid)return;
+    const local=(state?.stockGrants||[]).find(x=>x.id===g.id);if(!local)return;
+    try{
+      const ref=Store.db.collection('stock_grants').doc(g.id).collection('claims').doc(Store.uid);
+      await Store.db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);if(!snap.exists)tx.set(ref,{
+          uid:Store.uid,nickname:state?.nickname||'',stockCode:String(local.stockCode||''),
+          stockName:String(local.stockName||''),qty:Math.floor(+local.qty||0),
+          grantPrice:Math.max(1,Math.round(+local.grantPrice||1)),
+          claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+    }catch(error){console.warn('기존 주식 지급 기록 확인 실패',error?.code||error?.message)}
+  };
+  window.__v169FirebaseCompat={version:169,stockGrantDocument:'legacy schema',stockClaimDocument:'legacy hasOnly schema',usClaimPriceInteger:true,attendanceReward:'v167 legacy schema'};
+})();
+</script>
 </body></html>

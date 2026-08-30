@@ -72,7 +72,7 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
 .stock-preview.bad{color:var(--red)}
 .admin-market-us{display:inline-block;padding:2px 6px;margin-right:3px;border-radius:7px;background:#eaf2ff;color:#2563a8;font-size:10px;font-weight:900}
 </style>
-<script type="text/javascript" nonce="180a6dda4d08480790d85410d2d" src="//local.adguard.org?ts=1788048974731&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_00000000c7fc820b915a42c660faf761%26fn%3Dadmin%25284%2529.html%26cd%3Dattachment%26ts%3D496680%26p%3Dfs%26cid%3D1%26sig%3D689329e6dc7a5fc193933991e654ce48673db994580608b166d7f4c0e873bbb8%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="180a6dda4d08480790d85410d2d" src="//local.adguard.org?ts=1788048974731&amp;name=AdGuard%20Extra&amp;name=AdGuard%20Popup%20Blocker&amp;type=user-script"></script></head>
+</head>
 <body>
 
 <div id="login" class="login">
@@ -557,8 +557,6 @@ async function sendStock(targets){
     await db.collection('stock_grants').add({
       stockCode:stock.code,
       stockName:stock.name,
-      market:stock.market||'KR',
-      currency:stock.currency||(stock.market==='US'?'USD':'KRW'),
       qty,
       title,
       message,
@@ -575,7 +573,7 @@ async function sendStock(targets){
     selected=new Set();renderPeople();
     toast('주식 지급을 보냈어요');
   }catch(error){
-    $('#stock-send-err').textContent='전송 실패: '+(error?.code||error?.message||'');
+    const code=error?.code||'';$('#stock-send-err').textContent=code==='permission-denied'?'전송 실패: Firebase 규칙에서 stock_grants 관리자 쓰기가 허용되지 않았습니다.':('전송 실패: '+(code||error?.message||''));
   }finally{
     $('#send-stock-all').disabled=$('#send-stock-selected').disabled=false;
   }
@@ -632,5 +630,6 @@ window.__adminV4={version:4,customStockSearch:true,iosDatalistRemoved:true,samsu
 </script>
 
 <script>window.__adminV5={version:5,domesticAndUsSearch:true,usStockCount:100,grantMarketField:true,totalStockCount:ADMIN_STOCKS.length};</script>
+<script>window.__adminV6={version:6,stockGrantSchema:'legacy-compatible',marketInferredByTicker:true,firestoreExtraFieldsRemoved:['market','currency']};</script>
 </body>
 </html>
