@@ -12110,4 +12110,76 @@ window.__hourlyRewardV166={cashShare:.60,domesticStockShare:.30,usStockShare:.10
 window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticParity:true,usStockCount:US.length};
 })();
 </script>
+
+<style id="v167-live-hotfix-style">
+.v167-asset-group{margin:24px 0 7px;padding-top:15px;border-top:1px solid var(--line);font-size:16px;font-weight:900}.v167-asset-group:first-child{margin-top:8px;border-top:0}.v167-allocation-legend{display:grid!important;grid-template-columns:1fr 1fr;gap:10px 12px!important}.v167-allocation-legend span{white-space:nowrap}.v140-pnl-card{display:none!important}
+</style>
+<script id="v167-live-hotfix">
+(()=>{
+  const BR=window.__v166UsBridge||{},US_CODES=new Set((BR.stocks||[]).map(x=>x.code));
+  const ETF_API=window.__usMarketV142||{},US_ETF_CODES=new Set(ETF_API.usEtfs||[]);
+  const fxNow=()=>Math.max(.01,+BR.fx?.()?.rate||1377.32);
+  const usQuoteNow=code=>Math.max(.01,+BR.quote?.(code)?.price||1);
+  const usEtfQuoteNow=code=>Math.max(.01,+ETF_API.quote?.(code)?.price||1);
+
+  // 보상 claim 컬렉션 규칙이 구버전이어도 수령을 막지 않는다.
+  // 서버 문서는 기존 필드만 기록하고, 권한 거부 시 player 상태의 rewardClaims로 중복 방지한다.
+  claimHourlyReward=async function v167ClaimHourlyReward(){
+    const slot=hourlyRewardSlot();
+    if(!slot.open)return toast('장 운영시간에만 받을 수 있어요');
+    if(rewardClaimed(slot.slotKey))return toast('이번 시간 보상은 이미 받았어요');
+    if(!Store.online||!Store.uid)return toast('인터넷 연결 후 받을 수 있어요');
+    const btn=document.querySelector('[data-hourly-reward]');if(btn){btn.disabled=true;btn.textContent='추첨 중…'}
+    let reward=buildHourlyReward(slot.slotKey),remoteClaimed=false;
+    const payload={uid:Store.uid,slotKey:slot.slotKey,type:reward.type,amount:Math.round(+reward.amount||0),stockCode:String(reward.stockCode||''),stockName:String(reward.stockName||''),qty:Math.round(+reward.qty||0),grantPrice:Math.round(+reward.grantPrice||0),rarity:String(reward.rarity||'일반'),createdAtMs:Date.now()};
+    try{
+      if(Store.db){
+        const ref=Store.db.collection('attendance_rewards').doc(Store.uid).collection('claims').doc(slot.slotKey);
+        const result=await Store.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists)return{created:false,data:snap.data()};tx.set(ref,payload);return{created:true,data:payload}});
+        remoteClaimed=true;
+        if(!result.created&&result.data){const d=result.data,isUS=US_CODES.has(String(d.stockCode||''));reward={...reward,...d,market:isUS?'US':(d.type==='stock'?'KR':''),currency:isUS?'USD':'KRW',grantValueKrw:isUS?Math.round((+d.grantPrice||usQuoteNow(d.stockCode))*fxNow()):Math.round(+d.grantPrice||0)}}
+      }
+    }catch(error){
+      if(error?.code!=='permission-denied'&&error?.code!=='failed-precondition'&&error?.code!=='unavailable'){console.warn('보상 서버 확인 실패',error?.code||error?.message)}
+      // player 저장 상태가 동기화되므로 별도 claim 규칙이 없어도 시간 슬롯 중복을 막는다.
+    }
+    if(!applyHourlyReward(reward,slot.slotKey)){toast('이번 시간 보상은 이미 반영됐어요');render();return}
+    try{await Store.saveMe(userId,state);await Store.pushMyScore(true)}catch(error){console.warn('보상 상태 저장 지연',error?.code||error?.message)}
+    showHourlyRewardResult(reward);render();
+    if(!remoteClaimed)toast('보상을 받았어요');
+  };
+
+  // 홈 해외주식 제목이 미국주식/미국ETF마다 반복 생성되던 V142 선택자 오류 교정.
+  const HOME_BASE_V167=home;
+  home=function v167Home(){
+    const raw=HOME_BASE_V167(),t=document.createElement('template');t.innerHTML=raw;const screen=t.content.querySelector('.screen');if(!screen)return raw;
+    const titles=[...screen.querySelectorAll('.v127-overseas-title')],over=titles.filter(x=>x.textContent.includes('해외주식'));
+    over.slice(1).forEach(x=>x.remove());
+    return t.innerHTML;
+  };
+
+  const ACCOUNT_BASE_V167=accountDetail;
+  accountDetail=function v167AccountDetail(){
+    const raw=ACCOUNT_BASE_V167(),t=document.createElement('template');t.innerHTML=raw,root=t.content.querySelector('.account-detail');if(!root)return raw;
+    root.querySelector('.v140-pnl-card')?.remove();
+    const list=root.querySelector('.portfolio-list');
+    if(list){
+      const kr=[...list.querySelectorAll('[data-stock]')],us=[...list.querySelectorAll('[data-v119-account-us],[data-v142-etf-holding]')];
+      list.innerHTML='';
+      if(kr.length){list.insertAdjacentHTML('beforeend','<div class="v167-asset-group">국내주식</div>');kr.forEach(x=>list.append(x))}
+      if(us.length){list.insertAdjacentHTML('beforeend','<div class="v167-asset-group">해외주식</div>');us.forEach(x=>list.append(x))}
+      if(!kr.length&&!us.length)list.innerHTML='<div class="empty">보유 종목이 없어요.</div>';
+    }
+    let domestic=0,overseas=0;
+    for(const [code,h] of Object.entries(state?.holdings||{})){if(!(h?.qty>0))continue;const s=STOCKS.find(x=>x.code===code);if(s)domestic+=quote(s).price*h.qty}
+    const fx=fxNow();
+    for(const [code,h] of Object.entries(state?.usHoldings||{}))if(h?.qty>0)overseas+=usQuoteNow(code)*h.qty*fx;
+    for(const [code,h] of Object.entries(state?.usEtfHoldings||{}))if(h?.qty>0)overseas+=usEtfQuoteNow(code)*h.qty*fx;
+    const groups=[['국내주식',domestic,'#3182f6'],['해외주식',overseas,'#ff9f1a'],['원화 예수금',Math.max(0,+state?.cash||0),'#20c997'],['달러 예수금',Math.max(0,+state?.usdCash||0)*fx,'#8b5cf6']].filter(x=>x[1]>0),sum=groups.reduce((a,x)=>a+x[1],0)||1;
+    const inner=root.querySelector('.allocation-inner');if(inner){const count=Object.values(state?.holdings||{}).filter(h=>h?.qty>0).length+Object.values(state?.usHoldings||{}).filter(h=>h?.qty>0).length+Object.values(state?.usEtfHoldings||{}).filter(h=>h?.qty>0).length;inner.innerHTML=`<div class="between"><b>투자 비중 보기</b><span class="sub">${count}종목</span></div><div class="allocation-bar">${groups.map(([n,v,c])=>`<i style="width:${v/sum*100}%;background:${c}" title="${n}"></i>`).join('')}</div><div class="allocation-legend v167-allocation-legend">${groups.map(([n,v,c])=>`<span><i style="background:${c}"></i>${n} ${(v/sum*100).toFixed(1)}%</span>`).join('')}</div>`}
+    return t.innerHTML;
+  };
+  window.__v167Hotfix={version:167,rewardFallback:true,singleOverseasGroup:true,allocationGroups:['국내주식','해외주식','원화 예수금','달러 예수금'],pnlBreakdownRemoved:true};
+})();
+</script>
 </body></html>
