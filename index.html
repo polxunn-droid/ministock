@@ -117,6 +117,12 @@
 }
 </style>
 
+
+<style id="v181-class-top-tab-fix">
+.screen .tabs > [data-v180-daily-top]{white-space:nowrap;font-size:13px;letter-spacing:-.35px}
+.screen .tabs:has([data-v180-daily-top]){gap:0}
+.screen .tabs:has([data-v180-daily-top]) > button{min-width:0;padding-left:7px;padding-right:7px}
+</style>
 </head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script>
@@ -312,7 +318,7 @@ function refreshAccountDetail(){const amount=$('[data-account-total]');if(!amoun
 function refreshMyStock(){const box=$('[data-my-stock]');if(!box||!selected)return;const h=state.holdings[selected.code];if(!h?.qty)return;const q=quote(selected),value=q.price*h.qty,cost=h.avg*h.qty,profit=value-cost,rate=profit/Math.max(1,cost)*100,fee=Math.round(value*(FEE+TAX)),p=box.querySelector('[data-my-pnl]');box.querySelector('[data-my-value]').textContent=`${fmt(value)}원`;box.querySelector('[data-my-fee]').textContent=`${fmt(fee)}원`;p.textContent=`${sign(profit)}원 (${pct(rate)})`;p.className=profit<0?'down':'gain'}
 const refreshLiveBase=refreshLive;refreshLive=function(){const overlay=document.querySelector('.overlay');if(overlay){if(overlay.classList.contains('search-overlay'))refreshSearchQuotes();return}const parked=[];document.querySelectorAll('[data-quote]').forEach(el=>{const r=el.getBoundingClientRect();if(r.bottom<-80||r.top>(window.innerHeight||document.documentElement.clientHeight)+80){parked.push([el,el.dataset.quote]);el.removeAttribute('data-quote')}});refreshLiveBase();for(const [el,code] of parked)el.dataset.quote=code;const hero=$('.hero h2');if(hero)hero.textContent=hero.textContent.replace(' ›','');const realized=$('[data-live-realized]'),unrealized=$('[data-live-unrealized]'),rp=+state.realizedPnl||0,up=unrealizedPnl();if(realized){realized.textContent=`${sign(rp)}원`;realized.className=rp<0?'down':'gain'}if(unrealized){unrealized.textContent=`${sign(up)}원`;unrealized.className=up<0?'down':'gain'}refreshAccountDetail();refreshMyStock()};
 function orderSheet(type){const s=selected,q=quote(s),h=state.holdings[s.code]||{qty:0,avg:0};pendingOrder={type,code:s.code,price:q.price};$('#app').insertAdjacentHTML('beforeend',`<div class="overlay"><div class="sheet"><h2>${s.name} ${type==='buy'?'매수':'매도'}</h2><div class="between"><span>체결가</span><b>${fmt(q.price)}원</b></div><p class="sub">현재 주문창에 표시된 가격으로 즉시 체결돼요.</p><div class="quick">${['10%','25%','50%','최대'].map((x,i)=>`<button data-quick="${[.1,.25,.5,1][i]}">${x}</button>`).join('')}</div><input id="qty" inputmode="numeric" min="1" placeholder="수량을 입력하세요"><div class="card" style="margin-top:12px"><small>예상 금액 · 수수료/세금 포함</small><strong id="estimate">0원</strong></div><button class="primary" id="confirm" data-type="${type}">${type==='buy'?'매수하기':'매도하기'}</button></div></div>`);const input=$('#qty');input.oninput=()=>{$('#estimate').textContent=fmt((+input.value||0)*q.price*(type==='buy'?1+FEE:1-FEE-TAX))+'원'};document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{input.value=type==='buy'?Math.floor(state.cash/(q.price*(1+FEE))*+b.dataset.quick):Math.floor(h.qty*+b.dataset.quick);input.oninput()})}
-async function trade(type,qty){qty=Math.floor(Number(qty));if(trading)return;if(!Number.isFinite(qty)||qty<1)return toast('1주 이상 입력해주세요');if(!selected||!['buy','sell'].includes(type)||pendingOrder?.type!==type||pendingOrder?.code!==selected.code)return toast('주문 정보를 다시 확인해주세요');const s=selected,fillPrice=pendingOrder.price,h=state.holdings[s.code]||{qty:0,avg:0};if(type==='buy'){const cost=Math.round(fillPrice*qty*(1+FEE));if(cost>state.cash)return toast('예수금이 부족해요');h.avg=(h.avg*h.qty+cost)/(h.qty+qty);h.qty+=qty;state.cash-=cost}else{if(qty>h.qty)return toast('보유 수량이 부족해요');state.cash+=Math.round(fillPrice*qty*(1-FEE-TAX));h.qty-=qty;if(!h.qty)h.avg=0}trading=true;pendingOrder=null;state.holdings[s.code]=h;state.tradeLog.push({at:Date.now(),type,code:s.code,qty,price:fillPrice});await Store.saveMe(userId,state);trading=false;$('.overlay')?.remove();toast(`${fmt(fillPrice)}원에 ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);$('#app').innerHTML=detail(s);bind()}
+async function trade(type,qty){qty=Math.floor(Number(qty));if(trading)return;if(!Number.isFinite(qty)||qty<1)return toast('1주 이상 입력해주세요');if(!selected||!['buy','sell'].includes(type)||pendingOrder?.type!==type||pendingOrder?.code!==selected.code)return toast('주문 정보를 다시 확인해주세요');const s=selected,fillPrice=pendingOrder.price,h=state.holdings[s.code]||{qty:0,avg:0};if(type==='buy'){const cost=Math.round(fillPrice*qty*(1+FEE));if(cost>state.cash)return toast('예수금이 부족해요');h.avg=(h.avg*h.qty+cost)/(h.qty+qty);h.qty+=qty;state.cash-=cost}else{if(qty>h.qty)return toast('보유 수량이 부족해요');state.cash+=Math.round(fillPrice*qty*(1-FEE-TAX));h.qty-=qty;if(!h.qty)h.avg=0}trading=true;pendingOrder=null;state.holdings[s.code]=h;state.tradeLog.push({at:Date.now(),type,code:s.code,qty,price:fillPrice});window.ClassTradeDaily?.record('KR',state.tradeLog[state.tradeLog.length-1]);await Store.saveMe(userId,state);trading=false;$('.overlay')?.remove();toast(`${fmt(fillPrice)}원에 ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);$('#app').innerHTML=detail(s);bind()}
 const tradeBase=trade;trade=async function(type,qty){const n=Math.floor(Number(qty)),s=selected,before=state?.tradeLog?.length||0,avg=s?(state.holdings[s.code]?.avg||0):0;await tradeBase(type,qty);const log=state?.tradeLog||[];if(log.length===before)return;const fill=log.at(-1);if(type==='sell'&&fill?.type==='sell')state.realizedPnl=(+state.realizedPnl||0)+Math.round(fill.price*n*(1-FEE-TAX))-avg*n;await recordEquity(true);await Store.pushMyScore(true)};
 function toast(t){const el=document.createElement('div');el.className='toast';el.textContent=t;document.body.append(el);setTimeout(()=>el.remove(),2100)}
 let onboardingPreserve=false;
@@ -749,7 +755,7 @@ discover=function(watch=false){
   const groups=assetFilter==='etf'?['전체',...new Set(ETF_STOCKS.map(s=>s.etfCategory))]:['전체',...new Set(STOCKS.filter(s=>!s.isETF).map(s=>s.sector))],now=new Date();
   const assetMenu=`<div class="asset-switch"><button data-asset="stock" class="asset-card ${assetFilter==='stock'?'active':''}"><span class="asset-symbol kr-flag">🇰🇷</span><b>국내주식</b></button><button data-asset="etf" class="asset-card ${assetFilter==='etf'?'active':''}"><span class="asset-symbol etf-mark"><i></i></span><b>ETF</b></button></div>`;
   const chips=`<div class="chips">${groups.map(g=>`<button data-sector="${g}" class="chip ${sectorFilter===g?'active':''}">${g}</button>`).join('')}</div>`;
-  return shell(`${header('발견')}${assetMenu}${chips}<div class="strip"><div>오늘 이슈<b>1개</b></div><div>코스피<b class="gain">상승</b></div><div>시장 시간<b>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</b></div></div><div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div><h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div>${list.length?list.map((x,i)=>`<div class="stock" data-stock="${x.s.code}"><div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small class="${x.q.change<0?'down':'gain'}" data-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.q.change)}</small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button></div>`).join(''):`<div class="empty">해당 조건의 ${assetFilter==='etf'?'ETF':'종목'}가 없어요.</div>`}`,'discover');
+  return shell(`${header('발견')}${assetMenu}${chips}<div class="strip"><div>오늘 이슈<b>1개</b></div><div>코스피<b class="gain">상승</b></div><div>시장 시간<b>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</b></div></div><div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div><h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v180-daily-top>어제 학급 TOP</button></div>${list.length?list.map((x,i)=>`<div class="stock" data-stock="${x.s.code}"><div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small class="${x.q.change<0?'down':'gain'}" data-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.q.change)}</small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button></div>`).join(''):`<div class="empty">해당 조건의 ${assetFilter==='etf'?'ETF':'종목'}가 없어요.</div>`}`,'discover');
 };
 
 const v10Bind=bind;
@@ -4675,7 +4681,7 @@ function v53MoverDiscover(){
     <div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div>
     <h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2>
     <div class="tabs">
-      ${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}
+      ${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v180-daily-top>어제 학급 TOP</button>
     </div>
     <div id="v53-mover-list">${v53MoverRowsHtml(Date.now())}</div>
   `,'discover');
@@ -9589,7 +9595,7 @@ window.__marketV115={
       <div class="v118-us-wallet"><div><b>달러 예수금　$${USD_FMT.format(usd)}</b><small>달러 지갑 기반만 생성 · 환전 기능은 다음 단계</small></div><span class="v118-market-status ${sess.open?'open':'closed'}">${sess.label}</span></div>
       <div class="strip"><div>미국시장<b>${sess.label}</b></div><div>시장 시간<b data-v118-market-time>${marketTime}</b></div><div>테스트 종목<b>${US_STOCKS.length}개</b></div></div>
       <div class="v118-us-market-note">확장 검증용 미국 대표 50종목입니다. 국내 300종목 배열과 완전히 분리되어 있어 국내 화면에서는 미국 종목의 시세를 계산하지 않습니다.</div>
-      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div><div id="v118-us-list">${v118UsRows()}</div>
+      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v180-daily-top>어제 학급 TOP</button></div><div id="v118-us-list">${v118UsRows()}</div>
     `,'discover');
   }
 
@@ -9839,7 +9845,7 @@ window.__marketV115={
       <div class="strip"><div>미국시장<b>${sess.label}</b></div><div>시장 시간<b data-v119-market-time>${String(local.hour).padStart(2,'0')}:${String(local.minute).padStart(2,'0')}</b></div><div>테스트 종목<b>${US_META.length}개</b></div></div>
       <div class="v119-us-news"><b>🇺🇸 오늘의 미국시장 뉴스</b><p>${escHtml(ev.title)}</p><small>${newsPressureLabel(ev)}</small>${co.length?`<div class="v132-company-mini"><b>기업 뉴스</b>${co.slice(0,2).map(x=>`<span>${escHtml(META.get(x.code)?.name||x.code)} · ${escHtml(x.title)}</span>`).join('')}${co.length>2?`<em>외 ${co.length-2}건</em>`:''}</div>`:''}</div>
       <div class="v118-us-market-note">미국 대표주를 50종목으로 확대했습니다. 미국 종목·환율 계산은 국내 300종목과 계속 분리되어 있습니다.</div>
-      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div><div id="v119-us-list">${usRows()}</div>`,'discover');
+      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v180-daily-top>어제 학급 TOP</button></div><div id="v119-us-list">${usRows()}</div>`,'discover');
   }
 
   const DISCOVER_BASE=discover;
@@ -9890,9 +9896,9 @@ window.__marketV115={
   async function executeUsTrade(type,rawQty){
     ensureState();const s=META.get(US_SELECTED);if(!s)return;const qty=Math.floor(+rawQty||0);if(qty<1)return toast('수량을 입력해주세요');if(!usSession().open)return toast('장이 마감되어 주문할 수 없어요');
     const q=usQuote(s.code),price=q.price,h=state.usHoldings[s.code]||{qty:0,avg:0},gross=price*qty,fee=gross*US_FEE;
-    if(type==='buy'){const settlement=gross+fee;if(state.usdCash+1e-9<settlement)return toast('달러 예수금이 부족해요');state.usdCash-=settlement;h.avg=(h.avg*h.qty+settlement)/(h.qty+qty);h.qty+=qty;state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,at:Date.now(),costVersion:119})}
-    else{if(h.qty<qty)return toast('보유 수량이 부족해요');const settlement=gross-fee,realized=settlement-h.avg*qty;state.usdCash+=settlement;state.usRealizedPnlUsd=(+state.usRealizedPnlUsd||0)+realized;h.qty-=qty;if(h.qty<=0)delete state.usHoldings[s.code];else state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,realized,at:Date.now(),costVersion:119})}
-    state.usTradeLog=state.usTradeLog.slice(-300);await Store.saveMe(userId,state);document.querySelector('.v119-us-order-overlay')?.remove();toast(`${s.name} ${type==='buy'?'매수':'매도'}가 체결됐어요`);renderUsDetail();
+    if(type==='buy'){const settlement=gross+fee;if(state.usdCash+1e-9<settlement)return toast('달러 예수금이 부족해요');state.usdCash-=settlement;h.avg=(h.avg*h.qty+settlement)/(h.qty+qty);h.qty+=qty;state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,at:Date.now(),costVersion:119});window.ClassTradeDaily?.record('US',state.usTradeLog[state.usTradeLog.length-1])}
+    else{if(h.qty<qty)return toast('보유 수량이 부족해요');const settlement=gross-fee,realized=settlement-h.avg*qty;state.usdCash+=settlement;state.usRealizedPnlUsd=(+state.usRealizedPnlUsd||0)+realized;h.qty-=qty;if(h.qty<=0)delete state.usHoldings[s.code];else state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,realized,at:Date.now(),costVersion:119});window.ClassTradeDaily?.record('US',state.usTradeLog[state.usTradeLog.length-1])}
+    ;state.usTradeLog=state.usTradeLog.slice(-300);await Store.saveMe(userId,state);document.querySelector('.v119-us-order-overlay')?.remove();toast(`${s.name} ${type==='buy'?'매수':'매도'}가 체결됐어요`);renderUsDetail();
   }
 
   function exchangePreview(){
@@ -10819,7 +10825,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
       <div class="v118-us-wallet"><div><b>달러 예수금　<span data-v119-usd-cash>$${USD_FMT.format(usd)}</span></b><small>달러 예수금으로 미국주식을 거래할 수 있어요</small></div><div class="v119-us-wallet-actions"><button class="v119-exchange-btn" data-v119-exchange>환전</button></div></div>
       ${strip()}${latestNews()}
       <h2>실시간 종목</h2>
-      <div class="tabs" data-v138-us-tabs>${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div>
+      <div class="tabs" data-v138-us-tabs>${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v180-daily-top>어제 학급 TOP</button></div>
       <div id="v138-us-list">${rowsHtml()}</div>
     `,'discover');
   }
@@ -11547,7 +11553,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
     const def=ETF_BY_CODE.get(ETF_SELECTED);qty=Math.floor(+qty||0);if(!def||qty<1)return toast('1주 이상 입력해주세요');ensureEtfState();const sess=usCore().session?.()||{open:false};if(!sess.open)return toast('지금은 장 운영 시간이 아니에요');const q=etfQuote(def.code),h=state.usEtfHoldings[def.code]||{qty:0,avg:0},gross=q.price*qty,fee=gross*US_FEE,settlement=type==='buy'?gross+fee:gross-fee;
     if(type==='buy'){if(state.usdCash+1e-9<settlement)return toast('달러 예수금이 부족해요');state.usdCash-=settlement;h.avg=(h.avg*h.qty+settlement)/(h.qty+qty);h.qty+=qty;state.usEtfHoldings[def.code]=h;}
     else{if(h.qty<qty)return toast('보유 수량이 부족해요');state.usdCash+=settlement;const realized=settlement-h.avg*qty;state.usEtfRealizedPnlUsd=(+state.usEtfRealizedPnlUsd||0)+realized;h.qty-=qty;if(h.qty<=0)delete state.usEtfHoldings[def.code];else state.usEtfHoldings[def.code]=h;}
-    state.usEtfTradeLog.push({at:Date.now(),type,code:def.code,qty,price:q.price,fee,settlement,asset:'usEtf',costVersion:142});state.usEtfTradeLog=state.usEtfTradeLog.slice(-300);await Store.saveMe(userId,state);try{await recordEquity(true)}catch{}document.querySelector('.v142-us-etf-order')?.remove();toast(`${def.code} ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);renderEtfDetail();
+    state.usEtfTradeLog.push({at:Date.now(),type,code:def.code,qty,price:q.price,fee,settlement,asset:'usEtf',costVersion:142});window.ClassTradeDaily?.record('ETF',state.usEtfTradeLog[state.usEtfTradeLog.length-1]);state.usEtfTradeLog=state.usEtfTradeLog.slice(-300);await Store.saveMe(userId,state);try{await recordEquity(true)}catch{}document.querySelector('.v142-us-etf-order')?.remove();toast(`${def.code} ${qty}주 ${type==='buy'?'매수':'매도'} 완료`);renderEtfDetail();
   }
 
   // 홈: 기존 국내/해외 UI를 유지하고 미국 ETF를 해외주식 섹션의 동일한 holding 행으로만 추가.
@@ -12330,4 +12336,54 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v170YieldRepair={version:170,bridgeReady:!!BR.quote&&!!BR.fx,existingDollarOneRepair:true,usdGrantDecimalsPreserved:true,grantLogCurrencyRepair:true,dailyPnlCrossMarketRepair:true,usRewardMarketRepair:true,usEtfHighLowDots:true,adminGrantNoDollarOneFallback:true};
 })();
 </script>
+
+
+<style id="v180-daily-top-style">
+.v180-daily-meta{margin:10px 0 6px;padding:11px 13px;border-radius:14px;background:#f7f8fa;color:#6b7684;font-size:11.5px;line-height:1.45}.v180-daily-meta b{color:#333d4b}
+.v180-daily-empty,.v180-daily-loading{padding:34px 16px;text-align:center;color:#8b95a1;font-size:13px}.v180-daily-row .v180-sub{display:block;margin-top:3px;color:#8b95a1;font-size:11px}.v180-value{font-weight:800;text-align:right;white-space:nowrap}.v180-value small{display:block;margin-top:3px;color:#8b95a1;font-size:10.5px;font-weight:600}
+</style>
+<script id="v180-daily-class-top">
+(()=>{
+ const ROOT='classTradeDaily',KEY='mockstock:classTradeDaily:v2:',CACHE='mockstock:classTradeDailyTop:v2:',M=['KR','US','ETF'];let mem=null;
+ const pad=n=>String(n).padStart(2,'0'), day=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+ const today=()=>day(new Date()), yesterday=()=>{let d=new Date();d.setDate(d.getDate()-1);return day(d)};
+ const label=k=>{let [,m,d]=k.split('-');return `${+m}월 ${+d}일 08:00~23:30`};
+ const loadLocal=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{"days":{}}')}catch{return {days:{}}}};
+ const saveLocal=x=>{try{localStorage.setItem(KEY,JSON.stringify(x))}catch{}};
+ function record(m,t){
+   if(!M.includes(m)||!t?.code)return;const dt=new Date(t.at||Date.now()),min=dt.getHours()*60+dt.getMinutes();if(min<480||min>=1410)return;
+   const x=loadLocal(),k=day(dt),d=x.days[k]||={uploaded:false,markets:{KR:{},US:{},ETF:{}}},r=d.markets[m][t.code]||={value:0,qty:0,trades:0,buyValue:0,sellValue:0,buyTrades:0,sellTrades:0};
+   const q=Math.abs(+t.qty||0),v=q*Math.abs(+t.price||0),buy=t.type==='buy';r.value+=v;r.qty+=q;r.trades++;if(buy){r.buyValue+=v;r.buyTrades++}else{r.sellValue+=v;r.sellTrades++}d.uploaded=false;saveLocal(x);
+ }
+ async function upload(){
+   if(!(window.Store?.online&&Store.db&&Store.uid))return;const x=loadLocal(),td=today();
+   for(const [k,d] of Object.entries(x.days||{})){if(k>=td||d.uploaded)continue;try{await Store.db.collection(ROOT).doc(k).collection('users').doc(Store.uid).set({version:180,day:k,markets:d.markets,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});d.uploaded=true;saveLocal(x)}catch(e){}}
+ }
+ function aggregate(docs,k){const a={KR:new Map(),US:new Map(),ETF:new Map()};for(const doc of docs){const z=doc.data?.()||{};for(const m of M)for(const [c,r] of Object.entries(z.markets?.[m]||{})){let o=a[m].get(c)||{code:c,value:0,trades:0,users:0};o.value+=+r.value||0;o.trades+=+r.trades||0;if((+r.trades||0)>0)o.users++;a[m].set(c,o)}}const markets={};for(const m of M)markets[m]=[...a[m].values()].sort((x,y)=>y.value-x.value||y.users-x.users||y.trades-x.trades).slice(0,10);return{day:k,label:label(k),markets,docs:docs.length,loadedAt:Date.now()}}
+ async function getTop(){const k=yesterday();if(mem?.day===k)return mem;try{const c=JSON.parse(sessionStorage.getItem(CACHE+k)||'null');if(c?.day===k)return mem=c}catch{}if(!(Store?.online&&Store.db&&Store.uid))return{day:k,label:label(k),markets:{KR:[],US:[],ETF:[]},offline:true};const s=await Store.db.collection(ROOT).doc(k).collection('users').get();mem=aggregate(s.docs||[],k);try{sessionStorage.setItem(CACHE+k,JSON.stringify(mem))}catch{}return mem}
+ window.ClassTradeDaily={record,upload,getTop,yesterday,status:()=>({version:180,root:ROOT,cached:mem?.day||null})};
+ // 인증은 기존 앱 흐름을 그대로 사용. 이 모듈 때문에 접속을 막지 않는다.
+ setTimeout(()=>upload(),3500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)upload()});
+})();
+</script>
+
+
+<script id="v180-daily-top-ui">
+(()=>{
+ let active=false;
+ const market=()=>{try{return assetFilter==='stock'?'KR':assetFilter==='us'?'US':assetFilter==='etf'?'ETF':''}catch{return''}};
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ function parts(){if(typeof view!=='undefined'&&view!=='discover')return null;const s=document.querySelector('.screen');if(!s)return null;const tabs=[...s.querySelectorAll('.tabs')].find(t=>t.querySelector('[data-sort]'));return tabs?{s,tabs}:null}
+ function install(){const h=parts(),m=market();if(!h||!m)return;const b=h.tabs.querySelector('[data-v180-daily-top]');if(b)b.classList.toggle('active',active)}
+ function ordinary(h,hide){let n=h.tabs.nextElementSibling;while(n){if(!n.matches?.('.v180-daily-meta,.v180-daily-loading,.v180-daily-empty,.v180-daily-row')){if(n.classList?.contains('stock')||n.classList?.contains('empty')||n.querySelector?.('.stock')||/미국 ETF/.test(n.textContent||''))n.style.display=hide?'none':''}n=n.nextElementSibling}}
+ function clear(){document.querySelectorAll('.v180-daily-meta,.v180-daily-loading,.v180-daily-empty,.v180-daily-row').forEach(x=>x.remove())}
+ function nm(m,c){try{if(m==='KR')return STOCKS.find(x=>x.code===c)?.name||c;if(m==='US')return (typeof US_STOCKS!=='undefined'?US_STOCKS:[]).find(x=>x.code===c)?.name||c;if(m==='ETF')return ETF_BY_CODE?.get?.(c)?.name||c}catch{}return c}
+ function val(m,n){n=+n||0;return m==='KR'?Math.round(n).toLocaleString('ko-KR')+'원':n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n>=1e3?'$'+(n/1e3).toFixed(1)+'K':'$'+n.toFixed(2)}
+ async function show(){const h=parts(),m=market();if(!h||!m)return;active=true;install();h.tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.hasAttribute('data-v180-daily-top')));clear();ordinary(h,true);const k=ClassTradeDaily.yesterday(),meta=document.createElement('div');meta.className='v180-daily-meta';meta.innerHTML=`<b>${ClassTradeDaily.status().version?(()=>{let [,mo,d]=k.split('-');return `${+mo}월 ${+d}일 08:00~23:30`})():k}</b> 어제 우리학급 실제 거래 기준 · 매수+매도 거래대금 순`;h.tabs.after(meta);meta.insertAdjacentHTML('afterend','<div class="v180-daily-loading">어제 학급 거래 순위를 불러오는 중...</div>');let r;try{r=await ClassTradeDaily.getTop()}catch{}document.querySelector('.v180-daily-loading')?.remove();const rows=r?.markets?.[m]||[];if(!rows.length){meta.insertAdjacentHTML('afterend','<div class="v180-daily-empty">전날 집계된 우리학급 거래가 없습니다.</div>');return}meta.insertAdjacentHTML('afterend',rows.map((x,i)=>`<div class="stock v180-daily-row"><div class="row"><span class="rank-num">${i+1}</span><div class="logo">${esc(nm(m,x.code)[0])}</div></div><div><div class="name">${esc(nm(m,x.code))}</div><small class="v180-sub">${x.users}명 · ${x.trades}회 체결</small></div><div class="v180-value">${val(m,x.value)}<small>거래대금</small></div></div>`).join(''))}
+ document.addEventListener('click',e=>{if(e.target.closest?.('[data-v180-daily-top]')){e.preventDefault();show();return}if(e.target.closest?.('[data-sort]')){active=false;clear();const h=parts();if(h)ordinary(h,false)}},true);
+ // 버튼은 발견 화면 renderer 자체에 포함되어 있어 별도 감시/폴링이 필요 없다.
+ queueMicrotask(install);
+})();
+</script>
+
 </body></html>
