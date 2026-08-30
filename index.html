@@ -10095,7 +10095,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-v119-us-range]'))setTimeout(()=>{lastSig='';hover=-1;install()},0)},true);
   window.addEventListener('resize',()=>{lastSig='';paint(true)},{passive:true});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){lastSig='';paint(true);updateChange()}},{passive:true});
-  setInterval(()=>{if(document.hidden||!document.querySelector('.v119-us-detail'))return;paint(false);updateChange()},750);
+  setInterval(()=>{if(document.hidden||!document.querySelector('.v119-us-detail'))return;paint(false);updateChange()},1200);
   requestAnimationFrame(install);
 
   window.__usMarketV124={version:124,basedOn:123,guestTest:false,usChartUi:'same canvas/detail design as domestic',usChartRanges:['day','week','quarter','year'],usDaySlots:120,usLongHistorySource:'US game engine local 23:30 closes',usPrevCloseLine:true,usHoldingAverageLine:true,lineAndCandle:true,firebaseEnabled:true,domesticEngineChanged:false,usPriceEngineChanged:false};
@@ -10464,7 +10464,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
   refreshLive=function v126RefreshLive(){REFRESH_V125();paintIndex();};
 
   // 4초 경계에서 즉시 교대. 화면 재렌더 없이 헤더만 변경한다.
-  setInterval(()=>{if(!document.hidden)paintIndex();},500);
+  setInterval(()=>{if(!document.hidden)paintIndex();},1000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintIndex()},{passive:true});
   requestAnimationFrame(paintIndex);
 
@@ -11312,7 +11312,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
     document.querySelectorAll('[data-v140-watch-us-quote]').forEach(el=>{const q=usQuote(el.dataset.v140WatchUsQuote);el.textContent=`${USD(q.price)} · ${pct(+q.change||0)}`;el.className=(+q.change||0)<0?'down':'gain';});
     return out;
   };
-  setInterval(()=>{if(!document.hidden)paintTicker();},500);
+  setInterval(()=>{if(!document.hidden)paintTicker();},1000);
   requestAnimationFrame(()=>{paintTicker();syncUsDetailFavorite();});
 
   window.__usMarketV140={
@@ -12386,4 +12386,21 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 
+<script id="v182-performance-audit">
+window.__performanceV182={
+ version:182,
+ changes:[
+  'ranking view check 5s→15s',
+  'US detail canvas refresh 750ms→1200ms',
+  'index header paint 500ms→1000ms',
+  'watchlist ticker paint 500ms→1000ms',
+  'US favorite observer scoped to #app'
+ ],
+ marketEngineChanged:false,
+ pricingChanged:false,
+ newsGenerationChanged:false,
+ firebasePollingAdded:false,
+ classTopChanged:false
+};
+</script>
 </body></html>
