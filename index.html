@@ -11500,22 +11500,27 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
   function chartSeries(def,range){
     const now=Date.now(),serial=serialOf(now),out=[];
     if(range==='day'){
-      const d=new Date(now),endMin=Math.max(480,Math.min(1410,d.getHours()*60+d.getMinutes())),n=80;
-      for(let i=0;i<n;i++){const m=480+(endMin-480)*(i/(n-1)),h=Math.floor(m/60),mi=Math.floor(m%60),ms=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,mi,0,0).getTime();out.push({ms,price:etfQuote(def.code,ms).price});}
+      // 국내/미국 개별주식과 동일하게 08:00~23:30 전체 시간축을 고정하고
+      // 현재 시각에 해당하는 슬롯까지만 생성한다. 장중 미래 가격은 그리지 않는다.
+      const d=new Date(now),open=new Date(d.getFullYear(),d.getMonth(),d.getDate(),8,0,0,0).getTime(),close=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,30,0,0).getTime(),count=120;
+      const current=etfQuote(def.code,now),prev=Math.max(.01,+current.prevClose||+etfQuote(def.code,open-1).price||.01);
+      if(now<open)return [{ms:open,price:prev}];
+      const end=Math.min(now,close),progress=Math.max(0,Math.min(1,(end-open)/(close-open))),lastSlot=Math.max(1,Math.min(count-1,Math.floor(progress*(count-1)))),used=lastSlot+1;
+      for(let i=0;i<used;i++){const ms=open+(i/(count-1))*(close-open);out.push({ms,price:i===used-1?etfQuote(def.code,end).price:etfQuote(def.code,ms).price});}
       return out;
     }
     const days=range==='week'?7:range==='quarter'?90:365,count=range==='week'?16:range==='quarter'?72:96;
-    for(let i=0;i<count;i++){const ago=Math.round(days*(count-1-i)/(count-1)),s=serial-ago,ms=msFor(s,23,30);out.push({ms,price:etfClose(def,s)});}return out;
+    for(let i=0;i<count;i++){const ago=Math.round(days*(count-1-i)/(count-1)),s=serial-ago,ms=msFor(s,23,30);out.push({ms:i===count-1?now:ms,price:i===count-1?etfQuote(def.code,now).price:etfClose(def,s)});}return out;
   }
-  function rangeChange(def,range){const s=chartSeries(def,range),a=s[0]?.price||1,b=s.at(-1)?.price||a,v=b-a;return{value:v,rate:v/a*100,label:range==='day'?'어제보다':range==='week'?'지난주보다':range==='quarter'?'3개월 전보다':'1년 전보다'};}
+  function rangeChange(def,range){const s=chartSeries(def,range),q=etfQuote(def.code),a=range==='day'?Math.max(.01,+q.prevClose||s[0]?.price||1):(s[0]?.price||1),b=s.at(-1)?.price||a,v=b-a;return{value:v,rate:v/a*100,label:range==='day'?'어제보다':range==='week'?'지난주보다':range==='quarter'?'3개월 전보다':'1년 전보다'};}
   function drawEtfChart(def){
     const canvas=document.getElementById('v142-etf-chart');if(!canvas)return;const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=canvas.clientWidth||360,h=canvas.clientHeight||230;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
-    const series=chartSeries(def,ETF_RANGE),vals=series.map(x=>x.price),lo=Math.min(...vals),hi=Math.max(...vals),pad=Math.max(.01,(hi-lo)*.12),mn=lo-pad,mx=hi+pad,px=i=>18+(w-36)*(i/Math.max(1,series.length-1)),py=v=>14+(h-28)*(1-(v-mn)/Math.max(.01,mx-mn));
-    c.lineWidth=1;c.strokeStyle='rgba(139,149,161,.18)';for(let i=0;i<4;i++){const y=14+(h-28)*i/3;c.beginPath();c.moveTo(18,y);c.lineTo(w-18,y);c.stroke();}
+    const series=chartSeries(def,ETF_RANGE),vals=series.map(x=>x.price),qNow=etfQuote(def.code),prev=ETF_RANGE==='day'?Math.max(.01,+qNow.prevClose||vals[0]||.01):null,lo=Math.min(...vals,...(prev!=null?[prev]:[])),hi=Math.max(...vals,...(prev!=null?[prev]:[])),pad=Math.max(.01,(hi-lo)*.12),mn=lo-pad,mx=hi+pad,slots=ETF_RANGE==='day'?120:series.length,px=i=>18+(w-36)*(i/Math.max(1,slots-1)),py=v=>14+(h-28)*(1-(v-mn)/Math.max(.01,mx-mn));
+    c.lineWidth=1;c.strokeStyle='rgba(139,149,161,.18)';for(let i=0;i<4;i++){const y=14+(h-28)*i/3;c.beginPath();c.moveTo(18,y);c.lineTo(w-18,y);c.stroke();}if(prev!=null){c.save();c.setLineDash([5,5]);c.strokeStyle='#cfd6de';c.beginPath();c.moveTo(18,py(prev));c.lineTo(w-18,py(prev));c.stroke();c.setLineDash([]);c.fillStyle='#8b95a1';c.font='11px system-ui';c.textAlign='left';c.fillText('전일 종가',18,Math.max(12,py(prev)-6));c.restore();}
     const up=(series.at(-1)?.price||0)>=(series[0]?.price||0);c.strokeStyle=up?'#f04452':'#3182f6';c.fillStyle=c.strokeStyle;c.lineWidth=2.2;
-    if(ETF_MODE==='candle'&&series.length>2){const bw=Math.max(2,(w-36)/series.length*.55);for(let i=1;i<series.length;i++){const a=series[i-1].price,b=series[i].price,x=px(i),y1=py(a),y2=py(b);c.strokeStyle=b>=a?'#f04452':'#3182f6';c.fillStyle=c.strokeStyle;c.lineWidth=1;c.beginPath();c.moveTo(x,Math.min(y1,y2)-3);c.lineTo(x,Math.max(y1,y2)+3);c.stroke();c.fillRect(x-bw/2,Math.min(y1,y2),bw,Math.max(1,Math.abs(y2-y1)));}}
+    if(ETF_MODE==='candle'&&series.length>2){const bw=Math.max(2,(w-36)/slots*.55);for(let i=1;i<series.length;i++){const a=series[i-1].price,b=series[i].price,x=px(i),y1=py(a),y2=py(b);c.strokeStyle=b>=a?'#f04452':'#3182f6';c.fillStyle=c.strokeStyle;c.lineWidth=1;c.beginPath();c.moveTo(x,Math.min(y1,y2)-3);c.lineTo(x,Math.max(y1,y2)+3);c.stroke();c.fillRect(x-bw/2,Math.min(y1,y2),bw,Math.max(1,Math.abs(y2-y1)));}}
     else{c.beginPath();series.forEach((p,i)=>i?c.lineTo(px(i),py(p.price)):c.moveTo(px(i),py(p.price)));c.stroke();}
-    c.font='11px system-ui';c.fillStyle='#8b95a1';c.textAlign='left';c.fillText(USD(hi),18,11);c.fillText(USD(lo),18,h-4);
+    const hiI=vals.indexOf(Math.max(...vals)),loI=vals.indexOf(Math.min(...vals)),col=up?'#f04452':'#3182f6';c.font='11px system-ui';c.fillStyle='#8b95a1';c.textAlign='left';c.fillText(USD(hi),18,11);c.fillText(USD(lo),18,h-4);c.fillStyle=col;c.textAlign=px(hiI)>w*.7?'right':'left';c.fillText('최고 '+USD(vals[hiI]),px(hiI),Math.max(13,py(vals[hiI])-12));c.textAlign=px(loI)>w*.7?'right':'left';c.fillText('최저 '+USD(vals[loI]),px(loI),Math.min(h-8,py(vals[loI])+18));
   }
   function relatedNews(def){
     if(def.underlying){const sess=usCore().session?.()||{serial:0},ev=usCore().companyNewsForStock?.(def.underlying,sess.serial);if(ev)return ev.title;}
@@ -11609,7 +11614,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
     document.querySelectorAll('[data-v142-etf-quote]').forEach(el=>{const q=etfQuote(el.dataset.v142EtfQuote);if(!q)return;el.textContent=`${USD(q.price)} · ${pct(q.change)}`;el.className=q.change<0?'down':'gain';});
     const rows=etfHoldingRows(),fx=Math.max(.01,+fxQuote().rate||1);document.querySelectorAll('[data-v142-etf-holding]').forEach(el=>{const code=el.dataset.v142EtfHolding,h=state.usEtfHoldings?.[code],q=etfQuote(code);if(!h||!q)return;const value=q.price*h.qty*fx,profit=(q.price-h.avg)*h.qty*fx,rate=h.avg>0?(q.price/h.avg-1)*100:0,box=el.querySelector('.price'),small=box?.querySelector('small');if(box?.firstChild)box.firstChild.textContent=`${fmt(value)}원`;if(small){small.textContent=`${sign(profit)}원 (${pct(rate)})`;small.className=profit<0?'down':'gain';}});
     const badge=document.querySelector('[data-v129-overseas-rate]');if(badge&&(rows.length||Object.keys(state?.usHoldings||{}).length)){const r=overseasCombinedRate();badge.textContent=`${r>=0?'+':''}${r.toFixed(2)}%`;badge.className=r<0?'down':'gain';}
-    if(ETF_SELECTED&&document.querySelector('.v142-us-etf-detail')){const def=ETF_BY_CODE.get(ETF_SELECTED),q=etfQuote(ETF_SELECTED),p=document.querySelector('[data-v142-etf-detail-price]');if(p)p.textContent=USD(q.price);drawEtfChart(def);}
+    if(ETF_SELECTED&&document.querySelector('.v142-us-etf-detail')){const def=ETF_BY_CODE.get(ETF_SELECTED),q=etfQuote(ETF_SELECTED),p=document.querySelector('[data-v142-etf-detail-price]'),chg=rangeChange(def,ETF_RANGE),change=document.querySelector('[data-v142-etf-detail-change]');if(p)p.textContent=USD(q.price);if(change){change.textContent=`${chg.label} ${chg.value>=0?'+':''}${USD(Math.abs(chg.value))} (${pct(chg.rate)})`;change.className=`detail-change ${chg.value<0?'down':'gain'}`;}drawEtfChart(def);}
   }
 
   const BIND_BASE=bind;
@@ -12182,4 +12187,5 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v167Hotfix={version:167,rewardFallback:true,singleOverseasGroup:true,allocationGroups:['국내주식','해외주식','원화 예수금','달러 예수금'],pnlBreakdownRemoved:true};
 })();
 </script>
+<script id="v168-chart-hotfix-meta">window.__v168ChartHotfix={version:168,usEtfDayAxis:'08:00-23:30 fixed',futureSlotsHidden:true,dayChangeBase:'previous close',usStockDayAxisAudited:true,usStockFutureSlotsHidden:true};</script>
 </body></html>
