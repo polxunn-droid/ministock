@@ -117,7 +117,6 @@
 }
 </style>
 
-
 </head>
 <body><main class="phone" id="app"><section class="boot-screen"><div><div class="boot-spinner"></div><b>모의시장을 불러오는 중이에요</b></div></section></main>
 <script>
@@ -750,7 +749,7 @@ discover=function(watch=false){
   const groups=assetFilter==='etf'?['전체',...new Set(ETF_STOCKS.map(s=>s.etfCategory))]:['전체',...new Set(STOCKS.filter(s=>!s.isETF).map(s=>s.sector))],now=new Date();
   const assetMenu=`<div class="asset-switch"><button data-asset="stock" class="asset-card ${assetFilter==='stock'?'active':''}"><span class="asset-symbol kr-flag">🇰🇷</span><b>국내주식</b></button><button data-asset="etf" class="asset-card ${assetFilter==='etf'?'active':''}"><span class="asset-symbol etf-mark"><i></i></span><b>ETF</b></button></div>`;
   const chips=`<div class="chips">${groups.map(g=>`<button data-sector="${g}" class="chip ${sectorFilter===g?'active':''}">${g}</button>`).join('')}</div>`;
-  return shell(`${header('발견')}${assetMenu}${chips}<div class="strip"><div>오늘 이슈<b>1개</b></div><div>코스피<b class="gain">상승</b></div><div>시장 시간<b>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</b></div></div><div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div><h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v184-stock-top>어제 학급 TOP</button></div>${list.length?list.map((x,i)=>`<div class="stock" data-stock="${x.s.code}"><div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small class="${x.q.change<0?'down':'gain'}" data-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.q.change)}</small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button></div>`).join(''):`<div class="empty">해당 조건의 ${assetFilter==='etf'?'ETF':'종목'}가 없어요.</div>`}`,'discover');
+  return shell(`${header('발견')}${assetMenu}${chips}<div class="strip"><div>오늘 이슈<b>1개</b></div><div>코스피<b class="gain">상승</b></div><div>시장 시간<b>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</b></div></div><div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div><h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div>${list.length?list.map((x,i)=>`<div class="stock" data-stock="${x.s.code}"><div class="row"><span class="rank-num">${i+1}</span>${logo(x.s)}</div><div><div class="name">${x.s.name}</div><small class="${x.q.change<0?'down':'gain'}" data-quote="${x.s.code}">${fmt(x.q.price)}원 · ${pct(x.q.change)}</small></div><button class="icon-btn heart" aria-label="${x.s.name} 관심 종목" data-watch="${x.s.code}">${state.watch.includes(x.s.code)?'♥':'♡'}</button></div>`).join(''):`<div class="empty">해당 조건의 ${assetFilter==='etf'?'ETF':'종목'}가 없어요.</div>`}`,'discover');
 };
 
 const v10Bind=bind;
@@ -4676,7 +4675,7 @@ function v53MoverDiscover(){
     <div class="issue"><b>✦ 실시간 이슈</b>1　${newsText()}</div>
     <h2>${assetFilter==='etf'?'ETF 실시간':'실시간 종목'}</h2>
     <div class="tabs">
-      ${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v184-stock-top>어제 학급 TOP</button>
+      ${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}
     </div>
     <div id="v53-mover-list">${v53MoverRowsHtml(Date.now())}</div>
   `,'discover');
@@ -9590,7 +9589,7 @@ window.__marketV115={
       <div class="v118-us-wallet"><div><b>달러 예수금　$${USD_FMT.format(usd)}</b><small>달러 지갑 기반만 생성 · 환전 기능은 다음 단계</small></div><span class="v118-market-status ${sess.open?'open':'closed'}">${sess.label}</span></div>
       <div class="strip"><div>미국시장<b>${sess.label}</b></div><div>시장 시간<b data-v118-market-time>${marketTime}</b></div><div>테스트 종목<b>${US_STOCKS.length}개</b></div></div>
       <div class="v118-us-market-note">확장 검증용 미국 대표 50종목입니다. 국내 300종목 배열과 완전히 분리되어 있어 국내 화면에서는 미국 종목의 시세를 계산하지 않습니다.</div>
-      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v184-stock-top>어제 학급 TOP</button></div><div id="v118-us-list">${v118UsRows()}</div>
+      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div><div id="v118-us-list">${v118UsRows()}</div>
     `,'discover');
   }
 
@@ -9840,7 +9839,7 @@ window.__marketV115={
       <div class="strip"><div>미국시장<b>${sess.label}</b></div><div>시장 시간<b data-v119-market-time>${String(local.hour).padStart(2,'0')}:${String(local.minute).padStart(2,'0')}</b></div><div>테스트 종목<b>${US_META.length}개</b></div></div>
       <div class="v119-us-news"><b>🇺🇸 오늘의 미국시장 뉴스</b><p>${escHtml(ev.title)}</p><small>${newsPressureLabel(ev)}</small>${co.length?`<div class="v132-company-mini"><b>기업 뉴스</b>${co.slice(0,2).map(x=>`<span>${escHtml(META.get(x.code)?.name||x.code)} · ${escHtml(x.title)}</span>`).join('')}${co.length>2?`<em>외 ${co.length-2}건</em>`:''}</div>`:''}</div>
       <div class="v118-us-market-note">미국 대표주를 50종목으로 확대했습니다. 미국 종목·환율 계산은 국내 300종목과 계속 분리되어 있습니다.</div>
-      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v184-stock-top>어제 학급 TOP</button></div><div id="v119-us-list">${usRows()}</div>`,'discover');
+      <h2>미국 실시간 종목</h2><div class="tabs">${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div><div id="v119-us-list">${usRows()}</div>`,'discover');
   }
 
   const DISCOVER_BASE=discover;
@@ -9891,9 +9890,9 @@ window.__marketV115={
   async function executeUsTrade(type,rawQty){
     ensureState();const s=META.get(US_SELECTED);if(!s)return;const qty=Math.floor(+rawQty||0);if(qty<1)return toast('수량을 입력해주세요');if(!usSession().open)return toast('장이 마감되어 주문할 수 없어요');
     const q=usQuote(s.code),price=q.price,h=state.usHoldings[s.code]||{qty:0,avg:0},gross=price*qty,fee=gross*US_FEE;
-    if(type==='buy'){const settlement=gross+fee;if(state.usdCash+1e-9<settlement)return toast('달러 예수금이 부족해요');state.usdCash-=settlement;h.avg=(h.avg*h.qty+settlement)/(h.qty+qty);h.qty+=qty;state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,at:Date.now(),costVersion:119});}
-    else{if(h.qty<qty)return toast('보유 수량이 부족해요');const settlement=gross-fee,realized=settlement-h.avg*qty;state.usdCash+=settlement;state.usRealizedPnlUsd=(+state.usRealizedPnlUsd||0)+realized;h.qty-=qty;if(h.qty<=0)delete state.usHoldings[s.code];else state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,realized,at:Date.now(),costVersion:119});}
-    ;state.usTradeLog=state.usTradeLog.slice(-300);await Store.saveMe(userId,state);document.querySelector('.v119-us-order-overlay')?.remove();toast(`${s.name} ${type==='buy'?'매수':'매도'}가 체결됐어요`);renderUsDetail();
+    if(type==='buy'){const settlement=gross+fee;if(state.usdCash+1e-9<settlement)return toast('달러 예수금이 부족해요');state.usdCash-=settlement;h.avg=(h.avg*h.qty+settlement)/(h.qty+qty);h.qty+=qty;state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,at:Date.now(),costVersion:119})}
+    else{if(h.qty<qty)return toast('보유 수량이 부족해요');const settlement=gross-fee,realized=settlement-h.avg*qty;state.usdCash+=settlement;state.usRealizedPnlUsd=(+state.usRealizedPnlUsd||0)+realized;h.qty-=qty;if(h.qty<=0)delete state.usHoldings[s.code];else state.usHoldings[s.code]=h;state.usTradeLog.push({type,code:s.code,qty,price,fee,settlement,realized,at:Date.now(),costVersion:119})}
+    state.usTradeLog=state.usTradeLog.slice(-300);await Store.saveMe(userId,state);document.querySelector('.v119-us-order-overlay')?.remove();toast(`${s.name} ${type==='buy'?'매수':'매도'}가 체결됐어요`);renderUsDetail();
   }
 
   function exchangePreview(){
@@ -10090,7 +10089,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-v119-us-range]'))setTimeout(()=>{lastSig='';hover=-1;install()},0)},true);
   window.addEventListener('resize',()=>{lastSig='';paint(true)},{passive:true});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){lastSig='';paint(true);updateChange()}},{passive:true});
-  setInterval(()=>{if(document.hidden||!document.querySelector('.v119-us-detail'))return;paint(false);updateChange()},1200);
+  setInterval(()=>{if(document.hidden||!document.querySelector('.v119-us-detail'))return;paint(false);updateChange()},750);
   requestAnimationFrame(install);
 
   window.__usMarketV124={version:124,basedOn:123,guestTest:false,usChartUi:'same canvas/detail design as domestic',usChartRanges:['day','week','quarter','year'],usDaySlots:120,usLongHistorySource:'US game engine local 23:30 closes',usPrevCloseLine:true,usHoldingAverageLine:true,lineAndCandle:true,firebaseEnabled:true,domesticEngineChanged:false,usPriceEngineChanged:false};
@@ -10459,7 +10458,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
   refreshLive=function v126RefreshLive(){REFRESH_V125();paintIndex();};
 
   // 4초 경계에서 즉시 교대. 화면 재렌더 없이 헤더만 변경한다.
-  setInterval(()=>{if(!document.hidden)paintIndex();},1000);
+  setInterval(()=>{if(!document.hidden)paintIndex();},500);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintIndex()},{passive:true});
   requestAnimationFrame(paintIndex);
 
@@ -10820,7 +10819,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
       <div class="v118-us-wallet"><div><b>달러 예수금　<span data-v119-usd-cash>$${USD_FMT.format(usd)}</span></b><small>달러 예수금으로 미국주식을 거래할 수 있어요</small></div><div class="v119-us-wallet-actions"><button class="v119-exchange-btn" data-v119-exchange>환전</button></div></div>
       ${strip()}${latestNews()}
       <h2>실시간 종목</h2>
-      <div class="tabs" data-v138-us-tabs>${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}<button data-v184-stock-top>어제 학급 TOP</button></div>
+      <div class="tabs" data-v138-us-tabs>${[['value','거래량'],['rise','급상승'],['fall','급하락']].map(x=>`<button data-sort="${x[0]}" class="${sort===x[0]?'active':''}">${x[1]}</button>`).join('')}</div>
       <div id="v138-us-list">${rowsHtml()}</div>
     `,'discover');
   }
@@ -11307,7 +11306,7 @@ window.__usMarketV122={version:122,basedOn:121,guestTest:false,homeDollarCardOpe
     document.querySelectorAll('[data-v140-watch-us-quote]').forEach(el=>{const q=usQuote(el.dataset.v140WatchUsQuote);el.textContent=`${USD(q.price)} · ${pct(+q.change||0)}`;el.className=(+q.change||0)<0?'down':'gain';});
     return out;
   };
-  setInterval(()=>{if(!document.hidden)paintTicker();},1000);
+  setInterval(()=>{if(!document.hidden)paintTicker();},500);
   requestAnimationFrame(()=>{paintTicker();syncUsDetailFavorite();});
 
   window.__usMarketV140={
@@ -12331,109 +12330,4 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v170YieldRepair={version:170,bridgeReady:!!BR.quote&&!!BR.fx,existingDollarOneRepair:true,usdGrantDecimalsPreserved:true,grantLogCurrencyRepair:true,dailyPnlCrossMarketRepair:true,usRewardMarketRepair:true,usEtfHighLowDots:true,adminGrantNoDollarOneFallback:true};
 })();
 </script>
-
-
-<script id="v182-performance-audit">
-window.__performanceV182={
- version:182,
- changes:[
-  'ranking view check 5s→15s',
-  'US detail canvas refresh 750ms→1200ms',
-  'index header paint 500ms→1000ms',
-  'watchlist ticker paint 500ms→1000ms',
-  'US favorite observer scoped to #app'
- ],
- marketEngineChanged:false,
- pricingChanged:false,
- newsGenerationChanged:false,
- firebasePollingAdded:false,
- classTopChanged:false
-};
-</script>
-
-
-<style id="v184-stock-top-style">
-.screen .tabs:has([data-v184-stock-top]){gap:0}
-.screen .tabs:has([data-v184-stock-top])>button{min-width:0;padding-left:7px;padding-right:7px}
-.screen .tabs>[data-v184-stock-top]{white-space:nowrap;font-size:13px;letter-spacing:-.35px}
-.v184-box{margin:10px 0 8px}.v184-head{padding:11px 13px;border-radius:14px;background:#f7f8fa;color:#6b7684;font-size:11.5px;line-height:1.45}.v184-head b{color:#333d4b}
-.v184-switch{display:flex;gap:6px;margin:10px 0}.v184-switch button{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#f2f4f6;color:#6b7684;font-weight:800}.v184-switch button.active{background:#e8f3ff;color:#1b64da}
-.v184-empty,.v184-loading{padding:34px 16px;text-align:center;color:#8b95a1;font-size:13px}
-.v184-row .v184-stock{display:block;margin-top:3px;color:#8b95a1;font-size:11px}.v184-value{text-align:right;font-weight:900;white-space:nowrap}.v184-value small{display:block;margin-top:3px;color:#8b95a1;font-size:10.5px;font-weight:600}
-</style>
-<script id="v184-stock-position-top">
-(()=>{
- const ROOT='dailyStockRanking',CACHE='mockstock:dailyStockRankingTop:v184:',SNAP='mockstock:dailyStockRankingSnapshot:v184:',VER=184;
- let metric='value',mem=null;
- const pad=n=>String(n).padStart(2,'0'),key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
- const yesterday=()=>{let d=new Date();d.setDate(d.getDate()-1);return key(d)},today=()=>key(new Date());
- const label=k=>{let [,m,d]=k.split('-');return `${+m}월 ${+d}일 23:30 마감 기준`};
- const esc=x=>String(x??'').replace(/[<>&]/g,'');
- function can(){return !!(window.Store?.online&&Store.db&&Store.uid&&state?.nickname&&state.nickname!=='게스트')}
- function fxNow(){try{return Math.max(.01,Number(window.__usMarketV118?.fx?.().rate)||Number(fxQuote?.().rate)||1)}catch{return 1}}
- function usName(code){try{return US_META?.find?.(x=>x.code===code)?.name||code}catch{return code}}
- function etfName(code){try{return ETF_META?.find?.(x=>x.code===code)?.name||code}catch{return code}}
- function positions(){
-   const out=[],fx=fxNow();
-   for(const [code,h] of Object.entries(state?.holdings||{})){
-     if(!(h?.qty>0))continue;const st=STOCKS.find(x=>x.code===code);if(!st)continue;
-     const price=Number(smoothPriceAt(st,Date.now()))||0,avg=Number(h.avg)||0;
-     out.push({market:'KR',code,name:st.name||code,qty:+h.qty,value:Math.round(price*h.qty),returnRate:avg>0?(price/avg-1)*100:0});
-   }
-   for(const [code,h] of Object.entries(state?.usHoldings||{})){
-     if(!(h?.qty>0))continue;let q;try{q=window.__usMarketV118?.quoteUs?.(code,Date.now())||usQuote?.(code)}catch{}
-     const price=Number(q?.price)||0,avg=Number(h.avg)||0;
-     out.push({market:'US',code,name:usName(code),qty:+h.qty,value:Math.round(price*h.qty*fx),returnRate:avg>0?(price/avg-1)*100:0});
-   }
-   for(const [code,h] of Object.entries(state?.usEtfHoldings||{})){
-     if(!(h?.qty>0))continue;let q;try{q=window.__usMarketV142?.quote?.(code,Date.now())||etfQuote?.(code)}catch{}
-     const price=Number(q?.price)||0,avg=Number(h.avg)||0;
-     out.push({market:'ETF',code,name:etfName(code),qty:+h.qty,value:Math.round(price*h.qty*fx),returnRate:avg>0?(price/avg-1)*100:0});
-   }
-   return out.filter(x=>x.value>0&&Number.isFinite(x.returnRate));
- }
- async function snapshotClosedDay(){
-   if(!can())return false;const d=new Date(),mins=d.getHours()*60+d.getMinutes(),k=mins>=1410?today():yesterday();
-   try{if(localStorage.getItem(SNAP+k)==='1')return true}catch{}
-   const ps=positions();if(!ps.length)return false;
-   try{
-     await Store.db.collection(ROOT).doc(k).collection('users').doc(Store.uid).set({
-       version:VER,day:k,nickname:cleanNickname(state.nickname),positions:ps,
-       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-     },{merge:false});
-     try{localStorage.setItem(SNAP+k,'1')}catch{}return true;
-   }catch(e){console.warn('종목 TOP 저장 실패',e?.code||e?.message);return false}
- }
- async function load(force=false){
-   const k=yesterday();if(!force&&mem?.day===k)return mem;
-   try{const c=JSON.parse(sessionStorage.getItem(CACHE+k)||'null');if(!force&&c?.day===k)return mem=c}catch{}
-   if(!can())return {day:k,rows:[]};
-   const snap=await Store.db.collection(ROOT).doc(k).collection('users').get(),rows=[];
-   for(const d of snap.docs||[]){const x=d.data()||{},nick=String(x.nickname||'참가자');for(const p of Array.isArray(x.positions)?x.positions:[])if((+p.value||0)>0)rows.push({...p,uid:d.id,nickname:nick,value:+p.value||0,returnRate:+p.returnRate||0})}
-   mem={day:k,rows,loadedAt:Date.now()};try{sessionStorage.setItem(CACHE+k,JSON.stringify(mem))}catch{}return mem
- }
- function host(){if(typeof view!=='undefined'&&view!=='discover')return null;const screen=document.querySelector('.screen');if(!screen)return null;const tabs=[...screen.querySelectorAll('.tabs')].find(t=>t.querySelector('[data-v184-stock-top]'));return tabs?{screen,tabs}:null}
- function clear(){document.querySelectorAll('.v184-box,.v184-row,.v184-empty,.v184-loading').forEach(x=>x.remove())}
- function ordinary(h,hide){let n=h.tabs.nextElementSibling;while(n){if(!n.matches?.('.v184-box,.v184-row,.v184-empty,.v184-loading')){if(n.classList?.contains('stock')||n.classList?.contains('empty')||n.querySelector?.('.stock')||/미국 ETF/.test(n.textContent||''))n.style.display=hide?'none':''}n=n.nextElementSibling}}
- const money=n=>Math.round(n).toLocaleString('ko-KR')+'원',pct=n=>(n>=0?'+':'')+n.toFixed(2)+'%';
- async function show(){
-   const h=host();if(!h)return;h.tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.hasAttribute('data-v184-stock-top')));clear();ordinary(h,true);
-   const box=document.createElement('div');box.className='v184-box';box.innerHTML=`<div class="v184-head"><b>${label(yesterday())}</b><br>학급 전체 보유종목을 합쳐 순위를 계산합니다.</div><div class="v184-switch"><button data-v184-metric="value" class="${metric==='value'?'active':''}">평가금 TOP</button><button data-v184-metric="rate" class="${metric==='rate'?'active':''}">수익률 TOP</button></div>`;
-   h.tabs.after(box);box.insertAdjacentHTML('afterend','<div class="v184-loading">어제 종목 순위를 불러오는 중...</div>');
-   let r;try{r=await load(false)}catch{}document.querySelector('.v184-loading')?.remove();let rows=[...(r?.rows||[])];
-   rows.sort(metric==='rate'?(a,b)=>b.returnRate-a.returnRate||b.value-a.value:(a,b)=>b.value-a.value||b.returnRate-a.returnRate);rows=rows.slice(0,10);
-   if(!rows.length){box.insertAdjacentHTML('afterend','<div class="v184-empty">전날 마감 보유종목 데이터가 없습니다.</div>');return}
-   box.insertAdjacentHTML('afterend',rows.map((x,i)=>`<div class="stock v184-row"><div class="row"><span class="rank-num">${i+1}</span><div class="logo">${esc(x.nickname)[0]||'?'}</div></div><div><div class="name">${esc(x.nickname)}</div><small class="v184-stock">${esc(x.name)} · ${esc(x.code)}</small></div><div class="v184-value ${metric==='rate'?(x.returnRate<0?'down':'gain'):''}">${metric==='rate'?pct(x.returnRate):money(x.value)}<small>${metric==='rate'?money(x.value):pct(x.returnRate)}</small></div></div>`).join(''))
- }
- document.addEventListener('click',e=>{
-   if(e.target.closest?.('[data-v184-stock-top]')){e.preventDefault();show();return}
-   const b=e.target.closest?.('[data-v184-metric]');if(b){metric=b.dataset.v184Metric;show();return}
-   if(e.target.closest?.('[data-sort]')){clear();const h=host();if(h)ordinary(h,false)}
- },true);
- setTimeout(snapshotClosedDay,1200);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)snapshotClosedDay()});
- window.ClassStockTopV184={snapshotClosedDay,load,positions,status:()=>({version:VER,root:ROOT,day:yesterday(),metric})};
-})();
-</script>
-
 </body></html>
