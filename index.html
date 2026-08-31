@@ -12623,4 +12623,115 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v174SearchConvenience={version:174,bilingualAliases:true,markets:['국내주식','미국주식','ETF','코인'],networkAdded:false,timersAdded:false,priceEnginesChanged:false};
 })();
 </script>
+
+<!-- V175 — smooth mobile back navigation: browser/device back + left-edge swipe. Navigation only; market/trading/news logic untouched. -->
+<script>
+(()=>{
+  'use strict';
+  const NAV_TAG='ministock-detail';
+  let suppressBackIntercept=false;
+  let touch=null;
+
+  function detailBackButton(){
+    return document.querySelector('[data-v171-crypto-back], [data-v142-etf-back], [data-v119-us-back], .screen .detail-head .back');
+  }
+  function isDetailOpen(){ return !!detailBackButton(); }
+  function hasDetailState(){ return !!(history.state && history.state.__miniNav===NAV_TAG); }
+  function pushDetailState(){
+    if(!isDetailOpen() || hasDetailState()) return;
+    try{ history.pushState(Object.assign({},history.state||{},{__miniNav:NAV_TAG}), '', location.href); }catch(_){ }
+  }
+  function nativeDetailBack(){
+    const b=detailBackButton();
+    if(!b) return;
+    suppressBackIntercept=true;
+    try{ b.click(); } finally { setTimeout(()=>{suppressBackIntercept=false;},0); }
+  }
+  function requestBack(){
+    if(!isDetailOpen()) return false;
+    if(hasDetailState()) history.back();
+    else nativeDetailBack();
+    return true;
+  }
+
+  // A stock/ETF/crypto detail is rendered by the existing click handler first;
+  // then add one browser-history entry so hardware/browser Back returns to the list.
+  document.addEventListener('click',e=>{
+    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-v119-us-holding],[data-v142-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding]');
+    if(opener) setTimeout(pushDetailState,0);
+  },true);
+
+  // Existing top-left back buttons now consume the same history entry.
+  document.addEventListener('click',e=>{
+    if(suppressBackIntercept) return;
+    const b=e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.screen .detail-head .back');
+    if(!b || !isDetailOpen() || !hasDetailState()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    history.back();
+  },true);
+
+  // Browser / Android hardware Back.
+  window.addEventListener('popstate',()=>{
+    if(isDetailOpen()) nativeDetailBack();
+  });
+
+  // V175 — interactive iOS-style edge swipe. The detail page follows the finger,
+  // then smoothly completes or springs back. Left-edge only, so chart gestures stay intact.
+  function swipeSurface(){
+    const b=detailBackButton();
+    return (b && b.closest('.screen')) || document.querySelector('.screen');
+  }
+  function setSwipeX(x, animate){
+    const el=touch && touch.el; if(!el) return;
+    el.style.willChange='transform';
+    el.style.transition=animate ? 'transform 190ms cubic-bezier(.22,.75,.24,1)' : 'none';
+    el.style.transform=`translate3d(${Math.max(0,x)}px,0,0)`;
+  }
+  function clearSwipeStyle(el){
+    if(!el) return;
+    el.style.transition=''; el.style.transform=''; el.style.willChange='';
+  }
+  document.addEventListener('touchstart',e=>{
+    if(!isDetailOpen() || e.touches.length!==1 || document.querySelector('.overlay')) return;
+    const t=e.touches[0];
+    if(t.clientX>30) return;
+    touch={x:t.clientX,y:t.clientY,lastX:t.clientX,lastY:t.clientY,active:true,locked:false,el:swipeSurface()};
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!touch || !touch.active || e.touches.length!==1) return;
+    const t=e.touches[0], dx=t.clientX-touch.x, dy=t.clientY-touch.y;
+    touch.lastX=t.clientX; touch.lastY=t.clientY;
+    if(!touch.locked){
+      if(Math.abs(dx)<7 && Math.abs(dy)<7) return;
+      if(dx<=0 || Math.abs(dy)>Math.abs(dx)*.82){ touch.active=false; clearSwipeStyle(touch.el); return; }
+      touch.locked=true;
+    }
+    if(touch.locked){
+      e.preventDefault();
+      const w=Math.max(320,window.innerWidth||320);
+      const eased=Math.min(dx,w) * (dx>w*.72 ? .92 : 1);
+      setSwipeX(eased,false);
+    }
+  },{passive:false});
+  document.addEventListener('touchend',()=>{
+    if(!touch) return;
+    const cur=touch, dx=cur.lastX-cur.x, dy=Math.abs(cur.lastY-cur.y);
+    const ok=cur.active && cur.locked && dx>=Math.min(88,(window.innerWidth||390)*.24) && dy<=90 && dx>dy*1.15;
+    if(ok){
+      setSwipeX(window.innerWidth||420,true);
+      touch=null;
+      setTimeout(()=>{ clearSwipeStyle(cur.el); requestBack(); },150);
+    }else{
+      setSwipeX(0,true);
+      touch=null;
+      setTimeout(()=>clearSwipeStyle(cur.el),205);
+    }
+  },{passive:true});
+  document.addEventListener('touchcancel',()=>{
+    if(!touch) return; const cur=touch; setSwipeX(0,true); touch=null;
+    setTimeout(()=>clearSwipeStyle(cur.el),205);
+  },{passive:true});
+})();
+</script>
 </body></html>
