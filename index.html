@@ -12624,11 +12624,11 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 
-<!-- V176 — optimized mobile back navigation + deterministic scroll restore. Navigation only; market/trading/news logic untouched. -->
+<!-- V177 — low-latency mobile navigation. Navigation only; market/trading/news logic untouched. -->
 <script>
 (()=>{
   'use strict';
-  const NAV_TAG='ministock-detail-v176';
+  const NAV_TAG='ministock-detail-v177';
   let suppressBackIntercept=false, touch=null, returnScrollY=0, restoring=false;
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(_){ }
 
@@ -12638,17 +12638,24 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   function isDetailOpen(){ return !!detailBackButton(); }
   function hasDetailState(){ return !!(history.state && history.state.__miniNav===NAV_TAG); }
   function y(){ return Math.max(0, window.scrollY||document.documentElement.scrollTop||0); }
+  // V177: do the visible scroll correction immediately. Only schedule one cheap
+  // verification frame when the browser actually failed to settle at the target.
   function jumpTop(){
     restoring=true;
-    requestAnimationFrame(()=>{ window.scrollTo(0,0); requestAnimationFrame(()=>{ window.scrollTo(0,0); restoring=false; }); });
+    window.scrollTo(0,0);
+    requestAnimationFrame(()=>{
+      if(y()>1) window.scrollTo(0,0);
+      restoring=false;
+    });
   }
   function restoreListScroll(){
     const target=returnScrollY;
     restoring=true;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      window.scrollTo(0,target);
+    window.scrollTo(0,target);
+    requestAnimationFrame(()=>{
+      if(Math.abs(y()-target)>2) window.scrollTo(0,target);
       restoring=false;
-    }));
+    });
   }
   function pushDetailState(){
     if(!isDetailOpen() || hasDetailState()) return;
@@ -12673,7 +12680,10 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
     const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-v119-us-holding],[data-v142-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding],.account-open');
     if(!opener) return;
     returnScrollY=y();
-    setTimeout(()=>{ if(isDetailOpen()){ jumpTop(); pushDetailState(); } },0);
+    // Existing openers render synchronously. Avoid an extra timer turn on the common path;
+    // fall back to one microtask only if a specific opener renders asynchronously.
+    if(isDetailOpen()){ jumpTop(); pushDetailState(); }
+    else queueMicrotask(()=>{ if(isDetailOpen()){ jumpTop(); pushDetailState(); } });
   },true);
 
   // Existing top-left back buttons consume the same history entry.
@@ -12735,7 +12745,7 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
     if(!touch)return; const cur=touch; setSwipeX(0,true);touch=null;setTimeout(()=>clearSwipeStyle(cur.el),225);
   },{passive:true});
 
-  window.__v176Navigation={version:176,detailStartsAtTop:true,restoresListScroll:true,edgeSwipe:true,historyBack:true,marketLogicChanged:false,timersAdded:false};
+  window.__v177Navigation={version:177,detailStartsAtTop:true,restoresListScroll:true,edgeSwipe:true,historyBack:true,immediateEntry:true,marketLogicChanged:false,timersAdded:false};
 })();
 </script>
 </body></html>
