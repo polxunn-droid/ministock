@@ -12583,4 +12583,44 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 
+
+<script id="v174-search-convenience">
+(()=>{
+  const SEARCH_V174_BASE=searchRows;
+  const OPEN_V174_BASE=openSearch;
+
+  // Common Korean/English names and abbreviations. Search stays local: no network calls or timers.
+  const ALIAS_GROUPS=[
+    ['naver','네이버'],['sk','에스케이'],['lg','엘지'],['kb','케이비'],['posco','포스코'],['hd','에이치디'],['kt','케이티'],['hmm','에이치엠엠'],['lig','엘아이지'],['s-oil','에쓰오일','에스오일'],['cj','씨제이'],['bgf','비지에프'],['gs','지에스'],['nh','엔에이치'],['db','디비'],['bnk','비엔케이'],['jb','제이비'],['ls','엘에스'],['sdi','에스디아이'],['sds','에스디에스'],['f&f','에프앤에프'],
+    ['apple','애플'],['microsoft','마이크로소프트'],['nvidia','엔비디아'],['amazon','아마존'],['alphabet','google','구글','알파벳'],['meta','facebook','페이스북','메타'],['tesla','테슬라'],['jpmorgan','jp morgan','제이피모간','jp모간'],['exxon mobil','exxon','엑슨모빌'],['walmart','월마트'],['broadcom','브로드컴'],['netflix','넷플릭스'],['costco','코스트코'],['bank of america','뱅크오브아메리카'],['visa','비자'],['eli lilly','일라이 릴리'],['johnson & johnson','johnson and johnson','존슨앤드존슨'],['caterpillar','캐터필러'],['chevron','셰브론'],['cisco','시스코'],['oracle','오라클'],['salesforce','세일즈포스'],['adobe','어도비'],['qualcomm','퀄컴'],['micron','마이크론'],['starbucks','스타벅스'],['coca-cola','coca cola','코카콜라'],['mcdonalds','mcdonald\'s','맥도날드'],['mastercard','마스터카드'],['palantir','팔란티어'],['snowflake','스노우플레이크'],['dell','델'],['goldman sachs','골드만삭스'],['morgan stanley','모건스탠리'],['citigroup','씨티그룹'],['wells fargo','웰스파고'],['blackrock','블랙록'],['pfizer','화이자'],['intel','인텔'],['uber','우버'],['nike','나이키'],['disney','월트디즈니','디즈니'],['boeing','보잉'],['fedex','페덱스'],['lockheed martin','록히드마틴'],['spacex','스페이스x','스페이스엑스'],
+    ['s&p','s&p 500','sp500','snp500','에스앤피','에스엔피'],['nasdaq','나스닥'],['qqq','큐큐큐'],['spy','에스피와이'],['voo','브이오오'],['vti','브이티아이'],['schd','에스씨에이치디'],['tqqq','티큐큐큐'],['soxl','속슬'],['semiconductor','반도체'],['treasury','국채','채권'],['gold','금'],
+    ['bitcoin','비트코인','비트'],['ethereum','이더리움','이더'],['ripple','xrp','리플'],['dogecoin','doge','도지코인','도지']
+  ];
+  const compact=v=>String(v??'').toLowerCase().normalize('NFKC').replace(/[\s._\-·()&/]/g,'');
+  function expandedQueries(term){
+    const raw=String(term||'').trim();if(!raw)return [raw];
+    const q=compact(raw),out=[raw];
+    for(const group of ALIAS_GROUPS){
+      if(group.some(a=>{const x=compact(a);return x&&(x.includes(q)||q.includes(x));})){
+        for(const a of group)if(a&&!out.includes(a))out.push(a);
+      }
+    }
+    return out;
+  }
+  function keyOf(row){return row.getAttribute('data-search-stock')||row.getAttribute('data-v126-search-us')||row.getAttribute('data-v142-search-etf')||row.getAttribute('data-v171-search-crypto')||row.textContent.trim();}
+  function mergeSearchHtml(parts){
+    const t=document.createElement('template'),seen=new Set(),rows=[];
+    for(const html of parts){t.innerHTML=String(html||'');for(const row of [...t.content.querySelectorAll('.stock')]){const k=keyOf(row);if(seen.has(k))continue;seen.add(k);rows.push(row.outerHTML);}}
+    return rows.length?rows.join(''):`<div class="search-hint">일치하는 종목이 없어요.<br>한글명·영문명·종목코드·티커로 검색해보세요.</div>`;
+  }
+  searchRows=function v174SearchRows(term=''){
+    const qs=expandedQueries(term);if(qs.length===1)return SEARCH_V174_BASE(term);
+    return mergeSearchHtml(qs.map(q=>SEARCH_V174_BASE(q)));
+  };
+  openSearch=function v174OpenSearch(){
+    OPEN_V174_BASE();const input=document.querySelector('#stock-search');if(input){input.placeholder='한글명·영문명·종목코드·티커 검색';input.setAttribute('aria-label','한글·영문 종목명 통합검색');}
+  };
+  window.__v174SearchConvenience={version:174,bilingualAliases:true,markets:['국내주식','미국주식','ETF','코인'],networkAdded:false,timersAdded:false,priceEnginesChanged:false};
+})();
+</script>
 </body></html>
