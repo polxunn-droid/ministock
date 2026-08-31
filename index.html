@@ -9948,7 +9948,7 @@ window.__marketV115={
 
   window.__usMarketV119={version:119,basedOn:118,stage:'US trading + FX + news 2',usPrototypeStocks:US_META.length,separateUsUniverse:true,usTradingEnabled:true,fxTradingEnabled:true,fxFeeRate:FX_FEE,usTradeFeeRate:US_FEE,fxNewsLinked:true,usNewsLinked:true,usSearchEnabled:true,usDetailEnabled:true,usSessionHours:'08:00-23:30 local (same as KR)',domesticPriceEngineChanged:false,domesticStockArrayChanged:false,v116Changed:false,kospiChanged:false,domesticNewsGenerationChanged:false,usQuote:(code,ms)=>usQuote(code,ms),fx:fxQuote,news:currentNews,usAssetKrw:usSideKrw,usPnlKrw:usSidePnlKrw};
 })();
-</script>\n
+</script>
 <script id="v120-us-universe-stage3-metadata">
 window.__usMarketV120={
   version:120,basedOn:119,stage:'US representative 20-stock scale test',
@@ -12537,4 +12537,50 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v172ChartHomePolish={version:172,cryptoChartAnnotations:['오늘 00시','내 코인 평균','최고','최저'],domesticChartAnnotations:['전일 종가','내 주식 평균','최고','최저'],usChartAnnotations:['전일 종가','내 주식 평균','최고','최저'],etfChartAnnotations:['전일 종가','내 주식 평균','최고','최저'],cryptoTrailingZerosTrimmed:true,homeAssetSectionsCollapsible:true,priceEnginesChanged:false,tradingRulesChanged:false};
 })();
 </script>
+
+<style id="v173-home-fold-fix-style">
+/* V173: crypto is an independent home asset section. */
+.v172-asset-section.v173-crypto-section{margin-top:4px}
+</style>
+<script id="v173-home-fold-fix">
+(()=>{
+  const HOME_V173_BASE=home;
+  home=function v173Home(){
+    const raw=HOME_V173_BASE(),t=document.createElement('template');t.innerHTML=raw;
+    const screen=t.content.querySelector('.screen');if(!screen)return raw;
+    const crypto=screen.querySelector('.v171-crypto-home');
+    if(crypto){
+      const parentSection=crypto.closest('.v172-asset-section');
+      if(parentSection&&!parentSection.classList.contains('v173-crypto-section')){
+        parentSection.parentNode.insertBefore(crypto,parentSection.nextSibling);
+      }
+      crypto.classList.add('v172-asset-section','v173-crypto-section');
+      const title=crypto.querySelector(':scope>.v127-overseas-title');
+      if(title){
+        let body=crypto.querySelector(':scope>.v172-asset-body');
+        if(!body){
+          body=document.createElement('div');body.className='v172-asset-body';
+          const nodes=[];let n=title.nextSibling;while(n){nodes.push(n);n=n.nextSibling}
+          crypto.appendChild(body);nodes.forEach(x=>body.appendChild(x));
+        }
+        title.setAttribute('role','button');title.setAttribute('tabindex','0');title.setAttribute('aria-expanded','true');
+        if(!title.querySelector('.v172-fold'))title.insertAdjacentHTML('beforeend','<button type="button" class="v172-fold" aria-label="접기">⌄</button>');
+      }
+    }
+    return t.innerHTML;
+  };
+  const BIND_V173_BASE=bind;
+  bind=function v173Bind(){
+    BIND_V173_BASE();
+    const title=document.querySelector('.v173-crypto-section>.v127-overseas-title');
+    if(title){
+      const toggle=()=>{const sec=title.closest('.v173-crypto-section'),closed=sec.classList.toggle('is-collapsed');title.setAttribute('aria-expanded',String(!closed));const b=title.querySelector('.v172-fold');if(b)b.setAttribute('aria-label',closed?'펼치기':'접기');};
+      title.onclick=e=>{if(e.target.closest('.holding'))return;toggle()};
+      title.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}};
+    }
+  };
+  window.__v173HomeFoldFix={version:173,overseasCryptoIndependent:true,literalSlashNRemoved:true,priceEnginesChanged:false,tradingRulesChanged:false};
+})();
+</script>
+
 </body></html>
