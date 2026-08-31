@@ -12748,4 +12748,64 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   window.__v177Navigation={version:177,detailStartsAtTop:true,restoresListScroll:true,edgeSwipe:true,historyBack:true,immediateEntry:true,marketLogicChanged:false,timersAdded:false};
 })();
 </script>
+
+
+<!-- V178 — iOS detail-entry stability/performance patch. UI/render only; no market/trading/news changes. -->
+<style>
+/* Prevent Safari scroll anchoring from restoring the list's old Y after #app is replaced. */
+html.v178-detail-open, html.v178-detail-open body, html.v178-detail-open #app,
+.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,.screen:has(.detail-head){overflow-anchor:none!important}
+/* iOS Safari can defer/repaint canvas while its ancestor is entering with transform+opacity.
+   Detail pages already have the interactive swipe transition, so skip the redundant 180ms entrance animation. */
+.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,
+.screen:has(.detail-head){animation:none!important}
+</style>
+<script>
+(()=>{
+  'use strict';
+  let kickRaf=0, settleRaf=0;
+  const root=document.documentElement;
+  function detail(){return document.querySelector('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back');}
+  function topNow(){
+    const se=document.scrollingElement||document.documentElement;
+    if(se.scrollTop!==0) se.scrollTop=0;
+    if(document.body && document.body.scrollTop!==0) document.body.scrollTop=0;
+  }
+  function paintChartOnce(){
+    if(!detail()) return;
+    /* Domestic chart: call the existing painter directly. */
+    try{ if(typeof selected!=='undefined' && selected && document.getElementById('chart') && typeof drawChart==='function') drawChart(selected, typeof chartHoverIndex==='number'?chartHoverIndex:-1); }catch(_){ }
+    /* ETF/crypto painters are intentionally private. Their mode buttons call the existing painter
+       without rebuilding the page; invoking the active mode once is the cheapest safe public hook. */
+    const mode=document.querySelector('[data-v142-etf-mode].active,[data-v171-crypto-mode].active');
+    if(mode && mode.offsetParent!==null){ try{ mode.click(); }catch(_){ } }
+  }
+  function settleDetail(){
+    if(!detail()) return;
+    root.classList.add('v178-detail-open');
+    topNow();
+    cancelAnimationFrame(settleRaf); cancelAnimationFrame(kickRaf);
+    settleRaf=requestAnimationFrame(()=>{
+      topNow();
+      kickRaf=requestAnimationFrame(()=>{
+        topNow();
+        paintChartOnce();
+      });
+    });
+  }
+  document.addEventListener('click',e=>{
+    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-us-stock],[data-v119-us-holding],[data-v119-account-us],[data-v142-etf],[data-v142-us-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding],.account-open');
+    if(!opener)return;
+    queueMicrotask(settleDetail);
+  },true);
+  /* Remove the anti-anchor class only after returning to a list. No observer/timer is added. */
+  window.addEventListener('popstate',()=>requestAnimationFrame(()=>{if(!detail())root.classList.remove('v178-detail-open')}));
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back'))return;
+    requestAnimationFrame(()=>{if(!detail())root.classList.remove('v178-detail-open')});
+  },true);
+  window.__v178EntryStability={version:178,scrollAnchorGuard:true,detailEntryAnimationRemoved:true,chartFirstPaintKick:true,observersAdded:0,intervalsAdded:0,marketLogicChanged:false};
+})();
+</script>
+
 </body></html>
