@@ -12462,14 +12462,14 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
   function openCryptoDetail(code){if(!CRYPTO_CODES.has(code))return;CRYPTO_SELECTED=code;CRYPTO_RANGE='day';CRYPTO_MODE='line';CRYPTO_HOVER=-1;selected=null;accountView=false;view='discover';assetFilter='crypto';renderCryptoDetail();}
 
   function openCryptoOrder(type){const def=CRYPTO_BY_CODE.get(CRYPTO_SELECTED);if(!def||CRYPTO_TRADING)return;ensureCryptoState();const q=cryptoQuote(def.code),h=state.cryptoHoldings[def.code]||{qty:0,avg:0},verb=type==='buy'?'매수':'매도';document.body.insertAdjacentHTML('beforeend',`<div class="overlay v171-crypto-order"><div class="sheet"><div class="sheet-head"><h2>${escHtml(def.name)} ${verb}</h2>${closeButton()}</div><div class="between"><span>현재가</span><b>${krwPrice(q.price)}</b></div><div class="between"><span>${type==='buy'?'원화 예수금':'보유 수량'}</span><b>${type==='buy'?fmt(state.cash)+'원':qtyText(h.qty)+' '+def.code}</b></div><div class="between"><span>거래 수수료</span><b>${(CRYPTO_FEE*100).toFixed(2)}%</b></div><div class="order-toggle"><button class="active" data-v171-order-mode="qty">수량으로 ${verb}</button><button data-v171-order-mode="amount">금액으로 ${verb}</button></div><input id="v171-crypto-input" inputmode="decimal" type="number" min="0" step="0.00000001" placeholder="${type==='buy'?'수량을 입력하세요':'매도 수량을 입력하세요'}"><div class="quick">${['10%','25%','50%','최대'].map((x,i)=>`<button data-v171-crypto-quick="${[.1,.25,.5,1][i]}">${x}</button>`).join('')}</div><div class="v171-order-preview" data-v171-order-preview>최소 주문금액은 10,000원이에요.</div><button class="primary" data-v171-crypto-confirm data-type="${type}">${verb}하기</button><div class="subnote">코인은 원화 예수금으로 즉시 체결되며, 수수료 0.05%가 적용됩니다. 금액 주문은 수수료까지 포함한 금액을 기준으로 계산해요.</div></div></div>`);
-    let mode='qty';const input=document.getElementById('v171-crypto-input'),preview=document.querySelector('[data-v171-order-preview]');
+    let mode='qty',quickMax=false;const input=document.getElementById('v171-crypto-input'),preview=document.querySelector('[data-v171-order-preview]');
     function calc(){const raw=Math.max(0,+input.value||0);let qty=0;if(mode==='qty')qty=q8(raw);else qty=amountQty(raw,q.price,type);const gross=q.price*qty,fee=gross*CRYPTO_FEE,sett=Math.round(type==='buy'?gross+fee:gross-fee);if(preview)preview.textContent=qty>0?`${qtyText(qty)} ${def.code} · 주문금액 ${fmt(gross)}원 · 수수료 ${fmt(fee)}원 · ${type==='buy'?'예상 출금':'예상 입금'} ${fmt(sett)}원`:'최소 주문금액은 10,000원이에요.';return{qty,gross,fee,sett};}
-    document.querySelectorAll('[data-v171-order-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.v171OrderMode;document.querySelectorAll('[data-v171-order-mode]').forEach(x=>x.classList.toggle('active',x===b));input.value='';input.step=mode==='qty'?'0.00000001':'1';input.placeholder=mode==='qty'?(type==='buy'?'수량을 입력하세요':'매도 수량을 입력하세요'):(type==='buy'?'사용할 금액을 입력하세요':'받을 금액을 입력하세요');calc();});
-    input.addEventListener('input',calc);document.querySelectorAll('[data-v171-crypto-quick]').forEach(b=>b.onclick=()=>{const r=Math.max(0,+b.dataset.v171CryptoQuick||0);if(mode==='qty'){input.value=type==='buy'?qtyText(q8(state.cash*r/(q.price*(1+CRYPTO_FEE)))):qtyText(q8(h.qty*r));}else{input.value=Math.floor(type==='buy'?state.cash*r:h.qty*q.price*(1-CRYPTO_FEE)*r);}calc();});
-    document.querySelector('.v171-crypto-order [data-close]')?.addEventListener('click',()=>document.querySelector('.v171-crypto-order')?.remove());document.querySelector('[data-v171-crypto-confirm]')?.addEventListener('click',()=>executeCryptoTrade(type,mode,+input.value||0));
+    document.querySelectorAll('[data-v171-order-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.v171OrderMode;quickMax=false;document.querySelectorAll('[data-v171-order-mode]').forEach(x=>x.classList.toggle('active',x===b));input.value='';input.step=mode==='qty'?'0.00000001':'1';input.placeholder=mode==='qty'?(type==='buy'?'수량을 입력하세요':'매도 수량을 입력하세요'):(type==='buy'?'사용할 금액을 입력하세요':'받을 금액을 입력하세요');calc();});
+    input.addEventListener('input',()=>{quickMax=false;calc()});document.querySelectorAll('[data-v171-crypto-quick]').forEach(b=>b.onclick=()=>{const r=Math.max(0,+b.dataset.v171CryptoQuick||0);quickMax=r>=.999999&&type==='buy';if(mode==='qty'){input.value=type==='buy'?qtyText(amountQty(state.cash*r,q.price,'buy')):qtyText(q8(h.qty*r));}else{input.value=Math.floor(type==='buy'?state.cash*r:h.qty*q.price*(1-CRYPTO_FEE)*r);}calc();});
+    document.querySelector('.v171-crypto-order [data-close]')?.addEventListener('click',()=>document.querySelector('.v171-crypto-order')?.remove());document.querySelector('[data-v171-crypto-confirm]')?.addEventListener('click',()=>executeCryptoTrade(type,quickMax&&mode==='qty'?'qtymax':mode,+input.value||0));
   }
-  async function executeCryptoTrade(type,mode,inputValue){if(CRYPTO_TRADING)return;const def=CRYPTO_BY_CODE.get(CRYPTO_SELECTED);if(!def)return;ensureCryptoState();const q=cryptoQuote(def.code),h=state.cryptoHoldings[def.code]||{qty:0,avg:0};let qty=mode==='qty'?q8(inputValue):amountQty(inputValue,q.price,type);if(!(qty>0))return toast('주문 수량을 확인해주세요');const gross=q.price*qty,fee=gross*CRYPTO_FEE,settlement=Math.round(type==='buy'?gross+fee:gross-fee),minBasis=mode==='amount'?inputValue:settlement;if(minBasis<CRYPTO_MIN_ORDER)return toast('최소 주문금액은 10,000원이에요');if(type==='buy'&&settlement>state.cash)return toast('원화 예수금이 부족해요');if(type==='sell'&&qty>h.qty+1e-10)return toast('보유 수량이 부족해요');
-    CRYPTO_TRADING=true;try{if(type==='buy'){const oldQty=+h.qty||0,oldCost=(+h.avg||0)*oldQty;state.cash-=settlement;h.qty=q8(oldQty+qty);h.avg=(oldCost+settlement)/Math.max(1e-12,h.qty);state.cryptoHoldings[def.code]=h;}else{state.cash+=settlement;state.cryptoRealizedPnl=(+state.cryptoRealizedPnl||0)+(settlement-(+h.avg||0)*qty);h.qty=q8(h.qty-qty);if(h.qty<=1e-8)delete state.cryptoHoldings[def.code];else state.cryptoHoldings[def.code]=h;}state.cryptoTradeLog.push({at:Date.now(),type,code:def.code,qty,price:q.price,fee,settlement,mode,costVersion:171});state.cryptoTradeLog=state.cryptoTradeLog.slice(-300);await Store.saveMe(userId,state);try{await recordEquity(true)}catch{}try{await Store.pushMyScore(true)}catch{}document.querySelector('.v171-crypto-order')?.remove();toast(`${def.code} ${qtyText(qty)} ${type==='buy'?'매수':'매도'} 완료`);renderCryptoDetail();}finally{CRYPTO_TRADING=false}}
+  async function executeCryptoTrade(type,mode,inputValue){if(CRYPTO_TRADING)return;const def=CRYPTO_BY_CODE.get(CRYPTO_SELECTED);if(!def)return;ensureCryptoState();const q=cryptoQuote(def.code),h=state.cryptoHoldings[def.code]||{qty:0,avg:0};const maxQtyBuy=type==='buy'&&mode==='qtymax';let qty=maxQtyBuy?amountQty(state.cash,q.price,'buy'):(mode==='qty'?q8(inputValue):amountQty(inputValue,q.price,type));if(!(qty>0))return toast('주문 수량을 확인해주세요');const gross=q.price*qty,fee=gross*CRYPTO_FEE,settlement=Math.round(type==='buy'?gross+fee:gross-fee),minBasis=mode==='amount'?inputValue:settlement;if(minBasis<CRYPTO_MIN_ORDER)return toast('최소 주문금액은 10,000원이에요');if(type==='buy'&&settlement>state.cash)return toast('원화 예수금이 부족해요');if(type==='sell'&&qty>h.qty+1e-10)return toast('보유 수량이 부족해요');
+    CRYPTO_TRADING=true;try{if(type==='buy'){const oldQty=+h.qty||0,oldCost=(+h.avg||0)*oldQty;state.cash-=settlement;h.qty=q8(oldQty+qty);h.avg=(oldCost+settlement)/Math.max(1e-12,h.qty);state.cryptoHoldings[def.code]=h;}else{state.cash+=settlement;state.cryptoRealizedPnl=(+state.cryptoRealizedPnl||0)+(settlement-(+h.avg||0)*qty);h.qty=q8(h.qty-qty);if(h.qty<=1e-8)delete state.cryptoHoldings[def.code];else state.cryptoHoldings[def.code]=h;}state.cryptoTradeLog.push({at:Date.now(),type,code:def.code,qty,price:q.price,fee,settlement,mode:maxQtyBuy?'qty':mode,costVersion:185});state.cryptoTradeLog=state.cryptoTradeLog.slice(-300);await Store.saveMe(userId,state);try{await recordEquity(true)}catch{}try{await Store.pushMyScore(true)}catch{}document.querySelector('.v171-crypto-order')?.remove();toast(`${def.code} ${qtyText(qty)} ${type==='buy'?'매수':'매도'} 완료`);renderCryptoDetail();}finally{CRYPTO_TRADING=false}}
 
   function cryptoHomeRows(){return Object.entries(state?.cryptoHoldings||{}).filter(([,h])=>h?.qty>0).map(([code,h])=>{const def=CRYPTO_BY_CODE.get(code),p=cryptoPriceAt(code),value=p*h.qty,profit=(p-h.avg)*h.qty,rate=h.avg>0?(p/h.avg-1)*100:0;return{def,h,p,value,profit,rate};}).filter(x=>x.def).sort((a,b)=>b.value-a.value);}
   const HOME_BASE=home;
@@ -12624,114 +12624,57 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 
-<!-- V175 — smooth mobile back navigation: browser/device back + left-edge swipe. Navigation only; market/trading/news logic untouched. -->
-<script>
+<!-- V183 — consolidated mobile detail navigation + anchor restore + one-time lightweight chart warm-up. -->
+<style id="v180-detail-style">
+html.v180-detail-open,html.v180-detail-open body,html.v180-detail-open #app,
+.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,.screen:has(.detail-head){overflow-anchor:none!important}
+.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,.screen:has(.detail-head){animation:none!important}
+</style>
+<script id="v180-detail-navigation">
 (()=>{
-  'use strict';
-  const NAV_TAG='ministock-detail';
-  let suppressBackIntercept=false;
-  let touch=null;
+'use strict';
+const TAG='ministock-detail-v180';
+const OPEN='[data-stock],[data-search-stock],[data-v119-us-stock],[data-us-stock],[data-v119-us-holding],[data-v119-account-us],[data-v142-etf],[data-v142-us-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding],.account-open';
+const BACK='[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back';
+const root=document.documentElement;
+let listY=0,listAnchor=null,suppress=false,restoring=false,touch=null,verifyRaf=0;
+try{if('scrollRestoration' in history)history.scrollRestoration='manual'}catch(_){ }
+const se=()=>document.scrollingElement||document.documentElement;
+const y=()=>Math.max(0,se()?.scrollTop||0);
+const hardTop=()=>{const s=se();if(s)s.scrollTop=0;if(document.body)document.body.scrollTop=0};
+const detail=()=>document.querySelector(BACK);
+const hasState=()=>!!(history.state&&history.state.__miniNav===TAG);
+function restore(){restoring=true;const s=se();if(s)s.scrollTop=listY;requestAnimationFrame(()=>{try{if(listAnchor){const el=document.querySelector(listAnchor.selector);if(el){const delta=el.getBoundingClientRect().top-listAnchor.top;if(Math.abs(delta)>2){const q=se();if(q)q.scrollTop=Math.max(0,q.scrollTop+delta)}}else if(Math.abs(y()-listY)>2){const q=se();if(q)q.scrollTop=listY}}else if(Math.abs(y()-listY)>2){const q=se();if(q)q.scrollTop=listY}}finally{restoring=false}})}
+function pushState(){if(!detail()||hasState())return;try{history.pushState(Object.assign({},history.state||{},{__miniNav:TAG,__miniReturnY:listY}),'',location.href)}catch(_){ }}
+function settle(){if(!detail())return;root.classList.add('v180-detail-open');hardTop();cancelAnimationFrame(verifyRaf);verifyRaf=requestAnimationFrame(()=>{if(y()>1)hardTop()})}
+function nativeBack(){const b=detail();if(!b)return;suppress=true;try{b.click()}finally{queueMicrotask(()=>{suppress=false;root.classList.remove('v180-detail-open');restore()})}}
+function requestBack(){if(!detail())return false;if(hasState())history.back();else nativeBack();return true}
 
-  function detailBackButton(){
-    return document.querySelector('[data-v171-crypto-back], [data-v142-etf-back], [data-v119-us-back], .screen .detail-head .back');
-  }
-  function isDetailOpen(){ return !!detailBackButton(); }
-  function hasDetailState(){ return !!(history.state && history.state.__miniNav===NAV_TAG); }
-  function pushDetailState(){
-    if(!isDetailOpen() || hasDetailState()) return;
-    try{ history.pushState(Object.assign({},history.state||{},{__miniNav:NAV_TAG}), '', location.href); }catch(_){ }
-  }
-  function nativeDetailBack(){
-    const b=detailBackButton();
-    if(!b) return;
-    suppressBackIntercept=true;
-    try{ b.click(); } finally { setTimeout(()=>{suppressBackIntercept=false;},0); }
-  }
-  function requestBack(){
-    if(!isDetailOpen()) return false;
-    if(hasDetailState()) history.back();
-    else nativeDetailBack();
-    return true;
-  }
+// Save list position and reset BEFORE the existing synchronous detail renderer runs.
+document.addEventListener('click',e=>{if(restoring)return;const op=e.target.closest(OPEN);if(!op)return;listY=y();listAnchor=null;const pairs=[['data-stock','[data-stock="{v}"]'],['data-v119-us-stock','[data-v119-us-stock="{v}"]'],['data-us-stock','[data-us-stock="{v}"]'],['data-v142-us-etf','[data-v142-us-etf="{v}"]'],['data-v171-crypto','[data-v171-crypto="{v}"]']];for(const [a,t] of pairs){const v=op.getAttribute(a);if(v){listAnchor={selector:t.replace('{v}',CSS.escape(v)),top:op.getBoundingClientRect().top};break}}root.classList.add('v180-detail-open');hardTop()},true);
+// Existing renderers are synchronous; one microtask + bounded RAF verification is enough.
+document.addEventListener('click',e=>{if(!e.target.closest(OPEN))return;queueMicrotask(()=>{if(!detail()){root.classList.remove('v180-detail-open');return}hardTop();pushState();settle()})},false);
+// Consume our synthetic history entry for all visible back buttons.
+document.addEventListener('click',e=>{if(suppress)return;const b=e.target.closest(BACK);if(!b||!detail()||!hasState())return;e.preventDefault();e.stopImmediatePropagation();history.back()},true);
+window.addEventListener('popstate',()=>{if(!detail())return;const saved=history.state&&history.state.__miniReturnY;if(Number.isFinite(saved))listY=saved;nativeBack()});
 
-  // A stock/ETF/crypto detail is rendered by the existing click handler first;
-  // then add one browser-history entry so hardware/browser Back returns to the list.
-  document.addEventListener('click',e=>{
-    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-v119-us-holding],[data-v142-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding]');
-    if(opener) setTimeout(pushDetailState,0);
-  },true);
+// iOS-style left-edge swipe: transform only, no layout/repaint loop.
+const surface=()=>detail()?.closest('.screen')||document.querySelector('.screen');
+function move(x,anim){const el=touch?.el;if(!el)return;el.style.willChange='transform';el.style.transition=anim?'transform 210ms cubic-bezier(.22,.75,.24,1)':'none';el.style.transform=`translate3d(${Math.max(0,x)}px,0,0)`}
+function clear(el){if(!el)return;el.style.transition='';el.style.transform='';el.style.willChange=''}
+document.addEventListener('touchstart',e=>{if(restoring||!detail()||e.touches.length!==1||document.querySelector('.overlay'))return;const t=e.touches[0];if(t.clientX>30)return;touch={x:t.clientX,y:t.clientY,lastX:t.clientX,lastY:t.clientY,active:true,locked:false,el:surface()}},{passive:true});
+document.addEventListener('touchmove',e=>{if(!touch||!touch.active||e.touches.length!==1)return;const t=e.touches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;touch.lastX=t.clientX;touch.lastY=t.clientY;if(!touch.locked){if(Math.abs(dx)<7&&Math.abs(dy)<7)return;if(dx<=0||Math.abs(dy)>Math.abs(dx)*.82){touch.active=false;clear(touch.el);return}touch.locked=true}e.preventDefault();const w=Math.max(320,innerWidth||320);move(Math.min(dx,w)*(dx>w*.72?.92:1),false)},{passive:false});
+document.addEventListener('touchend',()=>{if(!touch)return;const c=touch,dx=c.lastX-c.x,dy=Math.abs(c.lastY-c.y),ok=c.active&&c.locked&&dx>=Math.min(88,(innerWidth||390)*.24)&&dy<=90&&dx>dy*1.15;if(ok){move(innerWidth||420,true);touch=null;setTimeout(()=>{clear(c.el);requestBack()},165)}else{move(0,true);touch=null;setTimeout(()=>clear(c.el),225)}},{passive:true});
+document.addEventListener('touchcancel',()=>{if(!touch)return;const c=touch;move(0,true);touch=null;setTimeout(()=>clear(c.el),225)},{passive:true});
 
-  // Existing top-left back buttons now consume the same history entry.
-  document.addEventListener('click',e=>{
-    if(suppressBackIntercept) return;
-    const b=e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.screen .detail-head .back');
-    if(!b || !isDetailOpen() || !hasDetailState()) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    history.back();
-  },true);
+// One-time lightweight warm-up for the domestic day-chart calculation path. This does not render,
+// mutate market state, or add a recurring timer; it only avoids first-tap JIT/cache cost.
+let warmDone=false;
+function warmDomesticChart(){if(warmDone)return;warmDone=true;try{if(typeof chartSeries==='function'&&Array.isArray(STOCKS)&&STOCKS[0])chartSeries(STOCKS[0],'day')}catch(_){ }}
+warmDomesticChart();
 
-  // Browser / Android hardware Back.
-  window.addEventListener('popstate',()=>{
-    if(isDetailOpen()) nativeDetailBack();
-  });
-
-  // V175 — interactive iOS-style edge swipe. The detail page follows the finger,
-  // then smoothly completes or springs back. Left-edge only, so chart gestures stay intact.
-  function swipeSurface(){
-    const b=detailBackButton();
-    return (b && b.closest('.screen')) || document.querySelector('.screen');
-  }
-  function setSwipeX(x, animate){
-    const el=touch && touch.el; if(!el) return;
-    el.style.willChange='transform';
-    el.style.transition=animate ? 'transform 190ms cubic-bezier(.22,.75,.24,1)' : 'none';
-    el.style.transform=`translate3d(${Math.max(0,x)}px,0,0)`;
-  }
-  function clearSwipeStyle(el){
-    if(!el) return;
-    el.style.transition=''; el.style.transform=''; el.style.willChange='';
-  }
-  document.addEventListener('touchstart',e=>{
-    if(!isDetailOpen() || e.touches.length!==1 || document.querySelector('.overlay')) return;
-    const t=e.touches[0];
-    if(t.clientX>30) return;
-    touch={x:t.clientX,y:t.clientY,lastX:t.clientX,lastY:t.clientY,active:true,locked:false,el:swipeSurface()};
-  },{passive:true});
-  document.addEventListener('touchmove',e=>{
-    if(!touch || !touch.active || e.touches.length!==1) return;
-    const t=e.touches[0], dx=t.clientX-touch.x, dy=t.clientY-touch.y;
-    touch.lastX=t.clientX; touch.lastY=t.clientY;
-    if(!touch.locked){
-      if(Math.abs(dx)<7 && Math.abs(dy)<7) return;
-      if(dx<=0 || Math.abs(dy)>Math.abs(dx)*.82){ touch.active=false; clearSwipeStyle(touch.el); return; }
-      touch.locked=true;
-    }
-    if(touch.locked){
-      e.preventDefault();
-      const w=Math.max(320,window.innerWidth||320);
-      const eased=Math.min(dx,w) * (dx>w*.72 ? .92 : 1);
-      setSwipeX(eased,false);
-    }
-  },{passive:false});
-  document.addEventListener('touchend',()=>{
-    if(!touch) return;
-    const cur=touch, dx=cur.lastX-cur.x, dy=Math.abs(cur.lastY-cur.y);
-    const ok=cur.active && cur.locked && dx>=Math.min(88,(window.innerWidth||390)*.24) && dy<=90 && dx>dy*1.15;
-    if(ok){
-      setSwipeX(window.innerWidth||420,true);
-      touch=null;
-      setTimeout(()=>{ clearSwipeStyle(cur.el); requestBack(); },150);
-    }else{
-      setSwipeX(0,true);
-      touch=null;
-      setTimeout(()=>clearSwipeStyle(cur.el),205);
-    }
-  },{passive:true});
-  document.addEventListener('touchcancel',()=>{
-    if(!touch) return; const cur=touch; setSwipeX(0,true); touch=null;
-    setTimeout(()=>clearSwipeStyle(cur.el),205);
-  },{passive:true});
+window.__v180DetailNavigation={version:184,consolidated:true,detailStartsAtTop:true,restoresListScroll:true,anchorRestore:true,edgeSwipe:true,historyBack:true,nativeChartPaintOnly:true,eagerChartWarmup:true,intervalsAdded:0,observersAdded:0,marketLogicChanged:false};
 })();
 </script>
+
 </body></html>
