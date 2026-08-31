@@ -71,6 +71,23 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
 .stock-preview.ok{color:var(--blue);font-weight:700}
 .stock-preview.bad{color:var(--red)}
 .admin-market-us{display:inline-block;padding:2px 6px;margin-right:3px;border-radius:7px;background:#eaf2ff;color:#2563a8;font-size:10px;font-weight:900}
+
+/* V7 — 관리자 콘솔 UI 리디자인 (기능/Firestore 로직 변경 없음) */
+:root{--admin-bg:#f3f6fa;--admin-navy:#172b4d;--admin-soft:#f7f9fc}
+body{background:linear-gradient(180deg,#edf3fb 0,#f7f9fb 260px,#f6f8fa 100%)}
+.wrap{max-width:1180px;padding-top:18px}
+.top{background:linear-gradient(135deg,#172b4d,#244d7d);color:#fff;padding:22px 24px;border-radius:24px;margin-bottom:14px;box-shadow:0 12px 30px #18375f20}
+.top h1{font-size:22px}.top .who{color:#dce8f7;margin-top:5px}.top .mini{background:#ffffff1f;color:#fff;border:1px solid #ffffff24}
+.admin-dashboard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px}
+.admin-stat{background:#fff;border:1px solid #e9eef5;border-radius:18px;padding:16px;box-shadow:0 4px 16px #26384d0a}
+.admin-stat small{display:block;color:var(--muted);font-size:11px;font-weight:750;margin-bottom:7px}.admin-stat b{font-size:21px;letter-spacing:-.5px}.admin-stat span{display:block;color:var(--muted);font-size:10.5px;margin-top:5px}
+.card{border:1px solid #edf1f5;box-shadow:0 5px 18px #25364b0b;border-radius:20px}.card h2{font-size:16px}.grid{grid-template-columns:minmax(360px,.9fr) minmax(0,1.1fr);gap:14px}
+.rows{border:0;background:#f7f9fb;padding:5px;border-radius:16px}.row{background:#fff;border:1px solid #edf0f4!important;border-radius:13px;margin:5px 0;padding:11px 12px}.row.on{background:#f1f7ff;border-color:#d7e8ff!important}.row .remove-user{opacity:.72}
+input,textarea{background:#f8fafc;border-color:#e5eaf0}input:focus,textarea:focus{background:#fff}.quick button,.mini,.ghost{transition:transform .12s ease,background .15s ease}.quick button:active,.mini:active,.ghost:active,.primary:active{transform:scale(.97)}
+.primary{box-shadow:0 5px 12px #3182f62b}.hist{padding:14px 4px}.hist .msg{background:#f7f9fb}.tag{font-weight:800}
+.admin-section-label{display:flex;align-items:center;gap:7px;color:#526170;font-size:11px;font-weight:850;letter-spacing:.02em;margin:2px 2px 9px}.admin-section-label:before{content:'';width:6px;height:6px;border-radius:50%;background:var(--blue)}
+@media(max-width:820px){.admin-dashboard{grid-template-columns:1fr 1fr}.top{border-radius:0;margin:0 -16px 14px;padding:20px 18px}.wrap{padding-top:0}.grid{grid-template-columns:1fr}.card{padding:17px}.rows{max-height:52vh}}
+@media(max-width:430px){.admin-stat{padding:13px}.admin-stat b{font-size:18px}.admin-stat span{font-size:10px}.top h1{font-size:20px}}
 </style>
 </head>
 <body>
@@ -93,6 +110,13 @@ textarea{resize:vertical;min-height:92px;line-height:1.6}
       <div class="who" id="who"></div>
     </div>
     <button class="mini" id="signout">로그아웃</button>
+  </div>
+
+  <div class="admin-dashboard" aria-label="관리자 현황">
+    <div class="admin-stat"><small>참여자</small><b id="stat-users">-</b><span>현재 랭킹 등록</span></div>
+    <div class="admin-stat"><small>선택됨</small><b id="stat-selected">0명</b><span>지급 대상</span></div>
+    <div class="admin-stat"><small>원화 지급</small><b id="stat-cash">-</b><span>최근 기록</span></div>
+    <div class="admin-stat"><small>주식 지급</small><b id="stat-stock">-</b><span>최근 기록</span></div>
   </div>
 
   <div class="grid">
@@ -201,6 +225,12 @@ const when=ms=>ms?new Date(ms).toLocaleString('ko-KR',{month:'2-digit',day:'2-di
 function toast(text){const el=document.createElement('div');el.className='toast';el.textContent=text;document.body.append(el);setTimeout(()=>el.remove(),2200)}
 
 let people=[],selected=new Set(),search='',unsubPeople=null,unsubHistory=null,unsubStockHistory=null;
+function updateAdminStats(){
+  const a=$('#stat-users'),b=$('#stat-selected');
+  if(a)a.textContent=`${people.length}명`;
+  if(b)b.textContent=`${selected.size}명`;
+}
+
 
 /* ---------- 로그인 ---------- */
 /* V3 AUTH FIX — iOS Safari/모바일 환경 로그인 안정화
@@ -315,6 +345,7 @@ function visible(){
 
 function renderPeople(){
   const list=visible();
+  updateAdminStats();
   $('#count').textContent=`선택 ${selected.size} / 전체 ${people.length}명`;
   $('#people').innerHTML=list.length?list.map(p=>{
     const rate=Number.isFinite(+p.pnlRate)?+p.pnlRate:0;
@@ -387,6 +418,7 @@ function watchHistory(){
   if(unsubHistory)return;
   unsubHistory=db.collection('grants').orderBy('createdAtMs','desc').limit(50).onSnapshot(snap=>{
     const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const stat=$('#stat-cash');if(stat)stat.textContent=`${rows.length}건`;
     $('#history').innerHTML=rows.length?rows.map(g=>{
       const all=g.targets==='all',amount=+g.amount||0;
       return `<div class="hist" data-id="${esc(g.id)}">
@@ -585,6 +617,7 @@ function watchStockHistory(){
   if(unsubStockHistory)return;
   unsubStockHistory=db.collection('stock_grants').orderBy('createdAtMs','desc').limit(40).onSnapshot(snap=>{
     const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const stat=$('#stat-stock');if(stat)stat.textContent=`${rows.length}건`;
     $('#stock-history').innerHTML=rows.length?rows.map(g=>{
       const all=g.targets==='all';
       return `<div class="hist" data-stock-grant="${esc(g.id)}">
@@ -630,6 +663,8 @@ window.__adminV4={version:4,customStockSearch:true,iosDatalistRemoved:true,samsu
 </script>
 
 <script>window.__adminV5={version:5,domesticAndUsSearch:true,usStockCount:100,grantMarketField:true,totalStockCount:ADMIN_STOCKS.length};</script>
+<script>window.__adminV7={version:7,uiRedesign:true,dashboardStats:true,logicChanged:false};
+</script>
 <script>window.__adminV6={version:6,stockGrantSchema:'legacy-compatible',marketInferredByTicker:true,firestoreExtraFieldsRemoved:['market','currency']};</script>
 </body>
 </html>
