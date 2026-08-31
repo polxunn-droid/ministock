@@ -12624,188 +12624,114 @@ window.__integrationV166={version:166,adminUsGrantReceiver:true,usChartDomesticP
 })();
 </script>
 
-<!-- V177 — low-latency mobile navigation. Navigation only; market/trading/news logic untouched. -->
+<!-- V175 — smooth mobile back navigation: browser/device back + left-edge swipe. Navigation only; market/trading/news logic untouched. -->
 <script>
 (()=>{
   'use strict';
-  const NAV_TAG='ministock-detail-v177';
-  let suppressBackIntercept=false, touch=null, returnScrollY=0, restoring=false;
-  try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(_){ }
+  const NAV_TAG='ministock-detail';
+  let suppressBackIntercept=false;
+  let touch=null;
 
   function detailBackButton(){
-    return document.querySelector('[data-v171-crypto-back], [data-v142-etf-back], [data-v119-us-back], .account-back, .screen .detail-head .back');
+    return document.querySelector('[data-v171-crypto-back], [data-v142-etf-back], [data-v119-us-back], .screen .detail-head .back');
   }
   function isDetailOpen(){ return !!detailBackButton(); }
   function hasDetailState(){ return !!(history.state && history.state.__miniNav===NAV_TAG); }
-  function y(){ return Math.max(0, window.scrollY||document.documentElement.scrollTop||0); }
-  // V177: do the visible scroll correction immediately. Only schedule one cheap
-  // verification frame when the browser actually failed to settle at the target.
-  function jumpTop(){
-    restoring=true;
-    window.scrollTo(0,0);
-    requestAnimationFrame(()=>{
-      if(y()>1) window.scrollTo(0,0);
-      restoring=false;
-    });
-  }
-  function restoreListScroll(){
-    const target=returnScrollY;
-    restoring=true;
-    window.scrollTo(0,target);
-    requestAnimationFrame(()=>{
-      if(Math.abs(y()-target)>2) window.scrollTo(0,target);
-      restoring=false;
-    });
-  }
   function pushDetailState(){
     if(!isDetailOpen() || hasDetailState()) return;
-    try{ history.pushState(Object.assign({},history.state||{},{__miniNav:NAV_TAG,__miniReturnY:returnScrollY}), '', location.href); }catch(_){ }
+    try{ history.pushState(Object.assign({},history.state||{},{__miniNav:NAV_TAG}), '', location.href); }catch(_){ }
   }
   function nativeDetailBack(){
-    const b=detailBackButton(); if(!b) return;
+    const b=detailBackButton();
+    if(!b) return;
     suppressBackIntercept=true;
-    try{ b.click(); } finally {
-      setTimeout(()=>{ suppressBackIntercept=false; restoreListScroll(); },0);
-    }
+    try{ b.click(); } finally { setTimeout(()=>{suppressBackIntercept=false;},0); }
   }
   function requestBack(){
     if(!isDetailOpen()) return false;
-    if(hasDetailState()) history.back(); else nativeDetailBack();
+    if(hasDetailState()) history.back();
+    else nativeDetailBack();
     return true;
   }
 
-  // Save the list position BEFORE the existing synchronous opener renders a detail page.
-  // Then force every detail page to start at the true top. One RAF pair avoids layout-race jumps.
+  // A stock/ETF/crypto detail is rendered by the existing click handler first;
+  // then add one browser-history entry so hardware/browser Back returns to the list.
   document.addEventListener('click',e=>{
-    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-v119-us-holding],[data-v142-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding],.account-open');
-    if(!opener) return;
-    returnScrollY=y();
-    // Existing openers render synchronously. Avoid an extra timer turn on the common path;
-    // fall back to one microtask only if a specific opener renders asynchronously.
-    if(isDetailOpen()){ jumpTop(); pushDetailState(); }
-    else queueMicrotask(()=>{ if(isDetailOpen()){ jumpTop(); pushDetailState(); } });
+    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-v119-us-holding],[data-v142-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding]');
+    if(opener) setTimeout(pushDetailState,0);
   },true);
 
-  // Existing top-left back buttons consume the same history entry.
+  // Existing top-left back buttons now consume the same history entry.
   document.addEventListener('click',e=>{
     if(suppressBackIntercept) return;
-    const b=e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back');
+    const b=e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.screen .detail-head .back');
     if(!b || !isDetailOpen() || !hasDetailState()) return;
-    e.preventDefault(); e.stopImmediatePropagation(); history.back();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    history.back();
   },true);
 
-  // Browser / Android hardware Back. Restore the exact list position after the existing renderer returns.
-  window.addEventListener('popstate',ev=>{
-    if(!isDetailOpen()) return;
-    const saved=history.state && history.state.__miniReturnY;
-    if(Number.isFinite(saved)) returnScrollY=saved;
-    nativeDetailBack();
+  // Browser / Android hardware Back.
+  window.addEventListener('popstate',()=>{
+    if(isDetailOpen()) nativeDetailBack();
   });
 
-  // Interactive iOS-style edge swipe. Transform-only animation stays GPU-friendly.
-  function swipeSurface(){ const b=detailBackButton(); return (b&&b.closest('.screen'))||document.querySelector('.screen'); }
-  function setSwipeX(x,animate){
-    const el=touch&&touch.el; if(!el) return;
+  // V175 — interactive iOS-style edge swipe. The detail page follows the finger,
+  // then smoothly completes or springs back. Left-edge only, so chart gestures stay intact.
+  function swipeSurface(){
+    const b=detailBackButton();
+    return (b && b.closest('.screen')) || document.querySelector('.screen');
+  }
+  function setSwipeX(x, animate){
+    const el=touch && touch.el; if(!el) return;
     el.style.willChange='transform';
-    el.style.transition=animate?'transform 210ms cubic-bezier(.22,.75,.24,1)':'none';
+    el.style.transition=animate ? 'transform 190ms cubic-bezier(.22,.75,.24,1)' : 'none';
     el.style.transform=`translate3d(${Math.max(0,x)}px,0,0)`;
   }
-  function clearSwipeStyle(el){ if(!el)return; el.style.transition='';el.style.transform='';el.style.willChange=''; }
-
+  function clearSwipeStyle(el){
+    if(!el) return;
+    el.style.transition=''; el.style.transform=''; el.style.willChange='';
+  }
   document.addEventListener('touchstart',e=>{
-    if(restoring||!isDetailOpen()||e.touches.length!==1||document.querySelector('.overlay'))return;
-    const t=e.touches[0]; if(t.clientX>30)return;
+    if(!isDetailOpen() || e.touches.length!==1 || document.querySelector('.overlay')) return;
+    const t=e.touches[0];
+    if(t.clientX>30) return;
     touch={x:t.clientX,y:t.clientY,lastX:t.clientX,lastY:t.clientY,active:true,locked:false,el:swipeSurface()};
   },{passive:true});
   document.addEventListener('touchmove',e=>{
-    if(!touch||!touch.active||e.touches.length!==1)return;
-    const t=e.touches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;
-    touch.lastX=t.clientX;touch.lastY=t.clientY;
+    if(!touch || !touch.active || e.touches.length!==1) return;
+    const t=e.touches[0], dx=t.clientX-touch.x, dy=t.clientY-touch.y;
+    touch.lastX=t.clientX; touch.lastY=t.clientY;
     if(!touch.locked){
-      if(Math.abs(dx)<7&&Math.abs(dy)<7)return;
-      if(dx<=0||Math.abs(dy)>Math.abs(dx)*.82){touch.active=false;clearSwipeStyle(touch.el);return;}
+      if(Math.abs(dx)<7 && Math.abs(dy)<7) return;
+      if(dx<=0 || Math.abs(dy)>Math.abs(dx)*.82){ touch.active=false; clearSwipeStyle(touch.el); return; }
       touch.locked=true;
     }
-    e.preventDefault();
-    const w=Math.max(320,window.innerWidth||320), eased=Math.min(dx,w)*(dx>w*.72?.92:1);
-    setSwipeX(eased,false);
+    if(touch.locked){
+      e.preventDefault();
+      const w=Math.max(320,window.innerWidth||320);
+      const eased=Math.min(dx,w) * (dx>w*.72 ? .92 : 1);
+      setSwipeX(eased,false);
+    }
   },{passive:false});
   document.addEventListener('touchend',()=>{
-    if(!touch)return;
-    const cur=touch,dx=cur.lastX-cur.x,dy=Math.abs(cur.lastY-cur.y);
-    const ok=cur.active&&cur.locked&&dx>=Math.min(88,(window.innerWidth||390)*.24)&&dy<=90&&dx>dy*1.15;
+    if(!touch) return;
+    const cur=touch, dx=cur.lastX-cur.x, dy=Math.abs(cur.lastY-cur.y);
+    const ok=cur.active && cur.locked && dx>=Math.min(88,(window.innerWidth||390)*.24) && dy<=90 && dx>dy*1.15;
     if(ok){
-      setSwipeX(window.innerWidth||420,true); touch=null;
-      setTimeout(()=>{clearSwipeStyle(cur.el);requestBack();},165);
+      setSwipeX(window.innerWidth||420,true);
+      touch=null;
+      setTimeout(()=>{ clearSwipeStyle(cur.el); requestBack(); },150);
     }else{
-      setSwipeX(0,true); touch=null; setTimeout(()=>clearSwipeStyle(cur.el),225);
+      setSwipeX(0,true);
+      touch=null;
+      setTimeout(()=>clearSwipeStyle(cur.el),205);
     }
   },{passive:true});
   document.addEventListener('touchcancel',()=>{
-    if(!touch)return; const cur=touch; setSwipeX(0,true);touch=null;setTimeout(()=>clearSwipeStyle(cur.el),225);
+    if(!touch) return; const cur=touch; setSwipeX(0,true); touch=null;
+    setTimeout(()=>clearSwipeStyle(cur.el),205);
   },{passive:true});
-
-  window.__v177Navigation={version:177,detailStartsAtTop:true,restoresListScroll:true,edgeSwipe:true,historyBack:true,immediateEntry:true,marketLogicChanged:false,timersAdded:false};
 })();
 </script>
-
-
-<!-- V178 — iOS detail-entry stability/performance patch. UI/render only; no market/trading/news changes. -->
-<style>
-/* Prevent Safari scroll anchoring from restoring the list's old Y after #app is replaced. */
-html.v178-detail-open, html.v178-detail-open body, html.v178-detail-open #app,
-.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,.screen:has(.detail-head){overflow-anchor:none!important}
-/* iOS Safari can defer/repaint canvas while its ancestor is entering with transform+opacity.
-   Detail pages already have the interactive swipe transition, so skip the redundant 180ms entrance animation. */
-.v119-us-detail,.v142-us-etf-detail,.v171-crypto-detail,
-.screen:has(.detail-head){animation:none!important}
-</style>
-<script>
-(()=>{
-  'use strict';
-  let kickRaf=0, settleRaf=0;
-  const root=document.documentElement;
-  function detail(){return document.querySelector('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back');}
-  function topNow(){
-    const se=document.scrollingElement||document.documentElement;
-    if(se.scrollTop!==0) se.scrollTop=0;
-    if(document.body && document.body.scrollTop!==0) document.body.scrollTop=0;
-  }
-  function paintChartOnce(){
-    if(!detail()) return;
-    /* Domestic chart: call the existing painter directly. */
-    try{ if(typeof selected!=='undefined' && selected && document.getElementById('chart') && typeof drawChart==='function') drawChart(selected, typeof chartHoverIndex==='number'?chartHoverIndex:-1); }catch(_){ }
-    /* ETF/crypto painters are intentionally private. Their mode buttons call the existing painter
-       without rebuilding the page; invoking the active mode once is the cheapest safe public hook. */
-    const mode=document.querySelector('[data-v142-etf-mode].active,[data-v171-crypto-mode].active');
-    if(mode && mode.offsetParent!==null){ try{ mode.click(); }catch(_){ } }
-  }
-  function settleDetail(){
-    if(!detail()) return;
-    root.classList.add('v178-detail-open');
-    topNow();
-    cancelAnimationFrame(settleRaf); cancelAnimationFrame(kickRaf);
-    settleRaf=requestAnimationFrame(()=>{
-      topNow();
-      kickRaf=requestAnimationFrame(()=>{
-        topNow();
-        paintChartOnce();
-      });
-    });
-  }
-  document.addEventListener('click',e=>{
-    const opener=e.target.closest('[data-stock],[data-v119-us-stock],[data-us-stock],[data-v119-us-holding],[data-v119-account-us],[data-v142-etf],[data-v142-us-etf],[data-v142-etf-holding],[data-v171-crypto],[data-v171-crypto-holding],.account-open');
-    if(!opener)return;
-    queueMicrotask(settleDetail);
-  },true);
-  /* Remove the anti-anchor class only after returning to a list. No observer/timer is added. */
-  window.addEventListener('popstate',()=>requestAnimationFrame(()=>{if(!detail())root.classList.remove('v178-detail-open')}));
-  document.addEventListener('click',e=>{
-    if(!e.target.closest('[data-v171-crypto-back],[data-v142-etf-back],[data-v119-us-back],.account-back,.screen .detail-head .back'))return;
-    requestAnimationFrame(()=>{if(!detail())root.classList.remove('v178-detail-open')});
-  },true);
-  window.__v178EntryStability={version:178,scrollAnchorGuard:true,detailEntryAnimationRemoved:true,chartFirstPaintKick:true,observersAdded:0,intervalsAdded:0,marketLogicChanged:false};
-})();
-</script>
-
 </body></html>
