@@ -12758,11 +12758,11 @@ const RE_UNITS=1000000000;
 const RE_OWNER_UNITS=Math.round(RE_UNITS*.90);
 const RE_CLOCK_REFRESH_MS=30*60*1000;
 const RE_META=[
-  {id:'gangnam-office',icon:'🏢',name:'파르나스타워',cap:3000000000,rate:.00300,occupancy:98,risk:'안정형',macroBeta:.35,rateSens:.040,idioVol:.00050,occSens:.35},
+  {id:'gangnam-office',icon:'🏢',name:'파르나스타워',cap:3000000000,rate:.00469,occupancy:98,risk:'안정형',macroBeta:.35,rateSens:.040,idioVol:.00050,occSens:.35},
   {id:'seoul-studio',icon:'🏠',name:'시그니엘 레지던스',cap:1800000000,rate:.00375,occupancy:95,risk:'월세형',macroBeta:.43,rateSens:.055,idioVol:.00070,occSens:.50},
-  {id:'logistics',icon:'📦',name:'CJ대한통운 곤지암 메가허브',cap:1000000000,rate:.00480,occupancy:91,risk:'성장형',macroBeta:.55,rateSens:.040,idioVol:.00090,occSens:.80},
-  {id:'retail',icon:'🏬',name:'여의도 IFC몰',cap:600000000,rate:.00630,occupancy:86,risk:'고수익형',macroBeta:.65,rateSens:.050,idioVol:.00120,occSens:1.00},
-  {id:'jeju-hotel',icon:'🏨',name:'그랜드 하얏트 제주',cap:300000000,rate:.00825,occupancy:78,risk:'고위험형',macroBeta:.78,rateSens:.035,idioVol:.00150,occSens:1.25}
+  {id:'logistics',icon:'📦',name:'CJ대한통운 곤지암 메가허브',cap:1000000000,rate:.00600,occupancy:91,risk:'성장형',macroBeta:.55,rateSens:.040,idioVol:.00090,occSens:.80},
+  {id:'retail',icon:'🏬',name:'여의도 IFC몰',cap:600000000,rate:.00788,occupancy:86,risk:'고수익형',macroBeta:.65,rateSens:.050,idioVol:.00120,occSens:1.00},
+  {id:'jeju-hotel',icon:'🏨',name:'그랜드 하얏트 제주',cap:300000000,rate:.01031,occupancy:78,risk:'고위험형',macroBeta:.78,rateSens:.035,idioVol:.00150,occSens:1.25}
 ];
 const RE_MAP=new Map(RE_META.map(x=>[x.id,x]));
 let RE_TOTAL_DISABLED=false,RE_ACTION_LOCK=false,RE_UI_LAST=0;
@@ -13242,7 +13242,7 @@ bind=function v210Bind(){RE_BIND_BASE();document.querySelectorAll('[data-v187-in
 const RE_REFRESH_BASE=refreshLive;
 refreshLive=function v210RefreshLive(){const out=RE_REFRESH_BASE();reAccrue();if(assetFilter!=='realestate')return out;const pending=document.querySelector('[data-v187-pending]');if(pending)pending.textContent=`+${fmt(+state?.realEstatePending||0)}원`;const claim=document.querySelector('[data-v187-claim]');if(claim)claim.disabled=!reOnlineReady()||(+state?.realEstatePending||0)<=0;const cd=document.querySelector('[data-v187-countdown]');if(cd)cd.textContent=reTime(reNextMs());const now=reClockNow();if(now-RE_UI_LAST>=15000){RE_UI_LAST=now;const sm=reMarketSummary(now),regime=document.querySelector('[data-v192-regime]'),rate=document.querySelector('[data-v192-rate]');if(regime)regime.textContent=sm.label;if(rate)rate.textContent=sm.rate.toFixed(2)+'%';for(const p of RE_META){const b=document.querySelector(`[data-v192-building="${p.id}"]`);if(b)b.textContent=fmt(reBuildingValue(p,now))+'원';const o=document.querySelector(`[data-v192-occ="${p.id}"]`);if(o)o.textContent=reDynamicOccupancy(p,now).toFixed(0)+'%';const ch=document.querySelector(`[data-v192-change="${p.id}"]`);if(ch){const r=reMarketChange(p,now);ch.textContent=(r>=0?'+':'')+r.toFixed(1)+'%';ch.className=r<0?'down':'gain'}const inc=document.querySelector(`[data-v192-income="${p.id}"]`);if(inc)inc.textContent='+'+fmt(reCycleIncome(p,now))+'원'}}return out};
 
-window.__realEstateV210={version:216,production:true,sharedFirebaseOwnership:true,serverClock:true,shareUnits:RE_UNITS,cycleHours:1,acquisitionShare:.90,pendingManualClaim:true,pendingIncomeSurvivesFullWithdrawal:true,transactionalInvestWithdrawClaim:true,crossTabActionLock:true,lazyFirebaseBootstrap:true,ownedBuildingsOnlyAccrualReads:true,zeroOwnerCleanup:true,marketEngine:'V72 macro + policy rate + property idiosyncratic random walk',saleFee:.015,gainTax:.10,marketEnginesChanged:false,legacyDailyPnlProtected:true,buildingIdsPreserved:true,properties:RE_META.map(x=>({id:x.id,name:x.name,cap:x.cap,rate3h:x.rate,baseOccupancy:x.occupancy}))};
+window.__realEstateV210={version:217,production:true,sharedFirebaseOwnership:true,serverClock:true,shareUnits:RE_UNITS,cycleHours:1,acquisitionShare:.90,pendingManualClaim:true,pendingIncomeSurvivesFullWithdrawal:true,transactionalInvestWithdrawClaim:true,crossTabActionLock:true,lazyFirebaseBootstrap:true,ownedBuildingsOnlyAccrualReads:true,zeroOwnerCleanup:true,marketEngine:'V72 macro + policy rate + property idiosyncratic random walk',saleFee:.015,gainTax:.10,marketEnginesChanged:false,legacyDailyPnlProtected:true,buildingIdsPreserved:true,properties:RE_META.map(x=>({id:x.id,name:x.name,cap:x.cap,rate3h:x.rate,baseOccupancy:x.occupancy}))};
 })();
 </script>
 
