@@ -12686,4 +12686,56 @@ window.__v186DetailNavigation={version:186,rendererOwnedTopReset:true,preDomChar
 })();
 </script>
 
+<!-- V188 — 요청한 2개 UI 수정만 적용: 긴 수익금액 잘림 + 접기 화살표 중앙정렬 -->
+<style id="v188-home-ui-two-fixes">
+/* 1) 수익금액이 길어져도 우측에서 잘리지 않도록 금액 열을 내용 폭에 맞춤 */
+.holding,
+.portfolio-list .holding{
+  grid-template-columns:44px minmax(0,1fr) max-content!important;
+}
+.holding .price{
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  overflow:visible!important;
+}
+.holding .price small{
+  font-size:clamp(10px,3vw,12px);
+  letter-spacing:-.2px;
+}
+@media(max-width:359px){
+  .holding,
+  .portfolio-list .holding{
+    grid-template-columns:40px minmax(0,1fr) max-content!important;
+    gap:9px;
+  }
+}
+
+/* 2) 목록 접기/펼치기 버튼의 화살표를 시각적으로 정확히 중앙에 정렬 */
+.v172-asset-section>.v127-overseas-title .v172-fold{
+  position:relative;
+  padding:0!important;
+  font-size:0!important;
+  line-height:1!important;
+  transform:none!important;
+}
+.v172-asset-section>.v127-overseas-title .v172-fold::before{
+  content:"";
+  display:block;
+  width:8px;
+  height:8px;
+  margin-top:-3px;
+  border-right:2px solid #6b7684;
+  border-bottom:2px solid #6b7684;
+  transform:rotate(45deg);
+  transform-origin:center;
+  transition:transform .16s ease;
+}
+.v172-asset-section.is-collapsed>.v127-overseas-title .v172-fold::before{
+  margin-top:0;
+  margin-left:-3px;
+  transform:rotate(-45deg);
+}
+</style>
+
 </body></html>
