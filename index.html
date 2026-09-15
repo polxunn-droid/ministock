@@ -319,7 +319,7 @@ async function trade(type,qty){qty=Math.floor(Number(qty));if(trading)return;if(
 const tradeBase=trade;trade=async function(type,qty){const n=Math.floor(Number(qty)),s=selected,before=state?.tradeLog?.length||0,avg=s?(state.holdings[s.code]?.avg||0):0;await tradeBase(type,qty);const log=state?.tradeLog||[];if(log.length===before)return;const fill=log.at(-1);if(type==='sell'&&fill?.type==='sell')state.realizedPnl=(+state.realizedPnl||0)+Math.round(fill.price*n*(1-FEE-TAX))-avg*n;await recordEquity(true);await Store.pushMyScore(true)};
 function toast(t){const el=document.createElement('div');el.className='toast';el.textContent=t;document.body.append(el);setTimeout(()=>el.remove(),2100)}
 let onboardingPreserve=false;
-function onboarding(preserve=false,message=''){onboardingPreserve=preserve;document.body.insertAdjacentHTML('beforeend',`<div class="overlay blocking"><div class="sheet"><div style="font-size:40px">📈</div><h2>${preserve?'닉네임을 다시 정해주세요':'같은 시장에서<br>투자를 시작해볼까요?'}</h2><p class="sub">${message||'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.'}</p><input id="nickname" maxlength="12" autocomplete="off" value="${preserve?state.nickname:''}" placeholder="닉네임을 입력하세요"><div class="nickname-help" id="nickname-status">시작할 때 실시간으로 중복 확인해요.</div><button class="primary" id="start">${preserve?'닉네임 저장':'중복 확인 후 시작'}</button></div></div>`)}
+function onboarding(preserve=false,message=''){if(document.querySelector('.overlay.blocking'))return;onboardingPreserve=preserve;document.body.insertAdjacentHTML('beforeend',`<div class="overlay blocking"><div class="sheet"><div style="font-size:40px">📈</div><h2>${preserve?'닉네임을 다시 정해주세요':'같은 시장에서<br>투자를 시작해볼까요?'}</h2><p class="sub">${message||'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.'}</p><input id="nickname" maxlength="12" autocomplete="off" value="${preserve?state.nickname:''}" placeholder="닉네임을 입력하세요"><div class="nickname-help" id="nickname-status">시작할 때 실시간으로 중복 확인해요.</div><button class="primary" id="start">${preserve?'닉네임 저장':'중복 확인 후 시작'}</button></div></div>`)}
 function render(){selected=null;accountView=false;$('#app').innerHTML=view==='home'?home():view==='discover'?discover():view==='watch'?discover(true):ranks();bind()}
 function cleanNickname(v){return String(v||'').normalize('NFKC').replace(/[<>&"']/g,'').replace(/\s+/g,' ').trim().slice(0,12)}
 function normalizeState(v){const out={nickname:cleanNickname(v?.nickname),cash:Number.isFinite(+v?.cash)?Math.max(0,+v.cash):START,holdings:{},tradeLog:[],watch:[]};for(const s of STOCKS){const h=v?.holdings?.[s.code];if(h&&Number.isFinite(+h.qty)&&+h.qty>0&&Number.isFinite(+h.avg)&&+h.avg>0)out.holdings[s.code]={qty:Math.floor(+h.qty),avg:+h.avg}}out.watch=[...new Set(Array.isArray(v?.watch)?v.watch.filter(c=>STOCKS.some(s=>s.code===c)):[])];out.tradeLog=(Array.isArray(v?.tradeLog)?v.tradeLog:[]).filter(x=>x&&['buy','sell'].includes(x.type)&&STOCKS.some(s=>s.code===x.code)&&Number.isFinite(+x.qty)&&Number.isFinite(+x.price)).slice(-300);return out}
@@ -335,7 +335,7 @@ function bind(){document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()
 const bindBase=bind;bind=function(){bindBase();if(selected&&$('#chart'))bindChartPointer(selected);document.querySelectorAll('[data-market]').forEach(b=>b.onclick=openMarketSummary);document.querySelectorAll('[data-settings]').forEach(b=>b.onclick=openSettings);$('#reset')?.addEventListener('click',openTradeLog);const fav=$('.detail-head .icons');if(selected&&fav){fav.style.cursor='pointer';fav.setAttribute('role','button');fav.setAttribute('tabindex','0');fav.setAttribute('aria-label','관심 종목 설정');fav.onclick=()=>{const c=selected.code;state.watch=state.watch.includes(c)?state.watch.filter(x=>x!==c):[...state.watch,c];Store.saveMe(userId,state);$('#app').innerHTML=detail(selected);window.__miniDetailMounted?.('domestic-rerender');bind()}}};
 const bindUi=bind;bind=function(){bindUi();requestAnimationFrame(()=>document.querySelector('.chip.active')?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));const fav=$('.detail-head .icons[role="button"]');if(fav)fav.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fav.click()}}};
 const bindAccount=bind;bind=function(){bindAccount();$('.account-open')?.addEventListener('click',openAccountDetail);$('.account-back')?.addEventListener('click',()=>{accountView=false;render()});if(selected&&$('#chart'))requestAnimationFrame(()=>drawChart(selected,chartHoverIndex))};
-document.addEventListener('click',async e=>{if(e.target.classList.contains('overlay')||e.target.closest('[data-close]'))e.target.closest('.overlay')?.remove();if(e.target.id==='confirm')trade(e.target.dataset.type,$('#qty')?.value);if(e.target.id==='start'){const button=e.target,raw=$('#nickname')?.value||'',n=cleanNickname(raw),status=$('#nickname-status');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 닉네임을 확인해주세요');button.disabled=true;if(status)status.textContent='중복 확인 중…';const oldName=onboardingPreserve?state.nickname:'',claim=await Store.claimNickname(n,oldName);button.disabled=false;if(!claim.ok){if(status)status.textContent=claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요.':'연결 오류가 있어 다시 확인해주세요.';return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요')}userId=Store.uid||userId;if(onboardingPreserve)state.nickname=n;else state={nickname:n,cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};try{localStorage.setItem('mockstock:uid',userId)}catch{}await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay.blocking')?.remove();onboardingPreserve=false;render()}if(e.target.id==='save-name'){const button=e.target,n=cleanNickname($('#rename')?.value||'');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 변경해주세요');button.disabled=true;const claim=await Store.claimNickname(n,state.nickname);button.disabled=false;if(!claim.ok)return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요');state.nickname=n;await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay')?.remove();toast('닉네임을 저장했어요');render()}if(e.target.id==='reset-game'){if(!confirm('보유 종목과 거래내역을 모두 지우고 처음부터 시작할까요?'))return;const oldName=state.nickname;await Store.removeMyScore();await Store.releaseNickname(oldName);try{localStorage.removeItem('mockstock:'+userId)}catch{}userId=Store.uid||userId;state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};$('.overlay')?.remove();render();onboarding()}});
+document.addEventListener('click',async e=>{if(e.target.classList.contains('overlay')||e.target.closest('[data-close]'))e.target.closest('.overlay')?.remove();if(e.target.id==='confirm')trade(e.target.dataset.type,$('#qty')?.value);if(e.target.id==='start'){const button=e.target,onboard=button.closest('.overlay.blocking'),raw=onboard?.querySelector('#nickname')?.value||'',n=cleanNickname(raw),status=onboard?.querySelector('#nickname-status');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 닉네임을 확인해주세요');button.disabled=true;if(status)status.textContent='중복 확인 중…';const oldName=onboardingPreserve?state.nickname:'',claim=await Store.claimNickname(n,oldName);button.disabled=false;if(!claim.ok){if(status)status.textContent=claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요.':'연결 오류가 있어 다시 확인해주세요.';return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요')}userId=Store.uid||userId;if(onboardingPreserve)state.nickname=n;else state={nickname:n,cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};try{localStorage.setItem('mockstock:uid',userId)}catch{}await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay.blocking')?.remove();onboardingPreserve=false;render()}if(e.target.id==='save-name'){const button=e.target,n=cleanNickname($('#rename')?.value||'');if(n.length<2)return toast('닉네임을 2자 이상 입력해주세요');if(!Store.online)return toast('인터넷 연결 후 변경해주세요');button.disabled=true;const claim=await Store.claimNickname(n,state.nickname);button.disabled=false;if(!claim.ok)return toast(claim.reason==='duplicate'?'이미 사용 중인 닉네임이에요':'닉네임을 확인하지 못했어요');state.nickname=n;await Store.saveMe(userId,state);await Store.pushMyScore(true);$('.overlay')?.remove();toast('닉네임을 저장했어요');render()}if(e.target.id==='reset-game'){if(!confirm('보유 종목과 거래내역을 모두 지우고 처음부터 시작할까요?'))return;const oldName=state.nickname;await Store.removeMyScore();await Store.releaseNickname(oldName);try{localStorage.removeItem('mockstock:'+userId)}catch{}userId=Store.uid||userId;state={nickname:'',cash:START,holdings:{},tradeLog:[],watch:[],realizedPnl:0,equityHistory:[],marketVersion:5};$('.overlay')?.remove();render();onboarding()}});
 document.addEventListener('click',e=>{if(e.target.matches('.overlay.blocking'))e.stopImmediatePropagation()},true);
 document.addEventListener('click',e=>{if(e.target.matches('.search-overlay')){e.stopImmediatePropagation();closeSearch()}},true);
 function isKakaoInApp(){return /KAKAOTALK/i.test(navigator.userAgent||'')}
@@ -1760,7 +1760,7 @@ window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuc
   }
   if(userId)await Store.saveMe(userId,state);
   if(!state.nickname||state.nickname==='게스트'){
-    if(!document.querySelector('.onboard'))onboarding(hadLocal,'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.');
+    if(!document.querySelector('.overlay.blocking'))onboarding(hadLocal,'닉네임은 모든 실제 참가자 중 하나만 사용할 수 있어요.');
   }else if(Store.online){
     const claim=await Store.claimNickname(state.nickname);
     if(claim.ok)await Store.pushMyScore(true);
@@ -3712,6 +3712,7 @@ window.__marketV46={
    4) nav 클릭 시 active 상태를 먼저 paint한 다음 render.
 */
 
+const V47_SNAPSHOT_STOCKS=STOCKS.filter(s=>!s.isETF);
 const V47_DISCOVER_SNAPSHOT=new Map();
 let V47_SNAPSHOT_AT=0;
 let V47_BUILDING=false;
@@ -3726,7 +3727,7 @@ function v47Idle(cb){
 
 function v47BuildSnapshot(force=false){
   if(document.hidden||V47_BUILDING)return;
-  if(!force && V47_DISCOVER_SNAPSHOT.size===STOCKS.length && Date.now()-V47_SNAPSHOT_AT<3500)return;
+  if(!force && V47_DISCOVER_SNAPSHOT.size===V47_SNAPSHOT_STOCKS.length && Date.now()-V47_SNAPSHOT_AT<3500)return;
   V47_BUILDING=true;
   const token=++V47_BUILD_TOKEN;
   const fresh=new Map();
@@ -3737,21 +3738,23 @@ function v47BuildSnapshot(force=false){
     const started=performance.now();
     // 첫 조작과 경쟁하지 않도록 한 task당 최대 8종목만 준비한다.
     let n=0;
-    while(i<STOCKS.length && n<8 && (deadline?.timeRemaining?.()>1 || performance.now()-started<4)){
-      const s=STOCKS[i++];
+    while(i<V47_SNAPSHOT_STOCKS.length && n<1 && (deadline?.timeRemaining?.()>1 || performance.now()-started<4)){
+      const s=V47_SNAPSHOT_STOCKS[i++];
       try{
         if(typeof v71KospiAnchorPrice==='function'&&!s.isETF)v71KospiAnchorPrice(s);
         fresh.set(s.code,V47_REAL_QUOTE(s));
-      }catch(e){}
+      }catch(e){console.warn('종목 시세 준비 실패',s.code,e?.message||e)}
       n++;
+      document.documentElement.dataset.miniWarmProgress=i+'/'+V47_SNAPSHOT_STOCKS.length;
     }
-    if(i<STOCKS.length){
+    if(i<V47_SNAPSHOT_STOCKS.length){
       v47Idle(step);
     }else{
       V47_DISCOVER_SNAPSHOT.clear();
       for(const [k,v] of fresh)V47_DISCOVER_SNAPSHOT.set(k,v);
       V47_SNAPSHOT_AT=Date.now();
       V47_BUILDING=false;
+      if(document.querySelector('[data-mini-quotes-loading]')&&!selected)setTimeout(()=>render(),0);
       try{window.__v115KospiWarmReady?.()}catch(e){}
     }
   };
@@ -5420,7 +5423,7 @@ v53RefreshMoverList=function v58CoolMoverRefresh(force=false){
 const V58_SNAPSHOT_BASE=v47BuildSnapshot;
 v47BuildSnapshot=function v58CoolSnapshot(force=false){
   if(document.hidden||V47_BUILDING)return;
-  const complete=V47_DISCOVER_SNAPSHOT.size===STOCKS.length;
+  const complete=V47_DISCOVER_SNAPSHOT.size===V47_SNAPSHOT_STOCKS.length;
   const age=Date.now()-V47_SNAPSHOT_AT;
   if(complete && age<V58_SNAPSHOT_REFRESH_MS)return;
   return V58_SNAPSHOT_BASE(true);
@@ -7220,7 +7223,7 @@ v53RefreshMoverList=function v83ThermalMover(force=false){
 const V83_SNAPSHOT_BASE=v47BuildSnapshot;
 v47BuildSnapshot=function v83ThermalSnapshot(force=false){
   if(document.hidden||V47_BUILDING)return;
-  const complete=V47_DISCOVER_SNAPSHOT.size===STOCKS.length;
+  const complete=V47_DISCOVER_SNAPSHOT.size===V47_SNAPSHOT_STOCKS.length;
   if(!marketSessionInfo().open && complete)return;
   return V83_SNAPSHOT_BASE(force);
 };
@@ -8756,6 +8759,7 @@ window.__marketV95={
   const PATH_CACHE=new Map(),PATH_CACHE_MAX=700;
   const FINAL_CACHE=new Map(),FINAL_CACHE_MAX=6000;
   const FINAL_SESSION_CACHE=new Map(),FINAL_SESSION_CACHE_MAX=1200;
+  const FINAL_SESSION_LATEST=new Map();
   const CURVES={
     blue:  {points:[[.10,1.00],[.15,.65],[.20,.38],[.30,.18],[.40,.10]],tail:.08},
     growth:{points:[[.16,1.00],[.25,.75],[.35,.52],[.50,.28],[.70,.18]],tail:.14},
@@ -8846,7 +8850,8 @@ window.__marketV95={
     if(hit!==undefined)return hit;
     const pos=v68SessionPosition(ms);
     const sessionKey=s.code+'|'+pos.day;
-    let anchor=FINAL_SESSION_CACHE.get(sessionKey);
+    const latest=FINAL_SESSION_LATEST.get(s.code);
+    let anchor=latest?.key===sessionKey?latest.anchor:FINAL_SESSION_CACHE.get(sessionKey);
     if(!anchor){
       // 자정 이후 재접속해도 08:00 개장 전까지는 직전 마감 세션의 기준가를 유지한다.
       const prevMs=v67SessionPrevCloseMs(pos.open);
@@ -8855,6 +8860,8 @@ window.__marketV95={
       const prevAdjusted=prevMs<TRANSITION_MS?rawPrev:finalBalancedVisual(s,prevMs);
       anchor={rawOpen,base:prevAdjusted*Math.exp(Math.max(-.01,Math.min(.01,Math.log(rawOpen/rawPrev))))};
       FINAL_SESSION_CACHE.set(sessionKey,anchor);
+      const newest=FINAL_SESSION_LATEST.get(s.code);
+      if(!newest||pos.day>=newest.day)FINAL_SESSION_LATEST.set(s.code,{key:sessionKey,day:pos.day,anchor});
       while(FINAL_SESSION_CACHE.size>FINAL_SESSION_CACHE_MAX)FINAL_SESSION_CACHE.delete(FINAL_SESSION_CACHE.keys().next().value);
     }
     const adjustedChange=integratedContinuation(s,raw/anchor.rawOpen-1);
@@ -13578,4 +13585,38 @@ window.__v211HomeProfitFoldFix={
 })();
 </script>
 
+<script>
+// Cache only deterministic random values, keyed by the exact seed string.
+// FIFO eviction limits memory; recomputation produces the same value.
+(function(){
+  function memoSeed(prefix,base){
+    const cache=new Map(),limit=30000;
+    return function(...args){
+      const key=[prefix,...args].join('|');
+      if(cache.has(key))return cache.get(key);
+      const value=base(...args);
+      if(cache.size>=limit)cache.delete(cache.keys().next().value);
+      cache.set(key,value);
+      return value;
+    };
+  }
+  v9Unit=memoSeed('v9',v9Unit);
+  v9Normal=memoSeed('v9n',v9Normal);
+})();
+
+// Keep navigation available while the initial domestic quote snapshot is built.
+(function(){
+  const baseDiscover=discover;
+  discover=function(watch=false){
+    const cold=V47_DISCOVER_SNAPSHOT.size<V47_SNAPSHOT_STOCKS.length;
+    if(cold&&(watch||assetFilter==='stock')){
+      v47BuildSnapshot(false);
+      const menu=watch?'':`<div class="asset-switch">${[['stock','🇰🇷 국내주식'],['us','🇺🇸 미국주식'],['etf','ETF'],['crypto','코인'],['realestate','🏢 부동산']].map(([key,label])=>`<button class="asset-card ${assetFilter===key?'active':''}" data-asset="${key}"><b>${label}</b></button>`).join('')}</div>`;
+      return shell(`${header(watch?'관심':'발견')}${menu}<div class="empty" data-mini-quotes-loading role="status" aria-live="polite">종목 시세를 준비하고 있어요. 잠시 후 목록이 표시됩니다.<br>다른 메뉴는 계속 이용할 수 있어요.</div>`,watch?'watch':'discover');
+    }
+    return baseDiscover(watch);
+  };
+})();
+
+</script>
 </body></html>
