@@ -260,7 +260,7 @@ const memory={};const LocalStore={async loadMe(id){try{return JSON.parse(localSt
 const nicknameKey=name=>encodeURIComponent(cleanNickname(name).normalize('NFKC').toLocaleLowerCase('ko-KR'));
 // 랭킹 점수(ranking/{uid}) 쓰기 최소 간격 — 랭킹 폴링 간격(RKV2_POLL_MS)과 동일하게 10분으로 통일.
 const SCORE_PUSH_INTERVAL_MS=10*60*1000;
-const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
+const Store={online:false,uid:'',db:null,rankingRows:[],unsubscribe:null,lastPushAt:0,pushTimer:0,pushPromise:null,async init(){let legacyId='';try{legacyId=localStorage.getItem('mockstock:uid')||''}catch{}try{if(!window.firebase)throw new Error('Firebase SDK unavailable');if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);await new Promise((resolve,reject)=>{let off;off=firebase.auth().onAuthStateChanged(()=>{off?.();resolve()},error=>{off?.();reject(error)})});const credential=firebase.auth().currentUser?{user:firebase.auth().currentUser}:await firebase.auth().signInAnonymously(),uid=credential.user.uid;this.uid=uid;this.db=firebase.firestore();this.online=true;try{const old=legacyId&&legacyId!==uid?localStorage.getItem('mockstock:'+legacyId):null,current=localStorage.getItem('mockstock:'+uid);if(old&&!current)localStorage.setItem('mockstock:'+uid,old);localStorage.setItem('mockstock:uid',uid)}catch{}userId=uid;this.unsubscribe=null;this.rankingRows=[];return true}catch(error){console.warn('Firebase 연결 실패',error?.code||error?.message);this.online=false;return false}},async claimNickname(name,oldName=''){if(!this.online||!this.db||!this.uid)return{ok:false,reason:'offline'};const clean=cleanNickname(name),key=nicknameKey(clean),oldKey=oldName?nicknameKey(oldName):'',ref=this.db.collection('nicknames').doc(key),oldRef=oldKey&&oldKey!==key?this.db.collection('nicknames').doc(oldKey):null;try{return await this.db.runTransaction(async tx=>{const current=await tx.get(ref),old=oldRef?await tx.get(oldRef):null;if(current.exists&&current.data()?.uid!==this.uid)return{ok:false,reason:'duplicate'};tx.set(ref,{uid:this.uid,nickname:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});if(oldRef&&old?.exists&&old.data()?.uid===this.uid)tx.delete(oldRef);return{ok:true,nickname:clean}})}catch(error){console.warn('닉네임 확인 실패',error?.code||error?.message);return{ok:false,reason:'error'}}},async releaseNickname(name){if(!this.online||!this.db||!this.uid||!name)return;const ref=this.db.collection('nicknames').doc(nicknameKey(name));try{await this.db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data()?.uid===this.uid)tx.delete(ref)})}catch{}},async loadMe(id){return LocalStore.loadMe(id)},async saveMe(id,v){await LocalStore.saveMe(id,v);this.scheduleScore()},scheduleScore(force=false){if(!this.online||!state||!this.uid)return;const wait=Math.max(0,SCORE_PUSH_INTERVAL_MS-(Date.now()-this.lastPushAt));if(force||wait===0){clearTimeout(this.pushTimer);this.pushTimer=0;this.pushMyScore(true);return}if(!this.pushTimer)this.pushTimer=setTimeout(()=>{this.pushTimer=0;this.pushMyScore(true)},wait)},async pushMyScore(force=false){if(!this.online||!state||!this.db||!this.uid||!state.nickname||state.nickname==='게스트')return false;if(this.pushPromise&&Date.now()-this.lastPushAt<500)return this.pushPromise;if(!force&&Date.now()-this.lastPushAt<SCORE_PUSH_INTERVAL_MS){this.scheduleScore();return false}this.lastPushAt=Date.now();this.pushPromise=this.db.collection('ranking').doc(this.uid).set({nickname:cleanNickname(state.nickname),totalValue:Math.round(total()),pnlRate:+accountRate().toFixed(4),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>true).catch(error=>{console.warn('랭킹 저장 실패',error?.code||error?.message);return false}).finally(()=>{this.pushPromise=null});return this.pushPromise},async removeMyScore(){if(!this.online||!this.db||!this.uid)return;try{await this.db.collection('ranking').doc(this.uid).delete()}catch{}}};
 let userId=(()=>{try{return localStorage.getItem('mockstock:uid')||''}catch{return''}})(),state=null,view='home',selected=null,accountView=false,sort='value',sectorFilter='전체',assetFilter='stock',chartRange='day',chartMode='line',lastChartTick=-1,chartHoverIndex=-1,trading=false,pendingOrder=null;
 // liveLoop는 매 프레임 도는 rAF 루프. 원래는 부트스트랩 IIFE(비동기) 안에서
 // const로 선언돼 있어서 (a) 다른 <script> 블록에서는 아예 접근 불가능했고,
@@ -1751,7 +1751,13 @@ window.__hourlyRewardV27={slot:hourlyRewardSlot,build:buildHourlyReward,priceBuc
 
   // 첫 화면을 먼저 그린 뒤 인증·랭킹 연결은 백그라운드에서 이어간다.
   await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
-  await Promise.race([loadFirebaseSdk().then(ok=>ok&&Store.init()),new Promise(resolve=>setTimeout(()=>resolve(false),6500))]);
+  Store.connectionState='connecting';
+  const connectionWatchdog=setTimeout(()=>{Store.connectionState='slow';if(state)render()},12000);
+  const connected=await loadFirebaseSdk().then(ok=>ok&&Store.init());
+  clearTimeout(connectionWatchdog);
+  Store.connectionState=connected?'online':'error';
+  if(state)render();
+  window.dispatchEvent(new Event('ministock:firebase-settled'));
   document.documentElement.dataset.v115FirebaseReadyMs=(performance.now()-V115_PAGE_START).toFixed(2);
   const synced=userId?await LocalStore.loadMe(userId):null;
   if(synced){
@@ -3999,6 +4005,7 @@ window.__marketV48={
 // 1) V29 EXACT incremental state cache
 // ------------------------------------------------------------------
 const V49_PATH_STATE_CACHE=new Map();
+const V49_PATH_STATE_LATEST=new Map();
 const V49_PATH_STATE_MAX=700;
 
 function v49PathKey(s,day,open){
@@ -4006,6 +4013,9 @@ function v49PathKey(s,day,open){
   return s.code+'|'+day+'|'+Number(open).toPrecision(12);
 }
 function v49TouchPathState(key,state){
+  // Keep each stock's newest path when historical requests evict the bounded LRU.
+  const [code,dayText]=key.split('|'),day=Number(dayText),latest=V49_PATH_STATE_LATEST.get(code);
+  if(!latest||day>=latest.day)V49_PATH_STATE_LATEST.set(code,{key,day,state});
   // Map insertion order 기반 작은 LRU.
   V49_PATH_STATE_CACHE.delete(key);
   V49_PATH_STATE_CACHE.set(key,state);
@@ -4019,7 +4029,8 @@ const V49_RAW_WITH_OPEN_BASE=v29RawWithOpen;
 v29RawWithOpen=function v49IncrementalRawWithOpen(s,day,minute,open){
   minute=Math.max(0,Math.min(389,Math.floor(+minute||0)));
   const key=v49PathKey(s,day,open);
-  let st=V49_PATH_STATE_CACHE.get(key);
+  const latest=V49_PATH_STATE_LATEST.get(s.code);
+  let st=V49_PATH_STATE_CACHE.get(key)||(latest?.key===key?latest.state:null);
 
   if(!st){
     st={
@@ -4107,7 +4118,7 @@ gameKospiQuote=function v49CachedGameKospiQuote(ms=Date.now()){
 
 try{
   V48_RAW_TICK_CACHE?.clear?.();
-  V49_PATH_STATE_CACHE.clear();
+  V49_PATH_STATE_CACHE.clear();V49_PATH_STATE_LATEST.clear();
   V49_KOSPI_CACHE.clear();
 }catch(e){}
 
@@ -5536,7 +5547,7 @@ try{
   v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
   V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
   priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
-  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
 }catch(e){}
 
 window.__marketV64={
@@ -5629,7 +5640,7 @@ try{
   V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
   priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
   V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
-  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
   V52_LIVE_QUOTE_CACHE?.clear?.();
 }catch(e){}
 
@@ -5776,7 +5787,7 @@ try{
   V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
   priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
   V43_FINAL_QUOTE_CACHE?.clear?.();V45_QUOTE_CACHE?.clear?.();
-  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
   V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
 }catch(e){}
 
@@ -5886,7 +5897,7 @@ function v70SessionCumulativeWalk(s,day,minute,openPrice){
 }
 
 try{
-  V49_PATH_STATE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();
+  V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();V48_RAW_TICK_CACHE?.clear?.();
   V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();
   V70_WALK_CACHE?.clear?.();
   referenceScaleCache?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();
@@ -7148,7 +7159,7 @@ try{
   v9PriceCache?.clear?.();V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();
   V29_SCALE_CACHE?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();
   priceCache?.clear?.();V23_QUOTE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
-  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V45_QUOTE_CACHE?.clear?.();V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
   V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();V70_WALK_CACHE?.clear?.();
   V52_LIVE_QUOTE_CACHE?.clear?.();V67_PREV_CLOSE_CACHE?.clear?.();
 }catch(e){}
@@ -7568,7 +7579,7 @@ v9Shock=function v85TierBalancedShock(s,day,minute){
 try{
   v9PriceCache?.clear?.();referenceScaleCache?.clear?.();dayOpenCache?.clear?.();priceCache?.clear?.();
   V29_OPEN_CACHE?.clear?.();V29_CLOSE_CACHE?.clear?.();V29_SCALE_CACHE?.clear?.();
-  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.();V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
   V69_RAW_CACHE?.clear?.();V69_SCALE_CACHE?.clear?.();V70_WALK_CACHE?.clear?.();
   V23_QUOTE_CACHE?.clear?.();V43_PREVCLOSE_CACHE?.clear?.();V43_FINAL_QUOTE_CACHE?.clear?.();
   V45_QUOTE_CACHE?.clear?.();V45_QUOTE_TICK_CACHE?.clear?.();V52_LIVE_QUOTE_CACHE?.clear?.();
@@ -7665,7 +7676,7 @@ window.__marketV100={
 try{
   v9PriceCache?.clear?.(); referenceScaleCache?.clear?.(); dayOpenCache?.clear?.(); priceCache?.clear?.();
   V29_OPEN_CACHE?.clear?.(); V29_CLOSE_CACHE?.clear?.(); V29_SCALE_CACHE?.clear?.();
-  V48_RAW_TICK_CACHE?.clear?.(); V49_PATH_STATE_CACHE?.clear?.();
+  V48_RAW_TICK_CACHE?.clear?.(); V49_PATH_STATE_CACHE?.clear?.();V49_PATH_STATE_LATEST?.clear?.();
   V69_RAW_CACHE?.clear?.(); V69_SCALE_CACHE?.clear?.(); V70_WALK_CACHE?.clear?.();
   V23_QUOTE_CACHE?.clear?.(); V43_PREVCLOSE_CACHE?.clear?.(); V43_FINAL_QUOTE_CACHE?.clear?.();
   V45_QUOTE_TICK_CACHE?.clear?.(); V52_LIVE_QUOTE_CACHE?.clear?.();
@@ -8844,10 +8855,10 @@ window.__marketV95={
   // 화면 최종 체감 레이어까지 통과한 '전일 종가 대비 일간 변화'도 같은 곡선으로 적분한다.
   // 이전 조정 종가를 다음 날 기준으로 재사용하므로 장 경계 연속성과 누적 경로를 함께 보존한다.
   function finalBalancedVisual(s,ms){
-    const raw=Math.max(1,Number(BASE_FINAL_VISUAL(s,ms))||1);
-    if(!s||s.isETF||ms<TRANSITION_MS)return raw;
+    if(!s||s.isETF||ms<TRANSITION_MS)return Math.max(1,Number(BASE_FINAL_VISUAL(s,ms))||1);
     const key=s.code+'|'+Math.floor(ms/1000),hit=FINAL_CACHE.get(key);
     if(hit!==undefined)return hit;
+    const raw=Math.max(1,Number(BASE_FINAL_VISUAL(s,ms))||1);
     const pos=v68SessionPosition(ms);
     const sessionKey=s.code+'|'+pos.day;
     const latest=FINAL_SESSION_LATEST.get(s.code);
@@ -13157,6 +13168,7 @@ function reScheduleAccrual(){clearTimeout(RE_SHARED.accrueTimer);if(!RE_SHARED.r
 async function reBootstrap(){
   if(RE_SHARED.booting||RE_SHARED.ready||!Store?.online||!Store?.db||!Store?.uid||!state)return;
   RE_SHARED.booting=true;RE_SHARED.error='';
+  const watchdog=setTimeout(()=>{if(RE_SHARED.booting&&!RE_SHARED.ready){RE_SHARED.error='connection-slow';reRenderSoon()}},12000);
   try{
     const readServerDocs=()=>Promise.all([reUserRef().get({source:'server'}),...RE_META.map(p=>reBuildingRef(p.id).get({source:'server'}))]);
     let docs;
@@ -13168,13 +13180,13 @@ async function reBootstrap(){
       [userSnap,...buildingSnaps]=docs;
     }
     RE_SHARED.user=reUserData(userSnap.data());for(let i=0;i<RE_META.length;i++)reSetBuildingLocal(RE_META[i].id,buildingSnaps[i].data());
-    RE_SHARED.ready=true;reApplyLocalMirror(true);
+    RE_SHARED.error='';RE_SHARED.ready=true;reApplyLocalMirror(true);
     RE_SHARED.buildingUnsub?.();RE_SHARED.userUnsub?.();
-    RE_SHARED.buildingUnsub=Store.db.collection('realestate_buildings').onSnapshot(s=>{let changed=false;s.docChanges().forEach(c=>{if(RE_MAP.has(c.doc.id)){reSetBuildingLocal(c.doc.id,c.doc.data());changed=true}});if(changed){reApplyLocalMirror(true);reScheduleAccrual();reRenderSoon()}},e=>{RE_SHARED.error=e?.code||'building-listener'});
-    RE_SHARED.userUnsub=reUserRef().onSnapshot(s=>{if(s.exists){RE_SHARED.user=reUserData(s.data());reApplyLocalMirror(true);reRenderSoon()}},e=>{RE_SHARED.error=e?.code||'user-listener'});
+    RE_SHARED.buildingUnsub=Store.db.collection('realestate_buildings').where(firebase.firestore.FieldPath.documentId(),'in',RE_META.map(p=>p.id)).onSnapshot(s=>{let changed=false;s.docChanges().forEach(c=>{if(RE_MAP.has(c.doc.id)){reSetBuildingLocal(c.doc.id,c.doc.data());changed=true}});if(changed){reApplyLocalMirror(true);reScheduleAccrual();reRenderSoon()}},e=>reListenerFailed(e,'building-listener'));
+    RE_SHARED.userUnsub=reUserRef().onSnapshot(s=>{if(s.exists){RE_SHARED.user=reUserData(s.data());reApplyLocalMirror(true);reRenderSoon()}},e=>reListenerFailed(e,'user-listener'));
     await reServerAccrueAll();reScheduleAccrual();reRenderSoon();
   }catch(e){RE_SHARED.error=e?.code||e?.message||'bootstrap';console.warn('부동산 서버 연결 실패',RE_SHARED.error)}
-  finally{RE_SHARED.booting=false}
+  finally{clearTimeout(watchdog);RE_SHARED.booting=false;reRenderSoon()}
 }
 function reWaitBootstrap(n=0,force=false){
   if(Store?.online&&Store?.db&&Store?.uid&&state){
@@ -13184,6 +13196,7 @@ function reWaitBootstrap(n=0,force=false){
   if(n<60)setTimeout(()=>reWaitBootstrap(n+1,force),500);
 }
 setTimeout(()=>reWaitBootstrap(),0);
+window.addEventListener('ministock:firebase-settled',()=>{reWaitBootstrap();reRenderSoon()});
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible'||!Store?.online)return;
   if(RE_SHARED.ready)reSyncClock(true).then(()=>reServerAccrueAll()).catch(()=>{});
@@ -13207,15 +13220,30 @@ function reInjectMenu(html){if(typeof html!=='string')return html;const t=docume
 function reMenu(){return `<div class="asset-switch"><button data-asset="stock" class="asset-card"><span class="asset-symbol kr-flag">🇰🇷</span><b>국내주식</b></button><button data-asset="us" class="asset-card"><span class="asset-symbol us-flag">🇺🇸</span><b>미국주식</b></button><button data-asset="etf" class="asset-card"><span class="asset-symbol etf-mark"><i></i></span><b>ETF</b></button><button data-asset="crypto" class="asset-card"><span class="asset-symbol" style="background:#fff5e8;color:#b86b00;font-weight:950">₿</span><b>코인</b></button>${reButton()}</div>`}
 function reCard(p){
   const s=reShare(p),owner=s>=.90,ranks=reRanks(p).slice(0,3),avail=reAvailable(p),ready=reOnlineReady();
-  return `<div class="v187-re-card ${owner?'owner':''}"><div class="v187-re-head"><div class="v187-re-logo">${p.icon}</div><div><div class="name">${escHtml(p.name)}</div><small class="sub">현재 건물가치 <span data-v192-building="${p.id}">${fmt(reBuildingValue(p))}원</span> · 임대율 <span data-v192-occ="${p.id}">${reDynamicOccupancy(p).toFixed(0)}%</span></small></div>${reBadge(p)}</div><div class="v187-re-stats"><div class="v187-re-stat"><small>현재 평가액</small><b>${fmt(reCurrentValue(p))}원</b></div><div class="v187-re-stat"><small>기준가 대비</small><b data-v192-change="${p.id}" class="${reMarketChange(p)<0?'down':'gain'}">${reMarketChange(p)>=0?'+':''}${reMarketChange(p).toFixed(1)}%</b></div><div class="v187-re-stat"><small>1시간 예상수익</small><b data-v192-income="${p.id}" class="gain">+${fmt(reCycleIncome(p))}원</b></div></div><div class="v187-re-gauge"><i style="width:${Math.min(100,s*100)}%"></i></div><div class="v187-re-gauge-label"><span>내 지분 ${(s*100).toFixed(2)}% · 매입원금 ${fmt(reCost(p.id))}원</span><span>🏢 건물주 90%</span></div><div class="v187-re-rank">${ranks.length?ranks.map((r,i)=>`<div class="v187-re-rank-row ${r.me?'me':''}"><span>${['🥇','🥈','🥉'][i]||'·'}</span><span>${escHtml(r.name)}</span><b>${(r.share*100).toFixed(2)}%</b></div>`).join(''):'<div class="v187-re-rank-row"><span>·</span><span>아직 투자자가 없어요</span><b>0%</b></div>'}</div>${owner?`<div class="v187-re-owner-note">${s>=.999999999?'🏢 모든 지분을 보유한 단독 건물주예요.':'🏢 90% 이상 지분을 확보해 건물주가 되었어요.'} 1시간 유지 후 건물주 보너스가 정산됩니다.</div>`:''}<div class="v187-re-gauge-label"><span>남은 투자 가능액</span><b>${fmt(avail)}원</b></div><div class="v187-re-actions"><button class="primary" data-v187-invest="${p.id}" ${!ready||avail<RE_MIN?'disabled':''}>${!ready?'연결 중':avail>=RE_MIN?'지분 투자하기':'모집 완료'}</button><button class="ghost" data-v187-withdraw="${p.id}" ${!ready||reCost(p.id)<RE_MIN?'disabled':''}>회수</button></div></div>`;
+  return `<div class="v187-re-card ${owner?'owner':''}"><div class="v187-re-head"><div class="v187-re-logo">${p.icon}</div><div><div class="name">${escHtml(p.name)}</div><small class="sub">현재 건물가치 <span data-v192-building="${p.id}">${fmt(reBuildingValue(p))}원</span> · 임대율 <span data-v192-occ="${p.id}">${reDynamicOccupancy(p).toFixed(0)}%</span></small></div>${reBadge(p)}</div><div class="v187-re-stats"><div class="v187-re-stat"><small>현재 평가액</small><b>${fmt(reCurrentValue(p))}원</b></div><div class="v187-re-stat"><small>기준가 대비</small><b data-v192-change="${p.id}" class="${reMarketChange(p)<0?'down':'gain'}">${reMarketChange(p)>=0?'+':''}${reMarketChange(p).toFixed(1)}%</b></div><div class="v187-re-stat"><small>1시간 예상수익</small><b data-v192-income="${p.id}" class="gain">+${fmt(reCycleIncome(p))}원</b></div></div><div class="v187-re-gauge"><i style="width:${Math.min(100,s*100)}%"></i></div><div class="v187-re-gauge-label"><span>내 지분 ${(s*100).toFixed(2)}% · 매입원금 ${fmt(reCost(p.id))}원</span><span>🏢 건물주 90%</span></div><div class="v187-re-rank">${ranks.length?ranks.map((r,i)=>`<div class="v187-re-rank-row ${r.me?'me':''}"><span>${['🥇','🥈','🥉'][i]||'·'}</span><span>${escHtml(r.name)}</span><b>${(r.share*100).toFixed(2)}%</b></div>`).join(''):'<div class="v187-re-rank-row"><span>·</span><span>아직 투자자가 없어요</span><b>0%</b></div>'}</div>${owner?`<div class="v187-re-owner-note">${s>=.999999999?'🏢 모든 지분을 보유한 단독 건물주예요.':'🏢 90% 이상 지분을 확보해 건물주가 되었어요.'} 1시간 유지 후 건물주 보너스가 정산됩니다.</div>`:''}<div class="v187-re-gauge-label"><span>남은 투자 가능액</span><b>${fmt(avail)}원</b></div><div class="v187-re-actions"><button class="primary" data-v187-invest="${p.id}" ${!ready||avail<RE_MIN?'disabled':''}>${!ready?(RE_SHARED.error||Store.connectionState==='error'?'연결 오류':'연결 중'):avail>=RE_MIN?'지분 투자하기':'모집 완료'}</button><button class="ghost" data-v187-withdraw="${p.id}" ${!ready||reCost(p.id)<RE_MIN?'disabled':''}>회수</button></div></div>`;
 }
+function reConnectionLabel(){
+  if(RE_SHARED.error==='connection-slow')return '서버 응답이 늦어지고 있어요. 인터넷 연결을 확인해주세요.';
+  if(RE_SHARED.error)return '공동지분 연결 오류';
+  if(Store.connectionState==='error')return 'Firebase 연결 실패 · 새로고침 후 다시 시도해주세요.';
+  if(Store.connectionState==='slow')return 'Firebase 연결 지연 · 인터넷 연결을 확인해주세요.';
+  return 'Firebase 공동지분 연결 중';
+}
+function reListenerFailed(error,fallback){
+  RE_SHARED.error=error?.code||fallback;
+  RE_SHARED.ready=false;
+  RE_SHARED.buildingUnsub?.();RE_SHARED.userUnsub?.();
+  clearTimeout(RE_SHARED.accrueTimer);
+  reRenderSoon();
+}
+
 function reDiscover(){
   reAccrue();const pending=Math.max(0,+state?.realEstatePending||0),perCycle=RE_META.reduce((a,p)=>a+reCycleIncome(p),0),owned=RE_META.filter(p=>reCost(p.id)>0).length,sm=reMarketSummary();
-  return shell(`${header('발견')}${reMenu()}<div class="v187-re-board"><div class="card"><small>내 부동산 평가액</small><strong>${fmt(rePortfolioMarketValue())}원</strong></div><div class="card"><small>1시간 예상수익</small><strong class="gain">+${fmt(perCycle)}원</strong></div><div class="card"><small>부동산 시장</small><strong data-v192-regime>${sm.label}</strong></div><div class="card"><small>게임 기준금리</small><strong data-v192-rate>${sm.rate.toFixed(2)}%</strong></div></div><div class="v187-re-claim"><div class="v187-re-claim-head"><div><small>미수령 임대수익</small><strong class="gain" data-v187-pending>+${fmt(pending)}원</strong></div><button class="primary" data-v187-claim ${!reOnlineReady()||pending<=0?'disabled':''}>정산금 받기</button></div><div class="v187-re-countdown">보유 ${owned}개 · ${reOnlineReady()?`다음 정산까지 약 <b data-v187-countdown>${reTime(reNextMs())}</b>`:'Firebase 공동지분 연결 중'}</div></div><div class="v187-re-note">모든 참가자가 같은 건물의 100% 지분을 나눠 갖습니다. 지분 변경은 Firebase transaction으로 처리되어 동시에 투자해도 100%를 넘을 수 없어요. 시세와 1시간 정산은 서버시간 기준이며, 전액 회수해도 이미 쌓인 미수령 정산금은 그대로 남습니다. 실제 건물명은 게임 연출용이며 기준가·시세·임대수익은 실제 자산가치와 무관한 모의 수치입니다.</div><h2 class="v187-re-list-title">부동산 지분 투자</h2>${RE_META.map(reCard).join('')}${RE_SHARED.error?`<div class="v187-re-note" style="margin-top:18px">부동산 서버 연결 오류: ${escHtml(String(RE_SHARED.error))}<br>배포용 Firestore 규칙이 적용됐는지 확인해주세요.</div>`:''}`,'discover');
+  return shell(`${header('발견')}${reMenu()}<div class="v187-re-board"><div class="card"><small>내 부동산 평가액</small><strong>${fmt(rePortfolioMarketValue())}원</strong></div><div class="card"><small>1시간 예상수익</small><strong class="gain">+${fmt(perCycle)}원</strong></div><div class="card"><small>부동산 시장</small><strong data-v192-regime>${sm.label}</strong></div><div class="card"><small>게임 기준금리</small><strong data-v192-rate>${sm.rate.toFixed(2)}%</strong></div></div><div class="v187-re-claim"><div class="v187-re-claim-head"><div><small>미수령 임대수익</small><strong class="gain" data-v187-pending>+${fmt(pending)}원</strong></div><button class="primary" data-v187-claim ${!reOnlineReady()||pending<=0?'disabled':''}>정산금 받기</button></div><div class="v187-re-countdown">보유 ${owned}개 · ${reOnlineReady()?`다음 정산까지 약 <b data-v187-countdown>${reTime(reNextMs())}</b>`:reConnectionLabel()}</div></div><div class="v187-re-note">모든 참가자가 같은 건물의 100% 지분을 나눠 갖습니다. 지분 변경은 Firebase transaction으로 처리되어 동시에 투자해도 100%를 넘을 수 없어요. 시세와 1시간 정산은 서버시간 기준이며, 전액 회수해도 이미 쌓인 미수령 정산금은 그대로 남습니다. 실제 건물명은 게임 연출용이며 기준가·시세·임대수익은 실제 자산가치와 무관한 모의 수치입니다.</div><h2 class="v187-re-list-title">부동산 지분 투자</h2>${RE_META.map(reCard).join('')}${RE_SHARED.error?`<div class="v187-re-note" style="margin-top:18px">부동산 서버 연결 오류: ${escHtml(String(RE_SHARED.error))}<br>${RE_SHARED.booting?'응답을 기다리는 중입니다. 인터넷 연결을 확인해주세요.':'<button class="ghost" data-re-retry>연결 다시 시도</button>'}</div>`:''}`,'discover');
 }
 const RE_DISCOVER_BASE=discover;discover=function v212Discover(watch=false){
   if(!watch&&assetFilter==='realestate'){
-    if(!RE_SHARED.ready&&!RE_SHARED.booting)queueMicrotask(()=>reWaitBootstrap(0,true));
+    if(!RE_SHARED.ready&&!RE_SHARED.booting&&!RE_SHARED.error)queueMicrotask(()=>reWaitBootstrap(0,true));
     return reDiscover();
   }
   const html=RE_DISCOVER_BASE(watch);return watch?html:reInjectMenu(html);
@@ -13297,7 +13325,7 @@ const RE_LOG_BASE=openTradeLog;
 openTradeLog=function v210TradeLog(){RE_LOG_BASE();const list=document.querySelector('.overlay:last-of-type .log-list');if(!list||!state?.realEstateLog?.length)return;for(const x of [...state.realEstateLog].sort((a,b)=>(+a.at||0)-(+b.at||0))){const p=RE_MAP.get(x.id),el=document.createElement('div');el.className='log-row';const title=x.type==='invest'?`부동산 투자 · ${p?.name||''}`:x.type==='withdraw'?`부동산 회수 · ${p?.name||''}`:x.type==='acquire'?`🏢 건물주 달성 · ${p?.name||''}`:'부동산 임대수익',amount=x.type==='invest'?`-${fmt(x.amount)}원`:x.type==='withdraw'?`+${fmt(Number.isFinite(+x.net)?+x.net:x.amount)}원`:x.type==='income'?`+${fmt(x.amount)}원`:'지분 '+((+x.share||0)*100).toFixed(2)+'%';el.innerHTML=`<b>${escHtml(title)}</b><b class="${x.type==='invest'?'down':x.type==='withdraw'&&(+x.realized||0)<0?'down':'gain'}">${amount}</b><small>${new Date(+x.at||0).toLocaleString('ko-KR')}${p&&x.type!=='income'?` · 지분 ${((+x.share||0)*100).toFixed(2)}%`:''}${x.type==='withdraw'&&Number.isFinite(+x.realized)?` · 실현손익 ${x.realized>=0?'+':''}${fmt(x.realized)}원`:''}</small>`;list.insertAdjacentElement('afterbegin',el)}};
 
 const RE_BIND_BASE=bind;
-bind=function v210Bind(){RE_BIND_BASE();document.querySelectorAll('[data-v187-invest]').forEach(b=>b.onclick=()=>reOpenInvest(b.dataset.v187Invest));document.querySelectorAll('[data-v187-withdraw]').forEach(b=>b.onclick=()=>reOpenWithdraw(b.dataset.v187Withdraw));document.querySelector('[data-v187-claim]')?.addEventListener('click',reClaim);document.querySelectorAll('[data-v191-re-home]').forEach(el=>{el.onclick=()=>reOpenWithdraw(el.dataset.v191ReHome);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click()}}});const homeClaim=document.querySelector('[data-v200-home-claim]');if(homeClaim){homeClaim.onclick=()=>reClaim();homeClaim.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();homeClaim.click()}}}};
+bind=function v210Bind(){RE_BIND_BASE();document.querySelector('[data-re-retry]')?.addEventListener('click',()=>reBootstrap());document.querySelectorAll('[data-v187-invest]').forEach(b=>b.onclick=()=>reOpenInvest(b.dataset.v187Invest));document.querySelectorAll('[data-v187-withdraw]').forEach(b=>b.onclick=()=>reOpenWithdraw(b.dataset.v187Withdraw));document.querySelector('[data-v187-claim]')?.addEventListener('click',reClaim);document.querySelectorAll('[data-v191-re-home]').forEach(el=>{el.onclick=()=>reOpenWithdraw(el.dataset.v191ReHome);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click()}}});const homeClaim=document.querySelector('[data-v200-home-claim]');if(homeClaim){homeClaim.onclick=()=>reClaim();homeClaim.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();homeClaim.click()}}}};
 
 const RE_REFRESH_BASE=refreshLive;
 refreshLive=function v210RefreshLive(){const out=RE_REFRESH_BASE();reAccrue();if(assetFilter!=='realestate')return out;const pending=document.querySelector('[data-v187-pending]');if(pending)pending.textContent=`+${fmt(+state?.realEstatePending||0)}원`;const claim=document.querySelector('[data-v187-claim]');if(claim)claim.disabled=!reOnlineReady()||(+state?.realEstatePending||0)<=0;const cd=document.querySelector('[data-v187-countdown]');if(cd)cd.textContent=reTime(reNextMs());const now=reClockNow();if(now-RE_UI_LAST>=15000){RE_UI_LAST=now;const sm=reMarketSummary(now),regime=document.querySelector('[data-v192-regime]'),rate=document.querySelector('[data-v192-rate]');if(regime)regime.textContent=sm.label;if(rate)rate.textContent=sm.rate.toFixed(2)+'%';for(const p of RE_META){const b=document.querySelector(`[data-v192-building="${p.id}"]`);if(b)b.textContent=fmt(reBuildingValue(p,now))+'원';const o=document.querySelector(`[data-v192-occ="${p.id}"]`);if(o)o.textContent=reDynamicOccupancy(p,now).toFixed(0)+'%';const ch=document.querySelector(`[data-v192-change="${p.id}"]`);if(ch){const r=reMarketChange(p,now);ch.textContent=(r>=0?'+':'')+r.toFixed(1)+'%';ch.className=r<0?'down':'gain'}const inc=document.querySelector(`[data-v192-income="${p.id}"]`);if(inc)inc.textContent='+'+fmt(reCycleIncome(p,now))+'원'}}return out};
@@ -13590,12 +13618,14 @@ window.__v211HomeProfitFoldFix={
 // FIFO eviction limits memory; recomputation produces the same value.
 (function(){
   function memoSeed(prefix,base){
-    const cache=new Map(),limit=30000;
+    const cache=new Map(),limit=30000,keys=new Array(limit);
+    let cursor=0;
     return function(...args){
       const key=[prefix,...args].join('|');
       if(cache.has(key))return cache.get(key);
       const value=base(...args);
-      if(cache.size>=limit)cache.delete(cache.keys().next().value);
+      if(cache.size>=limit)cache.delete(keys[cursor]);
+      keys[cursor]=key;cursor=(cursor+1)%limit;
       cache.set(key,value);
       return value;
     };
